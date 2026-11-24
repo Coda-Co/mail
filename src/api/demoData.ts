@@ -282,7 +282,7 @@ export function buildDemoState(now: Date): DemoState {
     calendars,
     events,
     signatures,
-    settings: { theme: 'light', notifications: true, ctrlF: 'forward', mcpEnabled: false, mcpAllowSend: false, remoteImageSenders: [] },
+    settings: { theme: 'light', notifications: true, ctrlF: 'forward', mcpEnabled: false, mcpAllowSend: false, remoteImageSenders: [], remoteImages: 'show' },
     serverOnly,
   };
 }

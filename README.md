@@ -11,7 +11,7 @@ A lightweight, fast replacement for Outlook on Windows and macOS: mail, calendar
 | Milestone | State |
 |---|---|
 | 1. Spikes | **Not done; they need the real platforms.** Web view isolation is built (WebView2 user data folder on Windows, WKWebView data store id on macOS 14+, plus the one-window-per-account fallback), but it is untested on Windows and macOS. Graph sign-in and admin consent are built, but untested against real tenants: that needs the app registration ([docs/APP_REGISTRATION.md](docs/APP_REGISTRATION.md)). |
-| 2. Read-only mail | Built. Accounts, unified inbox with tabs, folders per scope, reading pane, offline SQLite store, message delta sync, sanitised HTML with remote images blocked per sender, attachments on demand. |
+| 2. Read-only mail | Built. Accounts, unified inbox with tabs, folders per scope, reading pane, offline SQLite store, message delta sync, sanitised HTML with remote images shown by default (blocked in Junk, or always when set to ask), attachments on demand. |
 | 3. Write mail | Built. Reply at the top of the conversation, compose, pop-out and dock back, outbox (works offline; an unknown send result is held and never repeated), drafts autosaved to the server, archive, delete, flag, rich signatures that swap when From changes. |
 | 4. Search and people | Built. FTS5 local index, search filters the current view, facets (From, To, Has attachment, Unread, Date, Account), contact card, "Search the server", people ranked by recency and frequency. |
 | 5. Calendar | Built. Day, work week and month views, accounts overlaid and toggleable, event panel with Going / Maybe / No, create and edit, agenda panel, reminders. |

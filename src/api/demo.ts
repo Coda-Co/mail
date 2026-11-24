@@ -43,7 +43,11 @@ function load(): DemoState {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as DemoState;
-        if (parsed.version === DEMO_VERSION) return recount(parsed);
+        if (parsed.version === DEMO_VERSION) {
+          // Settings added since this state was saved take their defaults.
+          parsed.settings = { ...parsed.settings, remoteImages: parsed.settings.remoteImages ?? 'show' };
+          return recount(parsed);
+        }
       }
     } catch {
       /* storage unavailable: start fresh */
@@ -156,7 +160,9 @@ function draftSummary(d: Draft): MessageSummary {
 const REMOTE_IMG = /<img\b[^>]*\bsrc=["']https?:[^"']*["'][^>]*>/gi;
 
 function view(m: Message): Message {
-  const allowed = state.settings.remoteImageSenders.includes(m.from.email.toLowerCase()) || shownOnce.has(m.id);
+  const inJunk = state.folders.some((f) => f.id === m.folderId && f.role === 'junk');
+  const showByDefault = state.settings.remoteImages === 'show' && !inJunk;
+  const allowed = showByDefault || state.settings.remoteImageSenders.includes(m.from.email.toLowerCase()) || shownOnce.has(m.id);
   const hasRemote = REMOTE_IMG.test(m.bodyHtml);
   REMOTE_IMG.lastIndex = 0;
   if (!hasRemote || allowed) return { ...clone(m), remoteImagesBlocked: false };

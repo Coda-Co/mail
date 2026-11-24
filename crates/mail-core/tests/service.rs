@@ -231,15 +231,13 @@ fn reminders_fire_once_in_window() {
     assert!(later.is_empty());
 }
 
-#[test]
-fn remote_images_per_sender() {
-    let (svc, ids) = setup();
+fn store_image_mail(svc: &MailService, account: &str, id: &str, folder: &str) -> String {
     svc.store_messages(
-        &ids.coda,
+        account,
         &[mail_core::db::account::MessageRecord {
-            id: "m-img".into(),
-            folder_id: "inbox".into(),
-            conversation_id: "c-img".into(),
+            id: id.into(),
+            folder_id: folder.into(),
+            conversation_id: format!("c-{id}"),
             from: Address::new("News", "news@letter.example"),
             subject: "Pictures".into(),
             body_html: Some("<p>Hi</p><img src=\"https://letter.example/pixel.gif\">".into()),
@@ -248,7 +246,43 @@ fn remote_images_per_sender() {
         }],
     )
     .unwrap();
-    let id = format!("{}:m-img", ids.coda);
+    format!("{account}:{id}")
+}
+
+#[test]
+fn remote_images_show_by_default_except_in_junk() {
+    let (svc, ids) = setup();
+    assert_eq!(svc.settings().unwrap().remote_images, "show");
+    let inbox = store_image_mail(&svc, &ids.coda, "m-img", "inbox");
+    let m = svc.get_message(&inbox).unwrap();
+    assert!(!m.remote_images_blocked);
+    assert!(m.body_html.contains("pixel.gif"));
+
+    svc.with_account(&ids.coda, |db| db.upsert_folder("junk", "Junk Email", Some(FolderRole::Junk), None, 0)).unwrap();
+    let junk = store_image_mail(&svc, &ids.coda, "m-junk", "junk");
+    let m = svc.get_message(&junk).unwrap();
+    assert!(m.remote_images_blocked, "Junk stays blocked");
+    assert!(!m.body_html.contains("pixel.gif"));
+    assert!(svc.show_remote_images_once(&junk).unwrap().body_html.contains("pixel.gif"));
+    svc.allow_remote_images("news@letter.example").unwrap();
+    assert!(!svc.get_message(&junk).unwrap().remote_images_blocked, "an allowed sender loads even in Junk");
+}
+
+#[test]
+fn settings_saved_before_remote_images_existed_still_load() {
+    let svc = MailService::in_memory().unwrap();
+    svc.app().kv_set("app", r#"{"theme":"dark","notifications":false,"ctrlF":"find","mcpEnabled":false,"mcpAllowSend":false,"remoteImageSenders":["a@b.example"]}"#).unwrap();
+    let s = svc.settings().unwrap();
+    assert_eq!(s.theme, "dark", "older settings kept, not reset");
+    assert_eq!(s.remote_images, "show");
+    assert!(svc.update_settings(&SettingsPatch { remote_images: Some("never".into()), ..Default::default() }).is_err());
+}
+
+#[test]
+fn remote_images_per_sender() {
+    let (svc, ids) = setup();
+    svc.update_settings(&SettingsPatch { remote_images: Some("ask".into()), ..Default::default() }).unwrap();
+    let id = store_image_mail(&svc, &ids.coda, "m-img", "inbox");
     let m = svc.get_message(&id).unwrap();
     assert!(m.remote_images_blocked);
     assert!(!m.body_html.contains("pixel.gif"));

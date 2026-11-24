@@ -49,6 +49,25 @@ function GeneralTab() {
         </span>
       </div>
       <div className="settings-group">
+        <h3>Images</h3>
+        <div className="form-row">
+          <label htmlFor="remote-images">Images in mail</label>
+          <select
+            id="remote-images"
+            className="select"
+            style={{ maxWidth: 260 }}
+            value={settings.remoteImages}
+            onChange={(e) => updateSettings({ remoteImages: e.target.value as 'show' | 'ask' })}
+          >
+            <option value="show">Show automatically</option>
+            <option value="ask">Ask before showing</option>
+          </select>
+        </div>
+        <span className="hint">
+          Images load from the sender’s server, which can tell them when you opened the message. Images in Junk are never shown automatically. Senders you choose to always show are allowed either way.
+        </span>
+      </div>
+      <div className="settings-group">
         <h3>Data on this device</h3>
         <span className="hint">
           Mail for Graph accounts is stored on this device so it works offline. Full-disk encryption (BitLocker or FileVault) is{' '}

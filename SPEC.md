@@ -72,7 +72,7 @@ Each account has one of two backends. The interface treats them the same where i
 - **Send** goes through an outbox queue: works offline, sends on reconnect. A send whose result is unknown is held and flagged, never sent twice.
 - **From** defaults to the account the message came in on.
 - **Signatures** (v1): rich formatting (bold, italic, links, colour, line breaks, an inline logo image). One or more per account, with a default for new messages and a default for replies and forwards. Inserted when a draft opens and swapped when From changes. Edited in Settings with a small rich-text editor. Stored locally on each device; syncing signatures between devices is out of scope for v1.
-- HTML mail rendered in a sandboxed view. Remote images blocked by default, allowed per sender.
+- HTML mail rendered in a sandboxed view. Remote images shown by default, except in Junk; a setting switches to "ask before showing", and senders can be always allowed.
 - Attachments downloaded on demand, cached locally.
 
 ### 3.2 Search

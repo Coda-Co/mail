@@ -368,12 +368,21 @@ impl MailService {
         Ok(all.into_iter().skip(offset.max(0) as usize).take(limit as usize).collect())
     }
 
-    fn allow_remote_for(&self, sender: &str) -> Result<bool> {
-        Ok(self.app().settings()?.remote_image_senders.iter().any(|s| s.eq_ignore_ascii_case(sender)))
+    /// Remote images load by default, except in Junk (a loaded image confirms the address
+    /// to a spammer) or when the user chose "ask". Senders they allowed always load.
+    fn allow_remote_for(&self, sender: &str, in_junk: bool) -> Result<bool> {
+        let s = self.app().settings()?;
+        Ok((s.remote_images == "show" && !in_junk) || s.remote_image_senders.iter().any(|e| e.eq_ignore_ascii_case(sender)))
+    }
+
+    fn in_junk(&self, m: &Message) -> Result<bool> {
+        let (acc, raw_folder) = ids::split(&m.summary.folder_id)?;
+        let folders = self.with_account(acc, |db| db.folder_ids())?;
+        Ok(folders.iter().any(|(id, role)| id == raw_folder && *role == Some(FolderRole::Junk)))
     }
 
     fn render(&self, mut m: Message, force_remote: bool) -> Result<Message> {
-        let allow = force_remote || self.allow_remote_for(&m.summary.from.email)?;
+        let allow = force_remote || self.allow_remote_for(&m.summary.from.email, self.in_junk(&m)?)?;
         let inline = html::inline_data_urls(&m.attachments);
         let body = if m.body_html.is_empty() { crate::text::text_to_html(&m.summary.snippet) } else { m.body_html.clone() };
         let s = html::sanitize_mail_for_display(&body, allow, &inline);

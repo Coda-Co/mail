@@ -221,6 +221,12 @@ impl AppDb {
             s.remote_image_senders.sort();
             s.remote_image_senders.dedup();
         }
+        if let Some(v) = &p.remote_images {
+            if !["show", "ask"].contains(&v.as_str()) {
+                return Err(Error::Invalid(format!("remoteImages {v}")));
+            }
+            s.remote_images = v.clone();
+        }
         self.conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('app', ?1)", [to_json(&s)])?;
         Ok(s)
     }

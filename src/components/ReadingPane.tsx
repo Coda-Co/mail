@@ -19,7 +19,7 @@ function recipients(m: Message, meName: string, myEmails: string[]): string {
 }
 
 function MessageView({ message, expanded, onExpand, onChanged }: { message: Message; expanded: boolean; onExpand: () => void; onChanged: (m: Message) => void }) {
-  const { accountById, me, accounts } = useApp();
+  const { accountById, me, accounts, settings } = useApp();
   const acc = accountById(message.accountId);
   const myEmails = accounts.map((a) => a.email.toLowerCase());
   if (!expanded) {
@@ -53,7 +53,8 @@ function MessageView({ message, expanded, onExpand, onChanged }: { message: Mess
       </div>
       {message.remoteImagesBlocked && (
         <div className="images-bar">
-          <span>Remote images blocked</span>
+          {/* With images on, only Junk blocks them. */}
+          <span>{settings.remoteImages === 'ask' ? 'Remote images blocked' : 'Images are hidden in Junk'}</span>
           <button type="button" className="link-button" onClick={async () => onChanged(await api.showRemoteImagesOnce(message.id))}>
             Show images
           </button>

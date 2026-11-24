@@ -577,6 +577,14 @@ pub struct Settings {
     pub mcp_enabled: bool,
     pub mcp_allow_send: bool,
     pub remote_image_senders: Vec<String>,
+    /// "show": load remote images (except in Junk); "ask": block until shown or the
+    /// sender is allowed. Defaulted so settings saved before it existed still load.
+    #[serde(default = "default_remote_images")]
+    pub remote_images: String,
+}
+
+fn default_remote_images() -> String {
+    "show".into()
 }
 
 impl Default for Settings {
@@ -588,6 +596,7 @@ impl Default for Settings {
             mcp_enabled: false,
             mcp_allow_send: false,
             remote_image_senders: vec![],
+            remote_images: default_remote_images(),
         }
     }
 }
@@ -601,6 +610,7 @@ pub struct SettingsPatch {
     pub mcp_enabled: Option<bool>,
     pub mcp_allow_send: Option<bool>,
     pub remote_image_senders: Option<Vec<String>>,
+    pub remote_images: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

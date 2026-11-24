@@ -236,6 +236,8 @@ export interface Settings {
   /** Always false in v1: agents create drafts, the user sends. */
   mcpAllowSend: boolean;
   remoteImageSenders: string[];
+  /** 'show': load remote images except in Junk; 'ask': block until shown or the sender is allowed. */
+  remoteImages: 'show' | 'ask';
 }
 
 export interface SyncStatus {
