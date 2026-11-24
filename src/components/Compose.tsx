@@ -7,6 +7,7 @@ import { AddressField } from './AddressField';
 import { RichEditor, type RichEditorHandle } from './RichEditor';
 import { useToast } from './ui';
 import { MessageBody } from './MessageBody';
+import { FileIcon } from './FileIcon';
 import { keyLabel, isMac } from '../lib/platform';
 import { matches } from '../lib/shortcuts';
 import { formatSize } from '../lib/text';
@@ -239,7 +240,7 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
     <div className="attachments draft-attachments">
       {draft.attachments.map((a) => (
         <span key={a.id} className="attachment-chip">
-          <Paperclip size={14} />
+          <FileIcon name={a.name} contentType={a.contentType} />
           <span className="name">{a.name}</span>
           <span className="size">{formatSize(a.size)}</span>
           <button type="button" className="remove" aria-label={`Remove ${a.name}`} onClick={() => removeAttachment(a.id)}>

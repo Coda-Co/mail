@@ -24,6 +24,10 @@ const MAIL_DELTA_VERSION: &str = "2";
 /// Graph accepts simple attachments up to 3 MB; larger ones use an upload session.
 const SMALL_ATTACHMENT: u64 = 3 * 1024 * 1024;
 const CHUNK: usize = 5 * 320 * 1024;
+/// Background attachment caching per run: (attachment lists fetched, bytes downloaded).
+/// Older backlog catches up over later cycles, so syncing new mail is never held up for long.
+const ATTACHMENT_BUDGET_FULL: (i64, i64) = (50, 200 * 1024 * 1024);
+const ATTACHMENT_BUDGET_INBOX: (i64, i64) = (10, 25 * 1024 * 1024);
 
 #[derive(Debug, Default, Clone)]
 pub struct SyncReport {
@@ -102,6 +106,14 @@ impl<'a> Syncer<'a> {
             }
             Err(e) => return Err(e),
         }
+        match self.sync_attachments(ATTACHMENT_BUDGET_INBOX, &mut report).await {
+            Ok(()) => {}
+            Err(e) if e.is_network() => {
+                report.offline = true;
+                return Ok(report);
+            }
+            Err(e) => return Err(e),
+        }
         // Keep "last synced" current, without overwriting an offline or error state.
         if self.account.sync_state == SyncState::Idle {
             self.svc.app().set_sync_state(self.acc(), SyncState::Idle, None)?;
@@ -125,8 +137,10 @@ impl<'a> Syncer<'a> {
         self.sync_me().await?;
         self.sync_folders().await?;
         self.sync_messages(report).await?;
+        self.sync_attachments(ATTACHMENT_BUDGET_FULL, report).await?;
         self.sync_calendars(report).await?;
         self.prune_bodies()?;
+        self.prune_attachments()?;
         Ok(())
     }
 
@@ -321,6 +335,38 @@ impl<'a> Syncer<'a> {
         })
     }
 
+    /// Delete cached attachment files that no longer belong to mail inside the offline window
+    /// (it slid out, or the message was deleted). Old attachments still open on demand: they're
+    /// downloaded again. Files touched in the last hour are left for a later cycle, so one just
+    /// opened from an old message isn't pulled from under the app showing it, and a file that
+    /// can't be removed (open elsewhere on Windows) is simply tried again next time.
+    fn prune_attachments(&self) -> Result<()> {
+        let start = self.window_start();
+        let keep: HashSet<String> = self.db(|db| db.cached_attachment_paths_since(&start))?.into_iter().collect();
+        let root = self.svc.paths.attachments_dir(self.acc());
+        let Ok(dirs) = std::fs::read_dir(&root) else { return Ok(()) };
+        let recent = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+        let mut removed = vec![];
+        for dir in dirs.flatten().map(|d| d.path()).filter(|p| p.is_dir()) {
+            for file in std::fs::read_dir(&dir).into_iter().flatten().flatten().map(|f| f.path()) {
+                let p = file.to_string_lossy().to_string();
+                let touched = std::fs::metadata(&file).and_then(|m| m.modified()).map(|t| t > recent).unwrap_or(true);
+                if keep.contains(&p) || touched {
+                    continue;
+                }
+                match std::fs::remove_file(&file) {
+                    Ok(()) => removed.push(p),
+                    Err(e) => tracing::debug!("keeping {p} for now: {e}"),
+                }
+            }
+            let _ = std::fs::remove_dir(&dir); // only succeeds once empty
+        }
+        if !removed.is_empty() {
+            self.db(|db| db.clear_attachment_paths(&removed))?;
+        }
+        Ok(())
+    }
+
     /// Fetch the body of a header-only message (opened from outside the offline window).
     pub async fn fetch_message(&self, raw_id: &str) -> Result<()> {
         let v = self.graph.get(&format!("/me/messages/{}?$select={}", quote(raw_id), MESSAGE_SELECT)).await?;
@@ -332,8 +378,23 @@ impl<'a> Syncer<'a> {
     pub async fn ensure_attachments(&self, raw_id: &str) -> Result<bool> {
         let m = self.db(|db| db.get_message(raw_id))?;
         let needs = m.message.summary.has_attachments || m.message.body_html.contains("cid:");
-        if !needs || self.db(|db| db.has_attachment_rows(raw_id))? {
+        if !needs {
             return Ok(false);
+        }
+        if self.db(|db| Ok(db.attachments_checked(raw_id)? || db.has_attachment_rows(raw_id)?))? {
+            // Known list: bring back inline images pruned from the cache when the message
+            // left the offline window, so the body shows them again.
+            let missing: Vec<String> = self
+                .db(|db| db.list_attachments(raw_id))?
+                .into_iter()
+                .filter(|a| a.content_id.is_some() && a.size <= 2_000_000)
+                .filter(|a| !a.local_path.as_deref().is_some_and(|p| std::path::Path::new(p).exists()))
+                .map(|a| a.id)
+                .collect();
+            for id in &missing {
+                self.download_attachment(raw_id, id).await?;
+            }
+            return Ok(!missing.is_empty());
         }
         let v = self
             .graph
@@ -354,11 +415,54 @@ impl<'a> Syncer<'a> {
                 local_path: None,
             })
             .collect();
-        self.db(|db| db.replace_attachments(raw_id, &list))?;
+        self.db(|db| {
+            db.replace_attachments(raw_id, &list)?;
+            db.set_attachments_checked(raw_id)
+        })?;
         for a in list.iter().filter(|a| a.content_id.is_some() && a.size <= 2_000_000) {
             self.download_attachment(raw_id, &a.id).await?;
         }
-        Ok(true)
+        Ok(!list.is_empty())
+    }
+
+    /// Cache attachments of mail inside the offline window so they open without a connection.
+    /// Network and sign-in errors stop the step (the cycle reports them); a refusal for one
+    /// item is recorded so it isn't retried every cycle, and anything else is retried next time.
+    pub async fn sync_attachments(&self, (max_lists, max_bytes): (i64, i64), report: &mut SyncReport) -> Result<()> {
+        let start = self.window_start();
+        let fatal = |e: &Error| e.is_network() || matches!(e, Error::Auth(_));
+        let refused = |e: &Error| matches!(e.status(), Some(s) if (400..500).contains(&s) && s != 429);
+
+        for raw_id in self.db(|db| db.messages_needing_attachment_list(&start, max_lists))? {
+            match self.ensure_attachments(&raw_id).await {
+                Ok(true) => report.messages_changed += 1,
+                Ok(false) => {}
+                Err(e) if fatal(&e) => return Err(e),
+                Err(e) if refused(&e) => {
+                    tracing::warn!("attachment list for {raw_id}: {e}");
+                    self.db(|db| db.set_attachments_checked(&raw_id))?;
+                }
+                Err(e) => tracing::warn!("attachment list for {raw_id}: {e}"),
+            }
+        }
+
+        let mut spent = 0i64;
+        for (raw_id, att_id, size) in self.db(|db| db.attachments_to_download(&start, 500))? {
+            // Always take at least one, so a file bigger than the budget still arrives.
+            if spent > 0 && spent + size > max_bytes {
+                break;
+            }
+            match self.download_attachment(&raw_id, &att_id).await {
+                Ok(_) => spent += size.max(1),
+                Err(e) if fatal(&e) => return Err(e),
+                Err(e) if refused(&e) => {
+                    tracing::warn!("attachment {att_id} of {raw_id}: {e}");
+                    self.db(|db| db.set_attachment_failed(&raw_id, &att_id))?;
+                }
+                Err(e) => tracing::warn!("attachment {att_id} of {raw_id}: {e}"),
+            }
+        }
+        Ok(())
     }
 
     /// Download to the account's cache, return the local path.

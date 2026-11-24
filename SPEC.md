@@ -73,7 +73,7 @@ Each account has one of two backends. The interface treats them the same where i
 - **From** defaults to the account the message came in on.
 - **Signatures** (v1): rich formatting (bold, italic, links, colour, line breaks, an inline logo image). One or more per account, with a default for new messages and a default for replies and forwards. Inserted when a draft opens and swapped when From changes. Edited in Settings with a small rich-text editor. Stored locally on each device; syncing signatures between devices is out of scope for v1.
 - HTML mail rendered in a sandboxed view. Remote images shown by default, except in Junk; a setting switches to "ask before showing", and senders can be always allowed.
-- Attachments downloaded on demand, cached locally.
+- Attachments in the offline window are downloaded during sync and cached locally; older ones download on demand. Cached files are removed once their mail leaves the window or is deleted.
 
 ### 3.2 Search
 

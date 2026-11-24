@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ExternalLink, FileText, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
 import type { Draft, DraftMode, Folder, Message, Thread } from '../api/types';
 import { useApp } from '../state/app';
@@ -8,6 +8,7 @@ import { fullTime } from '../lib/dates';
 import { formatSize } from '../lib/text';
 import { Avatar, Menu, useToast, type Anchor, type MenuItem } from './ui';
 import { MessageBody } from './MessageBody';
+import { FileIcon } from './FileIcon';
 import { Compose, PoppedOutDraft } from './Compose';
 
 export type Selection = { kind: 'message' | 'draft'; id: string };
@@ -76,7 +77,7 @@ function MessageView({ message, expanded, onExpand, onChanged }: { message: Mess
             .filter((a) => !a.isInline)
             .map((a) => (
               <button key={a.id} type="button" className="attachment-chip" onClick={() => api.openAttachment(message.id, a.id)} title={`Open ${a.name}`}>
-                <FileText size={14} />
+                <FileIcon name={a.name} contentType={a.contentType} />
                 <span className="name">{a.name}</span>
                 <span className="size">{formatSize(a.size)}</span>
               </button>
@@ -152,6 +153,20 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
       if (m && !m.isRead) void api.markRead([m.id], true);
     });
   }, [selection, loadThread]);
+
+  // Attachments (and inline images) arrive in the background after the thread opens and are
+  // announced with mail://changed; refresh quietly so they appear without reopening.
+  const seenMailVersion = useRef(app.mailVersion);
+  useEffect(() => {
+    if (seenMailVersion.current === app.mailVersion) return;
+    seenMailVersion.current = app.mailVersion;
+    if (selection?.kind !== 'message') return;
+    const id = selection.id;
+    api
+      .getThread(id)
+      .then((t) => setThread((cur) => (cur && cur.messages.some((m) => m.id === id) ? t : cur)))
+      .catch(() => {});
+  }, [app.mailVersion, selection]);
 
   useEffect(
     () =>

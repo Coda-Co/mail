@@ -380,3 +380,111 @@ async fn inbox_pass_fetches_new_mail_with_one_request() {
     assert_eq!(*events.new_mail.lock().unwrap(), vec!["Brand new".to_string()]);
     assert_eq!(svc.get_account(&acc.id).unwrap().sync_state, SyncState::Idle);
 }
+
+#[tokio::test]
+async fn attachments_are_cached_during_sync() {
+    let (server, svc, acc, _) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+
+    let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let rec = |id: &str, received_at: &str| mail_core::db::account::MessageRecord {
+        id: id.into(),
+        folder_id: "F-INBOX".into(),
+        conversation_id: format!("conv-{id}"),
+        subject: id.into(),
+        body_html: Some("<p>hi</p>".into()),
+        received_at: received_at.into(),
+        has_attachments: true,
+        ..Default::default()
+    };
+    // A1: deck + a cloud link (no content); A2: flagged but the server lists nothing;
+    // OLD: outside the offline window, left for on-demand download.
+    svc.store_messages(&acc.id, &[rec("A1", &now), rec("A2", &now), rec("OLD", "2001-01-01T00:00:00Z")]).unwrap();
+    Mock::given(method("GET"))
+        .and(path("/me/messages/A1/attachments"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"value": [
+            {"id": "deck", "name": "Steerco.pptx", "contentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation", "size": 4, "isInline": false},
+            {"id": "link", "name": "Shared folder", "contentType": "", "size": 0, "isInline": false}
+        ]})))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET")).and(path("/me/messages/A1/attachments/deck/$value")).respond_with(ResponseTemplate::new(200).set_body_bytes(b"PPTX".to_vec())).expect(1).mount(&server).await;
+    Mock::given(method("GET"))
+        .and(path("/me/messages/A1/attachments/link/$value"))
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({"error": {"code": "ErrorInvalidRequest", "message": "reference attachment"}})))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET")).and(path("/me/messages/A2/attachments")).respond_with(ResponseTemplate::new(200).set_body_json(json!({"value": []}))).expect(1).mount(&server).await;
+    Mock::given(method("GET")).and(path("/me/messages/OLD/attachments")).respond_with(ResponseTemplate::new(500)).expect(0).mount(&server).await;
+
+    let acc = svc.get_account(&acc.id).unwrap();
+    let r = Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    assert!(r.messages_changed >= 1, "new attachment chips are announced");
+
+    let m = svc.get_message(&format!("{}:A1", acc.id)).unwrap();
+    let deck = m.attachments.iter().find(|a| a.id == "deck").unwrap();
+    let local = deck.local_path.as_deref().expect("deck cached during sync");
+    assert_eq!(std::fs::read(local).unwrap(), b"PPTX");
+
+    // The next cycles don't ask again: not for the empty list, nor the refused link.
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    Syncer::new(&svc, &g, acc).run_inbox().await.unwrap();
+}
+
+#[tokio::test]
+async fn cached_attachments_are_pruned_outside_the_window() {
+    let (server, svc, acc, _) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+
+    let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let rec = |received_at: &str| mail_core::db::account::MessageRecord {
+        id: "P1".into(),
+        folder_id: "F-INBOX".into(),
+        conversation_id: "conv-P1".into(),
+        subject: "Deck".into(),
+        body_html: Some("<p>hi</p>".into()),
+        received_at: received_at.into(),
+        has_attachments: true,
+        ..Default::default()
+    };
+    svc.store_messages(&acc.id, &[rec(&now)]).unwrap();
+    Mock::given(method("GET"))
+        .and(path("/me/messages/P1/attachments"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"value": [{"id": "deck", "name": "Deck.pptx", "contentType": "", "size": 4, "isInline": false}]})))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET")).and(path("/me/messages/P1/attachments/deck/$value")).respond_with(ResponseTemplate::new(200).set_body_bytes(b"PPTX".to_vec())).mount(&server).await;
+    Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run().await.unwrap();
+    let id = format!("{}:P1", acc.id);
+    let cached = svc.get_message(&id).unwrap().attachments[0].local_path.clone().expect("cached");
+
+    // Leftovers: a file from a message that was since deleted, and one opened a moment ago.
+    let root = svc.paths.attachments_dir(&acc.id);
+    std::fs::create_dir_all(root.join("gone")).unwrap();
+    let orphan = root.join("gone").join("old.pdf");
+    let fresh = root.join("gone").join("just-opened.pdf");
+    std::fs::write(&orphan, b"x").unwrap();
+    std::fs::write(&fresh, b"x").unwrap();
+    let two_hours_ago = std::time::SystemTime::now() - Duration::from_secs(7200);
+    for p in [std::path::PathBuf::from(&cached), orphan.clone()] {
+        std::fs::File::options().write(true).open(&p).unwrap().set_modified(two_hours_ago).unwrap();
+    }
+
+    // Still inside the window: nothing of P1's is touched, only the orphan goes.
+    Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run().await.unwrap();
+    assert!(std::path::Path::new(&cached).exists());
+    assert!(!orphan.exists(), "deleted message's file removed");
+    assert!(fresh.exists(), "recently opened file kept for now");
+
+    // P1 slides out of the window: its file is removed and forgotten, the chip stays.
+    svc.store_messages(&acc.id, &[rec("2001-01-01T00:00:00Z")]).unwrap();
+    Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run().await.unwrap();
+    assert!(!std::path::Path::new(&cached).exists());
+    let m = svc.get_message(&id).unwrap();
+    assert_eq!(m.attachments.len(), 1, "still listed, downloads on demand");
+    assert!(m.attachments[0].local_path.is_none());
+}
