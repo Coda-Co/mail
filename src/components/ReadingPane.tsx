@@ -98,8 +98,9 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
   const [focusDraft, setFocusDraft] = useState(false);
   const [menu, setMenu] = useState<{ anchor: Anchor; items: MenuItem[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // The message the loaded thread was opened for; outside conversation view only it is shown.
+  // The message the loaded thread was opened for: shown expanded, earlier messages collapsed below.
   const [shownId, setShownId] = useState<string | null>(null);
+  const [showLater, setShowLater] = useState(false);
 
   // While the next message loads, the previous thread stays on screen (no blank flash),
   // but actions only target a thread that holds the selected message.
@@ -108,6 +109,7 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
   const scrollRef = useRef<HTMLDivElement>(null);
   const latest = useRef(0);
   const shownConversation = useRef<string | null>(null);
+  const shownMessage = useRef<string | null>(null);
   const wanted = useRef<string | null>(null);
 
   const loadThread = useCallback(async (id: string) => {
@@ -117,9 +119,12 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
       // A slower reply for an earlier click, or a refresh of a thread the user has since
       // left, must not replace what they are now looking at.
       if (req !== latest.current || (wanted.current && !t.messages.some((m) => m.id === wanted.current))) return null;
-      if (shownConversation.current !== t.conversationId) {
+      // Opening another message (even in the same conversation) starts fresh; a refresh keeps state.
+      if (shownConversation.current !== t.conversationId || shownMessage.current !== id) {
         shownConversation.current = t.conversationId;
+        shownMessage.current = id;
         setExpanded(new Set([id]));
+        setShowLater(false);
         scrollRef.current?.scrollTo(0, 0);
       }
       setThread(t);
@@ -343,15 +348,30 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
                   }}
                 />
               ))}
-            {(app.settings.conversationView ? thread.messages : thread.messages.filter((m) => m.id === shownId)).map((m, i) => (
-              <MessageView
-                key={m.id}
-                message={m}
-                expanded={i === 0 || expanded.has(m.id)}
-                onExpand={() => setExpanded((s) => new Set(s).add(m.id))}
-                onChanged={(updated) => setThread((t) => (t ? { ...t, messages: t.messages.map((x) => (x.id === updated.id ? updated : x)) } : t))}
-              />
-            ))}
+            {(() => {
+              // Newest first: messages before the opened one are later replies, after it are earlier ones.
+              const at = Math.max(0, thread.messages.findIndex((m) => m.id === shownId));
+              const later = thread.messages.slice(0, at);
+              const shown = showLater ? thread.messages : thread.messages.slice(at);
+              return (
+                <>
+                  {later.length > 0 && (
+                    <button type="button" className="link-button later-toggle" onClick={() => setShowLater((v) => !v)}>
+                      {showLater ? 'Hide later messages' : `Show ${later.length} later ${later.length === 1 ? 'message' : 'messages'}`}
+                    </button>
+                  )}
+                  {shown.map((m) => (
+                    <MessageView
+                      key={m.id}
+                      message={m}
+                      expanded={m.id === shownId || expanded.has(m.id)}
+                      onExpand={() => setExpanded((s) => new Set(s).add(m.id))}
+                      onChanged={(updated) => setThread((t) => (t ? { ...t, messages: t.messages.map((x) => (x.id === updated.id ? updated : x)) } : t))}
+                    />
+                  ))}
+                </>
+              );
+            })()}
           </div>
         )}
       </div>

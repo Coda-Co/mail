@@ -227,9 +227,6 @@ impl AppDb {
             }
             s.remote_images = v.clone();
         }
-        if let Some(v) = p.conversation_view {
-            s.conversation_view = v;
-        }
         self.conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('app', ?1)", [to_json(&s)])?;
         Ok(s)
     }

@@ -50,7 +50,7 @@ interface AppState {
 
 const Ctx = createContext<AppState | null>(null);
 
-const DEFAULT_SETTINGS: Settings = { theme: 'light', notifications: true, ctrlF: 'forward', mcpEnabled: false, mcpAllowSend: false, remoteImageSenders: [], remoteImages: 'show', conversationView: false };
+const DEFAULT_SETTINGS: Settings = { theme: 'light', notifications: true, ctrlF: 'forward', mcpEnabled: false, mcpAllowSend: false, remoteImageSenders: [], remoteImages: 'show' };
 const DEFAULT_SYNC: SyncStatus = { online: true, syncing: false, label: 'Loading…', outboxHeld: 0 };
 
 export function AppProvider({ children }: { children: ReactNode }) {

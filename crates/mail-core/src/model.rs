@@ -581,9 +581,6 @@ pub struct Settings {
     /// sender is allowed. Defaulted so settings saved before it existed still load.
     #[serde(default = "default_remote_images")]
     pub remote_images: String,
-    /// Show the whole conversation when a message is opened. Off: only the message clicked.
-    #[serde(default)]
-    pub conversation_view: bool,
 }
 
 fn default_remote_images() -> String {
@@ -600,7 +597,6 @@ impl Default for Settings {
             mcp_allow_send: false,
             remote_image_senders: vec![],
             remote_images: default_remote_images(),
-            conversation_view: false,
         }
     }
 }
@@ -615,7 +611,6 @@ pub struct SettingsPatch {
     pub mcp_allow_send: Option<bool>,
     pub remote_image_senders: Option<Vec<String>>,
     pub remote_images: Option<String>,
-    pub conversation_view: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
