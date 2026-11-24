@@ -12,11 +12,15 @@ export function WebAccountView({ accountId }: { accountId: string }) {
   const app = useApp();
   const ref = useRef<HTMLDivElement>(null);
   const account = app.accountById(accountId);
+  const exists = account !== undefined;
   const overlayOpen = app.settingsTab !== null;
 
+  // Depend on whether the account exists, not on the account object: the list is
+  // replaced on every sync and unread change, and re-running this hides and
+  // re-shows the native web view, which flickers.
   useEffect(() => {
     const el = ref.current;
-    if (!el || !account || overlayOpen) {
+    if (!el || !exists || overlayOpen) {
       api.hideWebAccounts();
       return;
     }
@@ -33,7 +37,7 @@ export function WebAccountView({ accountId }: { accountId: string }) {
       window.removeEventListener('resize', report);
       api.hideWebAccounts();
     };
-  }, [accountId, account, overlayOpen]);
+  }, [accountId, exists, overlayOpen]);
 
   if (!account) {
     return (
