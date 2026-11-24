@@ -14,6 +14,12 @@ import { plural } from '../lib/text';
 const PAGE = 100;
 const ROLE_NAMES: Record<string, string> = { inbox: 'Inbox', drafts: 'Drafts', sent: 'Sent', archive: 'Archive', deleted: 'Deleted', junk: 'Junk' };
 
+function errorText(e: unknown, fallback = 'Something went wrong'): string {
+  if (typeof e === 'string' && e) return e;
+  if (e && typeof e === 'object' && 'message' in e && typeof e.message === 'string' && e.message) return e.message;
+  return fallback;
+}
+
 function ContactCard({ result, onEmail }: { result: SearchResult; onEmail: (email: string, name: string) => void }) {
   const { accountById } = useApp();
   const toast = useToast();
@@ -58,6 +64,13 @@ export function MailView() {
   const [search, setSearch] = useState<SearchState>(() => ({ query: { text: '', scope, allFolders: false } }));
   const [result, setResult] = useState<SearchResult | null>(null);
   const [serverBusy, setServerBusy] = useState(false);
+  const [searchPending, setSearchPending] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  // Runs the pending local search now instead of after the typing delay.
+  const runSearchNow = useRef<(() => void) | null>(null);
+  // The query whose results came from the server; a sync shouldn't replace them with local ones.
+  const serverResultFor = useRef<SearchState | null>(null);
+  const toast = useToast();
   const searchInput = useRef<HTMLInputElement>(null);
   const autoSelected = useRef(false);
 
@@ -97,16 +110,43 @@ export function MailView() {
     setResult(null);
   }, [scope]);
 
-  // Search filters the current view.
+  // Search filters the current view, as you type.
   useEffect(() => {
     if (!searchActive) {
       setResult(null);
+      setSearchPending(false);
+      setSearchError(null);
+      runSearchNow.current = null;
       return;
     }
+    if (serverResultFor.current === search) return;
     let cancelled = false;
-    const t = setTimeout(() => {
-      api.search({ ...search.query, scope }).then((r) => !cancelled && setResult(r));
-    }, 120);
+    let started = false;
+    setSearchPending(true);
+    const run = () => {
+      if (started) return;
+      started = true;
+      clearTimeout(t);
+      api
+        .search({ ...search.query, scope })
+        .then(
+          (r) => {
+            if (cancelled) return;
+            setResult(r);
+            setSearchError(null);
+          },
+          (e) => {
+            if (cancelled) return;
+            setResult(null);
+            setSearchError(errorText(e));
+          },
+        )
+        .finally(() => {
+          if (!cancelled) setSearchPending(false);
+        });
+    };
+    const t = setTimeout(run, 120);
+    runSearchNow.current = run;
     return () => {
       cancelled = true;
       clearTimeout(t);
@@ -177,12 +217,28 @@ export function MailView() {
   const setTab = (tab: ListTab) => app.setScope({ ...scope, tab });
 
   const searchServer = async () => {
+    if (serverBusy) return;
+    const forQuery = search;
     setServerBusy(true);
     try {
-      setResult(await api.searchServer({ ...search.query, scope }));
+      const r = await api.searchServer({ ...forQuery.query, scope });
+      serverResultFor.current = forQuery;
+      setResult(r);
+      setSearchError(null);
+    } catch (e) {
+      toast(errorText(e, "Couldn't search the server"));
     } finally {
       setServerBusy(false);
     }
+  };
+
+  // Enter: search now. If this search has already run and found nothing here, ask the server.
+  const submitSearch = () => {
+    if (searchPending) {
+      runSearchNow.current?.();
+      return;
+    }
+    if (result && !result.fromServer && result.messages.length === 0 && search.query.text.trim()) void searchServer();
   };
 
   const panes = (
@@ -214,7 +270,11 @@ export function MailView() {
             messages === null
               ? 'Loading…'
               : searchActive
-                ? 'No messages match these filters'
+                ? searchError
+                  ? `Search failed: ${searchError}`
+                  : searchPending && !result
+                    ? 'Searching…'
+                    : 'No messages match these filters'
                 : scope.tab === 'unread'
                   ? 'No unread messages'
                   : scope.tab === 'flagged'
@@ -242,7 +302,7 @@ export function MailView() {
     return (
       <div className="mail-view">
         <div className="mail-center search-mode">
-          <SearchHeader state={search} onChange={setSearch} onClose={closeSearch} scopeLabel={scopeLabel} resultCount={result ? result.total : null} inputRef={searchInput} />
+          <SearchHeader state={search} onChange={setSearch} onClose={closeSearch} scopeLabel={scopeLabel} resultCount={result && !searchPending ? result.total : null} busy={searchPending} onSubmit={submitSearch} inputRef={searchInput} />
           {panes}
         </div>
       </div>

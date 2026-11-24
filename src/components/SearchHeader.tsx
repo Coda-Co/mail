@@ -72,6 +72,8 @@ export function SearchHeader({
   onClose,
   scopeLabel,
   resultCount,
+  busy,
+  onSubmit,
   inputRef,
 }: {
   state: SearchState;
@@ -79,6 +81,9 @@ export function SearchHeader({
   onClose: () => void;
   scopeLabel: string;
   resultCount: number | null;
+  busy?: boolean;
+  /** Enter in the search box. */
+  onSubmit?: () => void;
   inputRef: React.RefObject<HTMLInputElement>;
 }) {
   const { graphAccounts, accountById } = useApp();
@@ -105,6 +110,12 @@ export function SearchHeader({
           placeholder={`Search ${scopeLabel}`}
           value={q.text}
           onChange={(e) => set({ text: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              onSubmit?.();
+            }
+          }}
         />
         <button type="button" className="scope-chip" onClick={toggle('scope')}>
           In: {q.allFolders ? `All folders${q.accountId || q.scope.accountId ? '' : ', all accounts'}` : scopeLabel} ▾
@@ -156,7 +167,7 @@ export function SearchHeader({
           {q.accountId ? accountById(q.accountId)?.displayName : 'Account'} ▾
         </button>
         <span className="spacer" />
-        {resultCount !== null && <span className="count">{plural(resultCount, 'result')}</span>}
+        {busy ? <span className="count">Searching…</span> : resultCount !== null && <span className="count">{plural(resultCount, 'result')}</span>}
       </div>
 
       {open?.kind === 'from' && <PersonPicker anchor={open.anchor} onClose={() => setOpen(null)} onPick={(p) => set({ from: p.email }, { fromName: p.name })} />}
