@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, ExternalLink, FileText, MoreHorizontal } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
 import type { Draft, DraftMode, Folder, Message, Thread } from '../api/types';
@@ -91,7 +91,6 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
   const app = useApp();
   const toast = useToast();
   const [thread, setThread] = useState<Thread | null>(null);
-  const readTimer = useRef<ReturnType<typeof setTimeout>>();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [focusDraft, setFocusDraft] = useState(false);
@@ -123,12 +122,11 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
       return;
     }
     setExpanded(new Set([selection.id]));
-    // Mark as read after it has been open briefly, so skimming past doesn't.
+    // Mark as read as soon as it opens.
     loadThread(selection.id).then((t) => {
       const m = t?.messages.find((x) => x.id === selection.id);
-      if (m && !m.isRead) readTimer.current = setTimeout(() => api.markRead([m.id], true), 1500);
+      if (m && !m.isRead) void api.markRead([m.id], true);
     });
-    return () => clearTimeout(readTimer.current);
   }, [selection, loadThread]);
 
   useEffect(
@@ -171,8 +169,6 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
     () => {
       if (!selectedMessage) return;
       const id = selectedMessage.id;
-      // Stop the pending auto-mark-read from undoing this.
-      clearTimeout(readTimer.current);
       void api.markRead([id], false).then(() => {
         loadThread(id);
         toast('Marked as unread');
