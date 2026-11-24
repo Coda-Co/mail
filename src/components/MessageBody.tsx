@@ -4,6 +4,8 @@ import { api } from '../api';
 
 // Mail HTML is rendered in a sandboxed iframe: no scripts (sandbox without
 // allow-scripts), a strict CSP, and links opened in the system browser.
+// The base styles below are only defaults: the sender's own <style> blocks and inline
+// styles come later / are more specific, so their fonts and spacing win, as in Outlook.
 
 function srcdoc(html: string, dark: boolean): string {
   const font = new URL(fontUrl, window.location.href).href;
@@ -17,8 +19,8 @@ function srcdoc(html: string, dark: boolean): string {
 @font-face{font-family:Geist;src:url(${font}) format('woff2');font-weight:100 900}
 html{color-scheme:${dark ? 'dark' : 'light'}}
 html,body{margin:0;padding:0;background:transparent}
-body{font-family:Geist,system-ui,sans-serif;font-size:15px;line-height:1.65;color:${text};overflow-wrap:anywhere}
-p{margin:0 0 1.65em}p:last-child{margin-bottom:0}
+body{font-family:Geist,system-ui,sans-serif;font-size:15px;line-height:1.4;color:${text};overflow-wrap:anywhere}
+body>:last-child{margin-bottom:0}
 img{max-width:100%;height:auto}
 a{color:${link}}
 blockquote{margin:0 0 1em;padding-left:12px;border-left:3px solid #DDE1E6;color:#4A5260}

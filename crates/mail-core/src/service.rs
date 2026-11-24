@@ -376,7 +376,7 @@ impl MailService {
         let allow = force_remote || self.allow_remote_for(&m.summary.from.email)?;
         let inline = html::inline_data_urls(&m.attachments);
         let body = if m.body_html.is_empty() { crate::text::text_to_html(&m.summary.snippet) } else { m.body_html.clone() };
-        let s = html::sanitize_mail(&body, allow, &inline);
+        let s = html::sanitize_mail_for_display(&body, allow, &inline);
         m.body_html = s.html;
         m.remote_images_blocked = s.remote_images_blocked;
         // Inline images are shown in the body, not as attachment chips.

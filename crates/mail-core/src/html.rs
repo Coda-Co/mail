@@ -55,6 +55,56 @@ pub fn sanitize_mail(html: &str, allow_remote: bool, inline: &HashMap<String, St
     Sanitized { html: out, remote_images_blocked: blocked.load(Ordering::Relaxed) }
 }
 
+/// Sanitise a received mail body for display, keeping the sender's `<style>` blocks
+/// (Outlook puts its paragraph spacing and fonts there, e.g. `p.MsoNormal{margin:0}`).
+/// The CSS only applies inside the sandboxed message iframe.
+pub fn sanitize_mail_for_display(html: &str, allow_remote: bool, inline: &HashMap<String, String>) -> Sanitized {
+    let (css, css_blocked) = extract_styles(html, allow_remote);
+    let mut s = sanitize_mail(html, allow_remote, inline);
+    if !css.is_empty() {
+        s.html = format!("<style>{css}</style>{}", s.html);
+    }
+    s.remote_images_blocked |= css_blocked;
+    s
+}
+
+/// Collect the contents of every `<style>` element, made safe to re-emit: no `@import`,
+/// no way to close the element early, and `url(...)` removed unless remote content is allowed.
+fn extract_styles(html: &str, allow_remote: bool) -> (String, bool) {
+    let lower = html.to_ascii_lowercase();
+    let mut css = String::new();
+    let mut blocked = false;
+    let mut i = 0;
+    while let Some(p) = lower[i..].find("<style") {
+        let open = i + p;
+        let Some(gt) = lower[open..].find('>') else { break };
+        let start = open + gt + 1;
+        let end = lower[start..].find("</style").map(|e| start + e).unwrap_or(html.len());
+        let mut block = html[start..end].replace("<!--", "").replace("-->", "");
+        block = strip_css_imports(&block);
+        if !allow_remote && block.to_ascii_lowercase().contains("url(") {
+            blocked = true;
+            block = strip_css_urls(&block);
+        }
+        css.push_str(&block.replace('<', "\\3C "));
+        css.push('\n');
+        i = end;
+    }
+    (css.trim().to_string(), blocked)
+}
+
+fn strip_css_imports(css: &str) -> String {
+    let lower = css.to_ascii_lowercase();
+    let mut out = String::new();
+    let mut i = 0;
+    while let Some(p) = lower[i..].find("@import") {
+        out.push_str(&css[i..i + p]);
+        i = lower[i + p..].find(';').map(|e| i + p + e + 1).unwrap_or(css.len());
+    }
+    out.push_str(&css[i..]);
+    out
+}
+
 fn strip_css_urls(style: &str) -> String {
     let mut out = String::new();
     let lower = style.to_ascii_lowercase();
@@ -223,6 +273,23 @@ mod tests {
         let allowed = sanitize_mail("<img src=\"https://t.co/p.gif\">", true, &HashMap::new());
         assert!(!allowed.remote_images_blocked);
         assert!(allowed.html.contains("t.co"));
+    }
+
+    #[test]
+    fn display_keeps_sender_styles() {
+        let html = "<html><head><style><!--\np.MsoNormal{margin:0cm;font-family:\"Aptos\",sans-serif}\n@import url(https://x/a.css);\ndiv{background:url(https://t.co/p.gif)}\n--></style></head><body><p class=MsoNormal>Hi</p></body></html>";
+        let s = sanitize_mail_for_display(html, false, &HashMap::new());
+        assert!(s.html.starts_with("<style>"));
+        assert!(s.html.contains("p.MsoNormal{margin:0cm"));
+        assert!(s.html.contains("class=\"MsoNormal\""));
+        assert!(!s.html.contains("@import"));
+        assert!(!s.html.contains("t.co"));
+        assert!(s.remote_images_blocked);
+        let evil = sanitize_mail_for_display("<style>a{}</style ><script>x</script><style>b{content:'<img>'}</style>", false, &HashMap::new());
+        assert!(!evil.html.contains("script"));
+        assert_eq!(evil.html.matches('<').count(), 2, "{}", evil.html);
+        // Quotes in replies stay free of sender CSS.
+        assert!(!sanitize_mail(html, false, &HashMap::new()).html.contains("<style"));
     }
 
     #[test]
