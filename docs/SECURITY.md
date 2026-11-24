@@ -30,7 +30,6 @@ It does **not** request:
 - **Disk encryption.** The app relies on full-disk encryption (BitLocker or FileVault) and shows whether it is on in Settings; it does not warn when it is off.
 - **Tokens.** Sign-in tokens are kept in the operating system's credential store (Windows Credential Manager or macOS Keychain), never in files.
 - **No Coda & Co servers in the path.** The app talks directly to `login.microsoftonline.com` and `graph.microsoft.com`; no mail, calendar data or tokens are sent to Coda & Co or anyone else.
-- **AI agents.** An optional local agent bridge (MCP) is off by default. When the user turns it on, it is enabled per account and runs only on the device. Agents can read mail and create drafts, but cannot send.
 - **Removing the account** in the app deletes its local database, cached attachments and tokens.
 
 ## How to approve

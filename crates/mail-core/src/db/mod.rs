@@ -13,7 +13,7 @@ pub fn open(path: &Path) -> Result<Connection> {
         std::fs::create_dir_all(dir)?;
     }
     let conn = Connection::open(path)?;
-    // WAL lets the MCP server read while the app writes.
+    // WAL lets readers proceed while a write is in progress.
     conn.pragma_update(None, "journal_mode", "WAL")?;
     conn.pragma_update(None, "synchronous", "NORMAL")?;
     conn.pragma_update(None, "foreign_keys", "ON")?;

@@ -1,6 +1,6 @@
 # Mail
 
-A lightweight, fast replacement for Outlook on Windows and macOS: mail, calendar and people for several Microsoft 365 accounts in one window. It works offline, is keyboard first, and gives AI agents draft-only access over a local MCP server.
+A lightweight, fast replacement for Outlook on Windows and macOS: mail, calendar and people for several Microsoft 365 accounts in one window. It works offline and is keyboard first.
 
 [SPEC.md](SPEC.md) is the source of truth for behaviour. [design/](design/) holds the mockups and tokens.
 
@@ -16,8 +16,7 @@ A lightweight, fast replacement for Outlook on Windows and macOS: mail, calendar
 | 4. Search and people | Built. FTS5 local index, search filters the current view, facets (From, To, Has attachment, Unread, Date, Account), contact card, "Search the server", people ranked by recency and frequency. |
 | 5. Calendar | Built. Day, work week and month views, accounts overlaid and toggleable, event panel with Going / Maybe / No, create and edit, agenda panel, reminders. |
 | 6. Web accounts | Built. Outlook on the web in an isolated native web view per account, kept loaded in the background, with unread count and notifications captured from the page. Needs the milestone-1 check on Windows and macOS. |
-| 7. MCP server | Built. `mail-mcp` sidecar: search, read message or thread, list events, create and update drafts, create events. Off by default, per account, no sending. |
-| 8. Polish | Mostly done. Dark mode, notifications, tray/dock badge, identical shortcuts, CI and signing/update pipeline ([docs/RELEASING.md](docs/RELEASING.md)). Still to do: real certificates, update host, two weeks of daily use. |
+| 7. Polish | Mostly done. Dark mode, notifications, tray/dock badge, identical shortcuts, CI and signing/update pipeline ([docs/RELEASING.md](docs/RELEASING.md)). Still to do: real certificates, update host, two weeks of daily use. |
 
 ## Try it
 
@@ -47,11 +46,10 @@ src/                  React + TypeScript interface (Vite)
 src-tauri/            Tauri v2 shell: commands, windows, web-account views, tray, notifications
 crates/mail-core/     Everything except the window
   db/                 SQLite: app database + one database per account (FTS5 index)
-  service.rs          Local-first operations the interface and MCP server call
+  service.rs          Local-first operations the interface calls
   sync.rs             Graph delta sync, pending-operation replay, outbox rules, calendar
   graph.rs, auth.rs   Graph client (immutable ids, Retry-After) and PKCE sign-in
   html.rs             Sanitising, remote-image blocking, signatures, quoting
-crates/mail-mcp/      Local MCP server (stdio)
 docs/                 Security note for client admins, app registration, releasing, screenshots
 ```
 
@@ -72,17 +70,9 @@ Sending is a queued operation like any other, with three rules:
 
 ```bash
 pnpm typecheck && pnpm test          # interface (vitest)
-cargo test --workspace               # core, sync against a mock Graph server, MCP
+cargo test --workspace               # core, sync against a mock Graph server
 cargo clippy --workspace --all-targets -- -D warnings
 ```
-
-## Connecting an agent (MCP)
-
-1. Turn on **Settings → Agents**.
-2. Enable the accounts agents may see in **Settings → Accounts**.
-3. Paste the snippet shown in the settings panel into your MCP client. It runs the bundled `mail-mcp` with this app's data folder.
-
-Agents can search and read mail, list events, create and update drafts, and create events. They cannot send.
 
 ## Open decisions (from the spec)
 

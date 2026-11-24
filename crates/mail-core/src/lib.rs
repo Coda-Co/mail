@@ -1,5 +1,5 @@
 //! mail-core: everything except the window. Storage, Microsoft Graph sync, search,
-//! people, drafts and the outbox, used by the desktop app and the MCP server.
+//! people, drafts and the outbox, used by the desktop app.
 
 pub mod auth;
 pub mod db;

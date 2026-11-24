@@ -15,7 +15,6 @@ export interface Account {
   /** Inbox unread count. null when it cannot be read (web accounts, best effort). */
   unread: number | null;
   notifications: boolean;
-  agentsEnabled: boolean;
   /** Months of full messages kept offline (Graph accounts). */
   offlineMonths: number;
   syncState: SyncState;
@@ -234,9 +233,6 @@ export interface Settings {
   notifications: boolean;
   /** What Ctrl+F does in the mail view (open decision 4). */
   ctrlF: 'forward' | 'find';
-  mcpEnabled: boolean;
-  /** Always false in v1: agents create drafts, the user sends. */
-  mcpAllowSend: boolean;
   remoteImageSenders: string[];
   /** 'show': load remote images except in Junk; 'ask': block until shown or the sender is allowed. */
   remoteImages: 'show' | 'ask';
@@ -269,14 +265,6 @@ export type AddAccountResult =
   | { kind: 'cancelled' }
   | { kind: 'error'; message: string };
 
-export interface McpInfo {
-  enabled: boolean;
-  command: string;
-  args: string[];
-  /** JSON snippet for an MCP client config. */
-  configSnippet: string;
-}
-
 export interface Me {
   name: string;
   email: string;
@@ -293,7 +281,7 @@ export interface MailApi {
   addAccount(email: string): Promise<AddAccountResult>;
   addWebAccount(email: string, displayName: string): Promise<Account>;
   upgradeWebAccount(accountId: string): Promise<AddAccountResult>;
-  updateAccount(accountId: string, patch: Partial<Pick<Account, 'displayName' | 'color' | 'notifications' | 'agentsEnabled' | 'offlineMonths'>>): Promise<Account>;
+  updateAccount(accountId: string, patch: Partial<Pick<Account, 'displayName' | 'color' | 'notifications' | 'offlineMonths'>>): Promise<Account>;
   removeAccount(accountId: string): Promise<void>;
 
   listFolders(accountId?: string): Promise<Folder[]>;
@@ -342,7 +330,6 @@ export interface MailApi {
   syncNow(accountId?: string): Promise<void>;
   syncStatus(): Promise<SyncStatus>;
   diskEncryption(): Promise<DiskEncryption>;
-  mcpInfo(): Promise<McpInfo>;
 
   /** Open a message or draft in its own window. */
   popOut(kind: 'message' | 'draft', id: string): Promise<void>;

@@ -36,7 +36,7 @@ CREATE TABLE signatures (
   default_reply INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE calendar_visibility (calendar_id TEXT PRIMARY KEY, visible INTEGER NOT NULL);
-"#];
+"#, "ALTER TABLE accounts DROP COLUMN agents_enabled"];
 
 pub const PALETTE: [&str; 6] = ["#1F883D", "#8250DF", "#D4600F", "#0B5CC4", "#BF3989", "#1A7F8E"];
 pub const WEB_COLOR: &str = "#6E7781";
@@ -45,7 +45,7 @@ pub struct AppDb {
     pub conn: Connection,
 }
 
-const ACCOUNT_COLS: &str = "id, email, display_name, kind, color, notifications, agents_enabled, offline_months, tenant_id, web_url, web_unread, sync_state, sync_error, last_synced_at";
+const ACCOUNT_COLS: &str = "id, email, display_name, kind, color, notifications, offline_months, tenant_id, web_url, web_unread, sync_state, sync_error, last_synced_at";
 
 fn row_account(r: &Row) -> rusqlite::Result<Account> {
     let kind = AccountKind::parse(&r.get::<_, String>(3)?);
@@ -56,15 +56,14 @@ fn row_account(r: &Row) -> rusqlite::Result<Account> {
         kind,
         color: r.get(4)?,
         // Graph unread counts are filled in by the service from the account database.
-        unread: if kind == AccountKind::Web { r.get(10)? } else { None },
+        unread: if kind == AccountKind::Web { r.get(9)? } else { None },
         notifications: r.get(5)?,
-        agents_enabled: r.get(6)?,
-        offline_months: r.get(7)?,
-        tenant_id: r.get(8)?,
-        web_url: r.get(9)?,
-        sync_state: SyncState::parse(&r.get::<_, String>(11)?),
-        sync_error: r.get(12)?,
-        last_synced_at: r.get(13)?,
+        offline_months: r.get(6)?,
+        tenant_id: r.get(7)?,
+        web_url: r.get(8)?,
+        sync_state: SyncState::parse(&r.get::<_, String>(10)?),
+        sync_error: r.get(11)?,
+        last_synced_at: r.get(12)?,
     })
 }
 
@@ -151,13 +150,12 @@ impl AppDb {
     pub fn update_account(&self, id: &str, p: &AccountPatch) -> Result<Account> {
         let a = self.get_account(id)?;
         self.conn.execute(
-            "UPDATE accounts SET display_name = ?2, color = ?3, notifications = ?4, agents_enabled = ?5, offline_months = ?6 WHERE id = ?1",
+            "UPDATE accounts SET display_name = ?2, color = ?3, notifications = ?4, offline_months = ?5 WHERE id = ?1",
             params![
                 id,
                 p.display_name.clone().unwrap_or(a.display_name),
                 p.color.clone().unwrap_or(a.color),
                 p.notifications.unwrap_or(a.notifications),
-                p.agents_enabled.unwrap_or(a.agents_enabled),
                 p.offline_months.unwrap_or(a.offline_months).clamp(1, 120),
             ],
         )?;
@@ -208,13 +206,6 @@ impl AppDb {
                 return Err(Error::Invalid(format!("ctrlF {v}")));
             }
             s.ctrl_f = v.clone();
-        }
-        if let Some(v) = p.mcp_enabled {
-            s.mcp_enabled = v;
-        }
-        // Sending by agents stays off in v1 whatever is asked.
-        if p.mcp_allow_send.is_some() {
-            s.mcp_allow_send = false;
         }
         if let Some(v) = &p.remote_image_senders {
             s.remote_image_senders = v.iter().map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()).collect();
@@ -360,11 +351,8 @@ mod tests {
     }
 
     #[test]
-    fn agents_cannot_be_allowed_to_send() {
+    fn rejects_unknown_theme() {
         let db = db();
-        let s = db.update_settings(&SettingsPatch { mcp_enabled: Some(true), mcp_allow_send: Some(true), ..Default::default() }).unwrap();
-        assert!(s.mcp_enabled);
-        assert!(!s.mcp_allow_send);
         assert!(db.update_settings(&SettingsPatch { theme: Some("neon".into()), ..Default::default() }).is_err());
     }
 }

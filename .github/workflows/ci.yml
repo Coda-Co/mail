@@ -57,17 +57,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: pnpm install --frozen-lockfile
-      - name: Build the MCP sidecar
-        shell: bash
-        run: |
-          cargo build --release -p mail-mcp
-          mkdir -p src-tauri/binaries
-          ext=""; [ "${{ runner.os }}" = "Windows" ] && ext=".exe"
-          cp "target/release/mail-mcp$ext" "src-tauri/binaries/mail-mcp-${{ matrix.target }}$ext"
       - name: Build the app (unsigned)
         env:
           MAIL_APP_SECURITY_NOTE_URL: ${{ vars.MAIL_APP_SECURITY_NOTE_URL }}
-        run: pnpm tauri build -c src-tauri/tauri.bundle.conf.json
+        run: pnpm tauri build
       - uses: actions/upload-artifact@v4
         with:
           name: mail-${{ matrix.target }}
