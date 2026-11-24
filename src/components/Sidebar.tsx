@@ -60,6 +60,18 @@ export function Sidebar() {
     app.navigate({ view: 'mail' });
   };
 
+  // Sign in again to an account whose sign-in expired or was never saved.
+  const signInAgain = async (a: Account) => {
+    try {
+      const r = await api.addAccount(a.email);
+      if (r.kind === 'needsAdminApproval') setApproval(r);
+      else if (r.kind === 'error') toast(r.message);
+      else if (r.kind === 'added') toast(`Signed in to ${r.account.displayName}`);
+    } catch (err) {
+      toast(String(err));
+    }
+  };
+
   const accountMenu = (e: MouseEvent, a: Account) => {
     e.preventDefault();
     const items: MenuItem[] = [];
@@ -70,6 +82,7 @@ export function Sidebar() {
       });
       items.push({ label: 'Reload', onSelect: () => api.reloadWebAccount(a.id) });
     } else {
+      if (a.syncState === 'needsAuth') items.push({ label: 'Sign in again', onSelect: () => signInAgain(a) });
       items.push({
         label: 'Sync now',
         onSelect: () => api.syncNow(a.id),
@@ -225,12 +238,32 @@ export function Sidebar() {
                 className={`nav-item${accountSelected(a) ? ' selected' : ''}`}
                 onClick={() => (a.kind === 'web' ? app.navigate({ view: 'web', param: a.id }) : openMail(a.id, { role: 'inbox' }))}
                 onContextMenu={(e) => accountMenu(e, a)}
-                title={a.syncState === 'needsAuth' ? 'Sign in again' : a.syncState === 'error' ? a.syncError : a.email}
+                title={a.syncState === 'needsAuth' ? `Sign-in needed${a.syncError ? `: ${a.syncError}` : ''}` : a.syncState === 'error' ? a.syncError : a.email}
               >
                 <span className="acc-square" style={{ background: a.color }} />
                 <span className="label">{a.displayName}</span>
                 {a.kind === 'web' && <span className="web-tag">web</span>}
-                {a.syncState === 'needsAuth' && <span className="web-tag">sign in</span>}
+                {a.syncState === 'needsAuth' && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="web-tag sign-in-tag"
+                    title="Sign in again"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      signInAgain(a);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        signInAgain(a);
+                      }
+                    }}
+                  >
+                    sign in
+                  </span>
+                )}
                 {a.unread === null ? <span className="neutral-dot" aria-label="Unread count unavailable" /> : a.unread > 0 && <span className="count">{a.unread}</span>}
               </button>
             ))}

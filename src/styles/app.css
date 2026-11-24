@@ -468,6 +468,16 @@ h3 {
   line-height: 16px;
 }
 
+.sign-in-tag {
+  cursor: pointer;
+  color: var(--accent);
+  border-color: currentColor;
+}
+
+.sign-in-tag:hover {
+  background: var(--chip-neutral);
+}
+
 .neutral-dot {
   width: 6px;
   height: 6px;

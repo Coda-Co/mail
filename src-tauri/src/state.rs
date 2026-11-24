@@ -39,7 +39,7 @@ impl AppState {
         let tokens: Arc<dyn TokenStore> = if demo {
             Arc::new(mail_core::secrets::MemoryTokenStore::default())
         } else {
-            Arc::new(mail_core::secrets::OsKeyring::new(identifier))
+            Arc::new(mail_core::secrets::os_token_store(identifier))
         };
         AppState {
             svc,
