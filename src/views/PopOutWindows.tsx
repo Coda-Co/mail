@@ -6,6 +6,7 @@ import { MessageBody } from '../components/MessageBody';
 import { Avatar, useToast } from '../components/ui';
 import { useApp } from '../state/app';
 import { fullTime } from '../lib/dates';
+import { useCommand } from '../lib/commands';
 import { isTauri } from '../api';
 
 async function closeWindow() {
@@ -49,7 +50,9 @@ export function ComposeWindow({ draftId }: { draftId: string }) {
       layout="popout"
       autoFocus
       onDone={(outcome) => {
-        if (outcome !== 'poppedOut') closeWindow();
+        // Escape: hand the saved draft back to the main window, which closes this one.
+        if (outcome === 'closed') api.dockBack(draftId).catch(() => closeWindow());
+        else if (outcome !== 'poppedOut') closeWindow();
       }}
     />
   );
@@ -60,6 +63,7 @@ export function MessageWindow({ messageId }: { messageId: string }) {
   const { accountById } = useApp();
   const toast = useToast();
   const [message, setMessage] = useState<Message | null>(null);
+  useCommand('escape', () => void closeWindow());
   useEffect(() => {
     api.getMessage(messageId).then((m) => {
       setMessage(m);

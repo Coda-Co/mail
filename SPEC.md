@@ -123,7 +123,7 @@ Each account has one of two backends. The interface treats them the same where i
 - Light mode first; dark mode before v1 ships.
 - Keyboard shortcuts identical on both platforms (Ctrl on Windows, Cmd on Mac):
   - Ctrl+N new message, Ctrl+R reply, Ctrl+Shift+R reply all, Ctrl+F forward (to confirm: clashes with find)
-  - E archive, Delete delete, Ctrl+Enter send, Ctrl+E search, Esc close or clear
+  - E archive, Delete delete, Ctrl+Z undo (archive, delete, move), Ctrl+Enter send, Ctrl+E search, Esc close or clear (closes a draft: an unchanged reply or forward, or a new message with no content, is discarded; anything else is saved. Closes a pop-out window)
   - Ctrl+1 mail, Ctrl+2 calendar, Ctrl+3 people
 - Narrow windows: agenda panel folds away first, then the reading pane stacks.
 

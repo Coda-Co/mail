@@ -9,6 +9,7 @@ export type ShortcutId =
   | 'archive'
   | 'delete'
   | 'markUnread'
+  | 'undo'
   | 'send'
   | 'search'
   | 'escape'
@@ -33,6 +34,8 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'archive', combo: 'E', allowInInput: false },
   { id: 'delete', combo: 'Delete', allowInInput: false },
   { id: 'markUnread', combo: 'Mod+U', allowInInput: false },
+  // Not while typing, so text fields keep their own undo.
+  { id: 'undo', combo: 'Mod+Z', allowInInput: false },
   { id: 'send', combo: 'Mod+Enter', allowInInput: true },
   { id: 'search', combo: 'Mod+E', allowInInput: true },
   { id: 'escape', combo: 'Escape', allowInInput: true },

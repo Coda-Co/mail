@@ -610,6 +610,7 @@ impl MailService {
             status: DraftStatus::Editing,
             error: None,
             popped_out: false,
+            edited: false,
         };
         let raw_source = source.as_ref().map(|s| s.raw_id.clone());
         self.with_account(&account.id, |db| {
@@ -650,6 +651,7 @@ impl MailService {
                     status: DraftStatus::Editing,
                     error: None,
                     popped_out: false,
+                    edited: true,
                 };
                 db.save_draft(raw, &d, None, "user")?;
                 db.set_draft_server_id(raw, raw)?;
@@ -687,6 +689,7 @@ impl MailService {
         d.subject = draft.subject.clone();
         d.body_html = draft.body_html.clone();
         d.popped_out = draft.popped_out;
+        d.edited = true;
         d.status = DraftStatus::Editing;
         d.error = None;
         d.saved_to_server = false;
@@ -725,6 +728,7 @@ impl MailService {
         d.body_html = html::swap_signature(&old.body_html, sig.as_ref().map(|s| (s.id.as_str(), s.html.as_str())));
         d.signature_id = sig.map(|s| s.id);
         d.saved_to_server = false;
+        d.edited = true;
         d.updated_at = now_iso();
         // Replies keep their source only within the same mailbox.
         let raw_source = None;
@@ -761,6 +765,7 @@ impl MailService {
             local_path: Some(path.to_string_lossy().to_string()),
         });
         d.saved_to_server = false;
+        d.edited = true;
         d.updated_at = now_iso();
         self.with_account(acc, |db| db.save_draft(raw, &d, None, "user"))?;
         self.enqueue(acc, &Op::SaveDraft { draft_id: raw.to_string() })?;
@@ -773,6 +778,7 @@ impl MailService {
         Self::editable(&d)?;
         d.attachments.retain(|a| a.id != attachment_id);
         d.saved_to_server = false;
+        d.edited = true;
         d.updated_at = now_iso();
         self.with_account(acc, |db| db.save_draft(raw, &d, None, "user"))?;
         self.enqueue(acc, &Op::SaveDraft { draft_id: raw.to_string() })?;

@@ -10,7 +10,7 @@ import { Avatar, Menu, useToast, type Anchor, type MenuItem } from './ui';
 import { MessageBody } from './MessageBody';
 import { splitQuoted } from '../lib/quoted';
 import { FileIcon } from './FileIcon';
-import { Compose, PoppedOutDraft } from './Compose';
+import { ClosedDraft, Compose, PoppedOutDraft } from './Compose';
 
 export type Selection = { kind: 'message' | 'draft'; id: string };
 
@@ -142,6 +142,8 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
   const [draft, setDraft] = useState<Draft | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [focusDraft, setFocusDraft] = useState(false);
+  // Inline draft closed with Escape: shown collapsed until reopened.
+  const [closedDraftId, setClosedDraftId] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ anchor: Anchor; items: MenuItem[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   // The message the loaded thread was opened for: shown expanded, earlier messages collapsed below.
@@ -251,6 +253,7 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
     if (!selectedMessage) return;
     const open = thread?.drafts.find((d) => !d.poppedOut);
     if (open) {
+      setClosedDraftId(null);
       setFocusDraft(true);
       return;
     }
@@ -399,14 +402,23 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
             {inlineDraft &&
               (inlineDraft.poppedOut ? (
                 <PoppedOutDraft draft={inlineDraft} />
+              ) : inlineDraft.id === closedDraftId ? (
+                <ClosedDraft
+                  draft={inlineDraft}
+                  onOpen={() => {
+                    setClosedDraftId(null);
+                    setFocusDraft(true);
+                  }}
+                />
               ) : (
                 <Compose
                   key={inlineDraft.id}
                   initial={inlineDraft}
                   layout="inline"
                   autoFocus={focusDraft}
-                  onDone={() => {
+                  onDone={(outcome) => {
                     setFocusDraft(false);
+                    if (outcome === 'closed') setClosedDraftId(inlineDraft.id);
                     if (selection) loadThread(selection.id);
                   }}
                 />
