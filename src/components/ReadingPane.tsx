@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
 import type { Draft, DraftMode, Folder, Message, Thread } from '../api/types';
@@ -8,6 +8,7 @@ import { fullTime } from '../lib/dates';
 import { formatSize } from '../lib/text';
 import { Avatar, Menu, useToast, type Anchor, type MenuItem } from './ui';
 import { MessageBody } from './MessageBody';
+import { splitQuoted } from '../lib/quoted';
 import { FileIcon } from './FileIcon';
 import { Compose, PoppedOutDraft } from './Compose';
 
@@ -23,6 +24,8 @@ function MessageView({ message, expanded, onExpand, onChanged }: { message: Mess
   const { accountById, me, accounts, settings } = useApp();
   const acc = accountById(message.accountId);
   const myEmails = accounts.map((a) => a.email.toLowerCase());
+  const split = useMemo(() => splitQuoted(message.bodyHtml), [message.bodyHtml]);
+  const [showQuoted, setShowQuoted] = useState(false);
   if (!expanded) {
     return (
       <div className="message-block">
@@ -84,7 +87,18 @@ function MessageView({ message, expanded, onExpand, onChanged }: { message: Mess
             ))}
         </div>
       )}
-      <MessageBody html={message.bodyHtml} cacheKey={message.id} />
+      <MessageBody html={showQuoted ? message.bodyHtml : split.main} cacheKey={showQuoted || !split.hasQuote ? message.id : `${message.id}:new`} />
+      {split.hasQuote && (
+        <button
+          type="button"
+          className="quote-toggle"
+          aria-expanded={showQuoted}
+          title={showQuoted ? 'Hide quoted text' : 'Show quoted text'}
+          onClick={() => setShowQuoted((v) => !v)}
+        >
+          {showQuoted ? 'Hide quoted text' : '•••'}
+        </button>
+      )}
     </div>
   );
 }
