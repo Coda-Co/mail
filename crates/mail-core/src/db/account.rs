@@ -119,6 +119,19 @@ CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     "ALTER TABLE attachments ADD COLUMN download_failed INTEGER NOT NULL DEFAULT 0",
     // False until the user changes a new draft; existing drafts count as edited.
     "ALTER TABLE drafts ADD COLUMN edited INTEGER NOT NULL DEFAULT 1",
+    // Search by field: split "people" into sender and recipients (To and Cc), rebuilt from what's stored.
+    r#"
+CREATE VIRTUAL TABLE messages_fts_new USING fts5(subject, body, sender, recipients, tokenize = 'unicode61 remove_diacritics 2');
+INSERT INTO messages_fts_new (rowid, subject, body, sender, recipients)
+  SELECT f.rowid, f.subject, f.body, m.from_name || ' ' || m.from_email,
+    coalesce((SELECT group_concat(coalesce(json_extract(j.value, '$.name'), '') || ' ' || coalesce(json_extract(j.value, '$.email'), ''), ' ')
+       FROM (SELECT value FROM json_each(m.to_json) UNION ALL SELECT value FROM json_each(m.cc_json)) j), '')
+  FROM messages_fts f JOIN messages m ON m.pk = f.rowid;
+DROP TABLE messages_fts;
+ALTER TABLE messages_fts_new RENAME TO messages_fts;
+"#,
+    // The From filter, newest first, straight from the index.
+    "CREATE INDEX messages_from_date ON messages(from_email, received_at DESC); DROP INDEX messages_from",
 ];
 
 /// A message as stored, with raw IDs. Built by sync from Graph, or by tests and the demo seed.
@@ -361,14 +374,13 @@ impl AccountDb {
         )?;
         let pk: i64 = tx.query_row("SELECT pk FROM messages WHERE id = ?1", [&m.id], |r| r.get(0))?;
         let body_text = body.as_deref().map(crate::text::html_to_text).unwrap_or_else(|| m.snippet.clone());
-        let people = std::iter::once(&m.from)
-            .chain(m.to.iter())
-            .chain(m.cc.iter())
-            .map(|a| format!("{} {}", a.name, a.email))
-            .collect::<Vec<_>>()
-            .join(" ");
+        let sender = format!("{} {}", m.from.name, m.from.email);
+        let recipients = m.to.iter().chain(m.cc.iter()).map(|a| format!("{} {}", a.name, a.email)).collect::<Vec<_>>().join(" ");
         tx.execute("DELETE FROM messages_fts WHERE rowid = ?1", [pk])?;
-        tx.execute("INSERT INTO messages_fts (rowid, subject, body, people) VALUES (?1, ?2, ?3, ?4)", params![pk, m.subject, body_text, people])?;
+        tx.execute(
+            "INSERT INTO messages_fts (rowid, subject, body, sender, recipients) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![pk, m.subject, body_text, sender, recipients],
+        )?;
         tx.commit()?;
         Ok(())
     }
@@ -405,6 +417,21 @@ impl AccountDb {
         let mut st = self.conn.prepare(&sql)?;
         let rows = st.query_map(params_from_iter(args), |r| self.row_summary(r))?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
+    }
+
+    /// A page of matches and the total number of matches, in one pass.
+    pub fn list_messages_counted(&self, f: &MessageFilter) -> Result<(Vec<MessageSummary>, i64)> {
+        let (sql, args) = self.filter_sql(f, &format!("SELECT {MSG_COLS}, COUNT(*) OVER ()"), true);
+        let mut st = self.conn.prepare(&sql)?;
+        let mut total = 0;
+        let rows = st
+            .query_map(params_from_iter(args), |r| Ok((self.row_summary(r)?, r.get::<_, i64>(13)?)))?
+            .map(|r| r.map(|(m, n)| {
+                total = n;
+                m
+            }))
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok((rows, total))
     }
 
     pub fn count_messages(&self, f: &MessageFilter) -> Result<i64> {
@@ -1073,7 +1100,21 @@ fn strip_signature_and_quote(body: &str) -> String {
 }
 
 /// Build an FTS5 query from free text: every word must match as a prefix.
-pub fn fts_query(text: &str) -> Option<String> {
+/// An FTS5 query for the search text: every word as a prefix, all required, limited to the
+/// columns for `field`.
+pub fn fts_query(text: &str, field: SearchField) -> Option<String> {
+    let terms = fts_terms(text)?;
+    let cols = match field {
+        SearchField::All => return Some(terms),
+        SearchField::From => "sender",
+        SearchField::To => "recipients",
+        SearchField::Subject => "subject",
+        SearchField::Content => "subject body",
+    };
+    Some(format!("{{{cols}}}: ({terms})"))
+}
+
+fn fts_terms(text: &str) -> Option<String> {
     let terms: Vec<String> = text
         .split(|c: char| c.is_whitespace() || c == '"' || c == '\'' || c == '(' || c == ')' || c == '*' || c == ':' || c == '^')
         .filter(|t| !t.is_empty())
@@ -1122,9 +1163,9 @@ mod tests {
         assert_eq!(all[0].id, "acc1:m1");
         assert_eq!(db.list_folders().unwrap()[0].unread, 2);
 
-        let hits = db.list_messages(&MessageFilter { fts: fts_query("steer"), ..Default::default() }).unwrap();
+        let hits = db.list_messages(&MessageFilter { fts: fts_query("steer", SearchField::All), ..Default::default() }).unwrap();
         assert_eq!(hits.len(), 1);
-        let hits = db.list_messages(&MessageFilter { fts: fts_query("body"), from_email: Some("TOM@x.com".into()), ..Default::default() }).unwrap();
+        let hits = db.list_messages(&MessageFilter { fts: fts_query("body", SearchField::All), from_email: Some("TOM@x.com".into()), ..Default::default() }).unwrap();
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].subject, "Invoice");
         let to = db.list_messages(&MessageFilter { to_email: Some("miles@me.com".into()), ..Default::default() }).unwrap();
@@ -1140,14 +1181,58 @@ mod tests {
         assert!(db.get_message("m2").unwrap().has_body);
         // Index follows updates and deletes.
         db.delete_message("m2").unwrap();
-        assert_eq!(db.list_messages(&MessageFilter { fts: fts_query("invoice"), ..Default::default() }).unwrap().len(), 0);
+        assert_eq!(db.list_messages(&MessageFilter { fts: fts_query("invoice", SearchField::All), ..Default::default() }).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn search_by_field() {
+        let db = db();
+        db.upsert_folder("inbox1", "Inbox", Some(FolderRole::Inbox), None, 2).unwrap();
+        // From Sarah to Miles, and from Tom to Miles with Sarah in the subject.
+        db.upsert_message(&msg("m1", "inbox1", "Steering committee", "Sarah", "2026-11-23T09:42:00Z")).unwrap();
+        db.upsert_message(&msg("m2", "inbox1", "Ask Sarah", "Tom", "2026-11-23T09:15:00Z")).unwrap();
+        let find = |text: &str, field| {
+            let f = MessageFilter { fts: fts_query(text, field), limit: 10, ..Default::default() };
+            let (list, total) = db.list_messages_counted(&f).unwrap();
+            assert_eq!(list.len() as i64, total);
+            list.into_iter().map(|m| m.id).collect::<Vec<_>>()
+        };
+        assert_eq!(find("sar", SearchField::From), vec!["acc1:m1"]);
+        assert_eq!(find("sarah@x", SearchField::From), vec!["acc1:m1"]);
+        assert_eq!(find("sarah", SearchField::Subject), vec!["acc1:m2"]);
+        assert_eq!(find("sarah", SearchField::All), vec!["acc1:m1", "acc1:m2"]);
+        assert_eq!(find("miles", SearchField::To).len(), 2);
+        assert!(find("miles", SearchField::From).is_empty());
+        assert_eq!(find("body about steering", SearchField::Content), vec!["acc1:m1"]);
+        assert!(find("nobody", SearchField::All).is_empty());
+    }
+
+    #[test]
+    fn index_rebuilt_with_sender_and_recipients() {
+        // A database from before the sender/recipients split.
+        let conn = crate::db::open_memory().unwrap();
+        crate::db::migrate(&conn, &MIGRATIONS[..5]).unwrap();
+        conn.execute_batch(
+            r#"INSERT INTO messages (pk, id, folder_id, conversation_id, from_name, from_email, to_json, cc_json, subject, received_at)
+                 VALUES (1, 'm1', 'inbox1', 'c1', 'Jane Doe', 'jane@acme.com', '[{"name":"Bob Ray","email":"bob@x.com"}]', '[]', 'Hello', '2026-11-23T09:00:00Z');
+               INSERT INTO messages_fts (rowid, subject, body, people) VALUES (1, 'Hello', 'the body text', 'Jane Doe jane@acme.com Bob Ray bob@x.com');"#,
+        )
+        .unwrap();
+        let db = AccountDb::new(conn, "acc1").unwrap();
+        let find = |text: &str, field| db.list_messages(&MessageFilter { fts: fts_query(text, field), ..Default::default() }).unwrap().len();
+        assert_eq!(find("jane", SearchField::From), 1);
+        assert_eq!(find("bob", SearchField::From), 0);
+        assert_eq!(find("bob", SearchField::To), 1);
+        assert_eq!(find("body", SearchField::Content), 1);
     }
 
     #[test]
     fn fts_query_is_safe() {
-        assert_eq!(fts_query("  "), None);
-        assert_eq!(fts_query("steer \"com"), Some("\"steer\"* \"com\"*".into()));
-        assert_eq!(fts_query("a:b OR (c)"), Some("\"a\"* \"b\"* \"OR\"* \"c\"*".into()));
+        assert_eq!(fts_query("  ", SearchField::All), None);
+        assert_eq!(fts_query("steer \"com", SearchField::All), Some("\"steer\"* \"com\"*".into()));
+        assert_eq!(fts_query("a:b OR (c)", SearchField::All), Some("\"a\"* \"b\"* \"OR\"* \"c\"*".into()));
+        assert_eq!(fts_query("jane d", SearchField::From), Some("{sender}: (\"jane\"* \"d\"*)".into()));
+        assert_eq!(fts_query("x", SearchField::Content), Some("{subject body}: (\"x\"*)".into()));
     }
 
     #[test]

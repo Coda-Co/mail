@@ -276,7 +276,15 @@ pub async fn send_draft(app: AppHandle, s: State<'_, AppState>, draft_id: String
 
 #[tauri::command]
 pub async fn search(s: State<'_, AppState>, query: SearchQuery) -> R<SearchResult> {
-    s.svc.search(&query)
+    // Typing fires a search per pause; once a newer one arrives, older ones stop instead of
+    // holding the database while the newest waits.
+    use std::sync::atomic::Ordering::SeqCst;
+    let gen = s.search_gen.fetch_add(1, SeqCst) + 1;
+    let svc = s.svc.clone();
+    let latest = s.search_gen.clone();
+    tauri::async_runtime::spawn_blocking(move || svc.search_unless(&query, || latest.load(SeqCst) != gen))
+        .await
+        .map_err(|e| Error::Other(e.to_string()))?
 }
 
 /// Extend results beyond the offline window.

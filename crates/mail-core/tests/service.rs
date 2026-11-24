@@ -115,7 +115,7 @@ fn outbox_rules() {
 #[test]
 fn search_filters_the_view() {
     let (svc, ids) = setup();
-    let q = |text: &str| SearchQuery { text: text.into(), scope: ViewScope::unified_inbox(), all_folders: false, from: None, to: None, has_attachment: None, unread: None, date: None, account_id: None };
+    let q = |text: &str| SearchQuery { text: text.into(), scope: ViewScope::unified_inbox(), all_folders: false, from: None, to: None, has_attachment: None, unread: None, date: None, account_id: None, field: SearchField::All };
     let r = svc.search(&q("steering")).unwrap();
     assert_eq!(r.total, 3);
     let mut from = q("steering");
@@ -143,6 +143,15 @@ fn search_filters_the_view() {
     to.to = Some("elena@marsh.example".into());
     to.all_folders = true;
     assert_eq!(svc.search(&to).unwrap().total, 1);
+    // By field: the sender's name finds their mail; the subject field doesn't look at senders.
+    let mut sender = q("okafor");
+    sender.field = SearchField::From;
+    let r = svc.search(&sender).unwrap();
+    assert!(r.total > 0 && r.messages.iter().all(|m| m.from.name == "Sarah Okafor"));
+    sender.field = SearchField::Subject;
+    assert_eq!(svc.search(&sender).unwrap().total, 0);
+    // A superseded search stops.
+    assert!(svc.search_unless(&q("steering"), || true).is_err());
 }
 
 #[test]

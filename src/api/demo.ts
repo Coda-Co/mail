@@ -15,6 +15,7 @@ import type {
   MessageSummary,
   Person,
   SearchQuery,
+  SearchField,
   SearchResult,
   Signature,
   SyncStatus,
@@ -238,20 +239,23 @@ function people(): Person[] {
 
 // ---- Search --------------------------------------------------------------
 
-function matchText(m: Message, text: string): boolean {
+function matchText(m: Message, text: string, field: SearchField = 'all'): boolean {
   const terms = text.toLowerCase().split(/\s+/).filter(Boolean);
   if (terms.length === 0) return true;
-  const hay = [
-    m.subject,
-    m.snippet,
-    htmlToText(m.bodyHtml),
-    m.from.name,
-    m.from.email,
-    ...m.to.flatMap((a) => [a.name, a.email]),
-    ...m.attachments.map((a) => a.name),
-  ]
-    .join(' ')
-    .toLowerCase();
+  const sender = [m.from.name, m.from.email];
+  const recipients = [...m.to, ...m.cc].flatMap((a) => [a.name, a.email]);
+  const content = [m.subject, m.snippet, htmlToText(m.bodyHtml)];
+  const parts =
+    field === 'from'
+      ? sender
+      : field === 'to'
+        ? recipients
+        : field === 'subject'
+          ? [m.subject]
+          : field === 'content'
+            ? content
+            : [...content, ...sender, ...recipients, ...m.attachments.map((a) => a.name)];
+  const hay = parts.join(' ').toLowerCase();
   return terms.every((t) => hay.includes(t));
 }
 
@@ -272,7 +276,7 @@ function runSearch(q: SearchQuery, pool: Message[]): MessageSummary[] {
     .filter((m) => !q.hasAttachment || m.hasAttachments)
     .filter((m) => !q.unread || !m.isRead)
     .filter((m) => !windowDays || ref.getTime() - new Date(m.receivedAt).getTime() <= windowDays * 86400000)
-    .filter((m) => matchText(m, q.text))
+    .filter((m) => matchText(m, q.text, q.field))
     .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt))
     .map(summary);
 }

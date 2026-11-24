@@ -390,11 +390,29 @@ pub enum DateFilter {
     Year,
 }
 
+/// Which part of a message the search text is matched against.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum SearchField {
+    /// Subject, body, sender and recipients.
+    #[default]
+    All,
+    /// Sender name and address.
+    From,
+    /// To and Cc names and addresses.
+    To,
+    Subject,
+    /// Subject and body.
+    Content,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchQuery {
     #[serde(default)]
     pub text: String,
+    #[serde(default)]
+    pub field: SearchField,
     pub scope: ViewScope,
     #[serde(default)]
     pub all_folders: bool,

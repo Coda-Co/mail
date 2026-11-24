@@ -135,7 +135,7 @@ async fn first_and_incremental_sync() {
     assert!(!subjects.contains(&"Invoice".to_string()));
     assert_eq!(*events.new_mail.lock().unwrap(), vec!["Brand new".to_string()]);
     // Search sees synced mail.
-    let q = SearchQuery { text: "brand".into(), scope: ViewScope::unified_inbox(), all_folders: false, from: None, to: None, has_attachment: None, unread: None, date: None, account_id: None };
+    let q = SearchQuery { text: "brand".into(), scope: ViewScope::unified_inbox(), all_folders: false, from: None, to: None, has_attachment: None, unread: None, date: None, account_id: None, field: SearchField::All };
     assert_eq!(svc.search(&q).unwrap().total, 1);
 }
 

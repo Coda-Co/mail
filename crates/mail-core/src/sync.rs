@@ -490,8 +490,15 @@ impl<'a> Syncer<'a> {
     /// Server search beyond the offline window. Results are stored as headers.
     pub async fn search_server(&self, q: &SearchQuery) -> Result<Vec<String>> {
         let mut kql = vec![];
-        if !q.text.trim().is_empty() {
-            kql.push(q.text.replace('"', ""));
+        let text = q.text.replace('"', "");
+        let text = text.trim();
+        if !text.is_empty() {
+            kql.push(match q.field {
+                SearchField::All | SearchField::Content => text.to_string(),
+                SearchField::From => format!("from:{text}"),
+                SearchField::To => format!("to:{text}"),
+                SearchField::Subject => format!("subject:{text}"),
+            });
         }
         if let Some(f) = &q.from {
             kql.push(format!("from:{f}"));

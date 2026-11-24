@@ -131,8 +131,13 @@ export interface Thread {
 
 export type DateFilter = 'any' | 'week' | 'month' | 'year';
 
+/** What the search text is matched against. "content" is subject and body. */
+export type SearchField = 'from' | 'to' | 'subject' | 'content' | 'all';
+
 export interface SearchQuery {
   text: string;
+  /** Defaults to "all". */
+  field?: SearchField;
   scope: ViewScope;
   /** Widen "In: Inbox" to all folders. */
   allFolders: boolean;

@@ -289,6 +289,7 @@ pub fn call(svc: &MailService, name: &str, args: &Value) -> R<Value> {
                 unread: args.get("unread").and_then(|v| v.as_bool()),
                 date: None,
                 account_id: account,
+                field: SearchField::All,
             };
             let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(20).clamp(1, 100) as usize;
             let r = svc.search(&q).map_err(e)?;

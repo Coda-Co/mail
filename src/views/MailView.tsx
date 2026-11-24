@@ -1,7 +1,7 @@
 import { LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
-import type { Folder, ListTab, MessageSummary, SearchResult } from '../api/types';
+import type { Folder, ListTab, MessageSummary, SearchField, SearchResult } from '../api/types';
 import { useApp } from '../state/app';
 import { useCommand } from '../lib/commands';
 import { MessageList } from '../components/MessageList';
@@ -14,6 +14,20 @@ import { plural } from '../lib/text';
 
 const PAGE = 100;
 const ROLE_NAMES: Record<string, string> = { inbox: 'Inbox', drafts: 'Drafts', sent: 'Sent', archive: 'Archive', deleted: 'Deleted', junk: 'Junk' };
+
+const FIELD_KEY = 'mail.searchField';
+const FIELDS: SearchField[] = ['from', 'to', 'subject', 'content', 'all'];
+
+/** The search field last used; From by default. */
+function lastSearchField(): SearchField {
+  try {
+    const v = localStorage.getItem(FIELD_KEY) as SearchField | null;
+    if (v && FIELDS.includes(v)) return v;
+  } catch {
+    // Storage unavailable: use the default.
+  }
+  return 'from';
+}
 
 function errorText(e: unknown, fallback = 'Something went wrong'): string {
   if (typeof e === 'string' && e) return e;
@@ -62,7 +76,7 @@ export function MailView() {
   const [hasMore, setHasMore] = useState(false);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [folders, setFolders] = useState<Folder[]>([]);
-  const [search, setSearch] = useState<SearchState>(() => ({ query: { text: '', scope, allFolders: false } }));
+  const [search, setSearch] = useState<SearchState>(() => ({ query: { text: '', field: lastSearchField(), scope, allFolders: false } }));
   const [result, setResult] = useState<SearchResult | null>(null);
   const [serverBusy, setServerBusy] = useState(false);
   const [searchPending, setSearchPending] = useState(false);
@@ -107,9 +121,17 @@ export function MailView() {
   // Reset selection when the scope changes.
   useEffect(() => {
     setSelection(null);
-    setSearch({ query: { text: '', scope, allFolders: false } });
+    setSearch((s) => ({ query: { text: '', field: s.query.field, scope, allFolders: false } }));
     setResult(null);
   }, [scope]);
+
+  useEffect(() => {
+    try {
+      if (search.query.field) localStorage.setItem(FIELD_KEY, search.query.field);
+    } catch {
+      // Not remembered; fine.
+    }
+  }, [search.query.field]);
 
   // Search filters the current view, as you type.
   useEffect(() => {
@@ -189,7 +211,7 @@ export function MailView() {
 
   const closeSearch = () => {
     setSearchActive(false);
-    setSearch({ query: { text: '', scope, allFolders: false } });
+    setSearch((s) => ({ query: { text: '', field: s.query.field, scope, allFolders: false } }));
   };
 
   useCommand('newMessage', () => void newMessage());
