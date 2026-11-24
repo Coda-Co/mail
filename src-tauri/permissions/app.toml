@@ -38,6 +38,7 @@ permissions = [
   "allow-list-calendars",
   "allow-set-calendar-visible",
   "allow-list-events",
+  "allow-search-events",
   "allow-agenda",
   "allow-create-event",
   "allow-update-event",

@@ -36,6 +36,7 @@ const COMMANDS: &[&str] = &[
     "list_calendars",
     "set_calendar_visible",
     "list_events",
+    "search_events",
     "agenda",
     "create_event",
     "update_event",
