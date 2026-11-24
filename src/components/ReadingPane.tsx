@@ -98,6 +98,8 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
   const [focusDraft, setFocusDraft] = useState(false);
   const [menu, setMenu] = useState<{ anchor: Anchor; items: MenuItem[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The message the loaded thread was opened for; outside conversation view only it is shown.
+  const [shownId, setShownId] = useState<string | null>(null);
 
   // While the next message loads, the previous thread stays on screen (no blank flash),
   // but actions only target a thread that holds the selected message.
@@ -121,6 +123,7 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
         scrollRef.current?.scrollTo(0, 0);
       }
       setThread(t);
+      setShownId(id);
       setError(null);
       return t;
     } catch (e) {
@@ -340,7 +343,7 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
                   }}
                 />
               ))}
-            {thread.messages.map((m, i) => (
+            {(app.settings.conversationView ? thread.messages : thread.messages.filter((m) => m.id === shownId)).map((m, i) => (
               <MessageView
                 key={m.id}
                 message={m}

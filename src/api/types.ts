@@ -238,6 +238,8 @@ export interface Settings {
   remoteImageSenders: string[];
   /** 'show': load remote images except in Junk; 'ask': block until shown or the sender is allowed. */
   remoteImages: 'show' | 'ask';
+  /** Show the whole conversation when a message is opened; off shows only the message clicked. */
+  conversationView: boolean;
 }
 
 export interface SyncStatus {

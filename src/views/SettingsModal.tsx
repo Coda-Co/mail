@@ -49,6 +49,22 @@ function GeneralTab() {
         </span>
       </div>
       <div className="settings-group">
+        <h3>Reading</h3>
+        <div className="form-row">
+          <label htmlFor="conversation-view">When opening a message</label>
+          <select
+            id="conversation-view"
+            className="select"
+            style={{ maxWidth: 260 }}
+            value={settings.conversationView ? 'conversation' : 'message'}
+            onChange={(e) => updateSettings({ conversationView: e.target.value === 'conversation' })}
+          >
+            <option value="message">Show only that message</option>
+            <option value="conversation">Show the whole conversation</option>
+          </select>
+        </div>
+      </div>
+      <div className="settings-group">
         <h3>Images</h3>
         <div className="form-row">
           <label htmlFor="remote-images">Images in mail</label>

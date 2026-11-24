@@ -45,7 +45,7 @@ function load(): DemoState {
         const parsed = JSON.parse(raw) as DemoState;
         if (parsed.version === DEMO_VERSION) {
           // Settings added since this state was saved take their defaults.
-          parsed.settings = { ...parsed.settings, remoteImages: parsed.settings.remoteImages ?? 'show' };
+          parsed.settings = { ...parsed.settings, remoteImages: parsed.settings.remoteImages ?? 'show', conversationView: parsed.settings.conversationView ?? false };
           return recount(parsed);
         }
       }
