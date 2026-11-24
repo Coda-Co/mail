@@ -2703,3 +2703,13 @@ h3 {
 .quote-toggle:hover {
   color: var(--text);
 }
+
+.message-head.collapsible {
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.message-head.collapsible:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 4px;
+}

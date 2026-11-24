@@ -20,7 +20,20 @@ function recipients(m: Message, meName: string, myEmails: string[]): string {
   return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
 }
 
-function MessageView({ message, expanded, onExpand, onChanged }: { message: Message; expanded: boolean; onExpand: () => void; onChanged: (m: Message) => void }) {
+function MessageView({
+  message,
+  expanded,
+  onExpand,
+  onCollapse,
+  onChanged,
+}: {
+  message: Message;
+  expanded: boolean;
+  onExpand: () => void;
+  /** Set for messages that can fold back to one line (not the one that was opened). */
+  onCollapse?: () => void;
+  onChanged: (m: Message) => void;
+}) {
   const { accountById, me, accounts, settings } = useApp();
   const acc = accountById(message.accountId);
   const myEmails = accounts.map((a) => a.email.toLowerCase());
@@ -37,7 +50,26 @@ function MessageView({ message, expanded, onExpand, onChanged }: { message: Mess
   }
   return (
     <div className="message-block">
-      <div className="message-head">
+      <div
+        className={onCollapse ? 'message-head collapsible' : 'message-head'}
+        {...(onCollapse && {
+          role: 'button',
+          tabIndex: 0,
+          'aria-expanded': true,
+          title: 'Collapse',
+          onClick: (e: React.MouseEvent) => {
+            // Leave selecting text in the header alone.
+            if (!window.getSelection()?.isCollapsed) return;
+            if ((e.target as Element).closest('a, button')) return;
+            onCollapse();
+          },
+          onKeyDown: (e: React.KeyboardEvent) => {
+            if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+            e.preventDefault();
+            onCollapse();
+          },
+        })}
+      >
         <Avatar name={message.from.name || message.from.email} />
         <div className="who">
           <span className="name" title={message.from.email}>
@@ -380,6 +412,16 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
                       message={m}
                       expanded={m.id === shownId || expanded.has(m.id)}
                       onExpand={() => setExpanded((s) => new Set(s).add(m.id))}
+                      onCollapse={
+                        m.id === shownId
+                          ? undefined
+                          : () =>
+                              setExpanded((s) => {
+                                const next = new Set(s);
+                                next.delete(m.id);
+                                return next;
+                              })
+                      }
                       onChanged={(updated) => setThread((t) => (t ? { ...t, messages: t.messages.map((x) => (x.id === updated.id ? updated : x)) } : t))}
                     />
                   ))}
