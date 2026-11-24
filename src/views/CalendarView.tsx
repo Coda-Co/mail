@@ -8,7 +8,7 @@ import { now } from '../lib/clock';
 import { eventBorder, eventFill, eventSelectedFill } from '../lib/colors';
 import { EventForm } from './EventForm';
 import { eventWhere } from '../components/Agenda';
-import { useToast } from '../components/ui';
+import { Modal, useToast } from '../components/ui';
 import { eventTitle } from '../lib/text';
 
 type Mode = 'day' | 'week' | 'month';
@@ -45,7 +45,7 @@ function layoutDay(events: CalendarEvent[]): Placed[] {
   return placed;
 }
 
-function EventPanel({ event, onChanged, onEdit, onDeleted }: { event: CalendarEvent; onChanged: (e: CalendarEvent) => void; onEdit: () => void; onDeleted: () => void }) {
+function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: CalendarEvent; onClose: () => void; onChanged: (e: CalendarEvent) => void; onEdit: () => void; onDeleted: () => void }) {
   const { accountById } = useApp();
   const toast = useToast();
   const [showAll, setShowAll] = useState(false);
@@ -68,73 +68,80 @@ function EventPanel({ event, onChanged, onEdit, onDeleted }: { event: CalendarEv
     ['declined', 'No'],
   ];
   return (
-    <aside className="event-panel" aria-label="Event details">
-      <span className="acc">
-        <span className="acc-dot" style={{ background: acc?.color ?? event.color }} />
-        {acc?.displayName}
-      </span>
-      <h2>{eventTitle(event)}</h2>
-      <div className="facts">
-        <span>{longDate(start)}</span>
-        <span>{event.isAllDay ? 'All day' : `${hhmm(start)} – ${hhmm(end)}`}</span>
-        {event.location && <span>{event.location}</span>}
-        {event.isOnlineMeeting && event.onlineMeetingUrl && (
-          <button type="button" className="link-button" style={{ alignSelf: 'flex-start', display: 'inline-flex', gap: 6, alignItems: 'center' }} onClick={() => api.openExternal(event.onlineMeetingUrl!)}>
-            Join Teams meeting <ExternalLink size={13} />
-          </button>
-        )}
-      </div>
-      {!isOrganizer && (
-        <div className="rsvp">
-          {rsvp.map(([r, label]) => (
-            <button key={r} type="button" className={event.myResponse === r ? 'on' : ''} aria-pressed={event.myResponse === r} onClick={() => respond(r)}>
-              {label}
+    <Modal
+      title={eventTitle(event)}
+      onClose={onClose}
+      footer={
+        isOrganizer ? (
+          <>
+            <button
+              type="button"
+              className="btn btn-danger"
+              style={{ marginRight: 'auto' }}
+              onClick={async () => {
+                await api.deleteEvent(event.id);
+                toast(event.attendees.length > 1 ? 'Event cancelled' : 'Event deleted');
+                onDeleted();
+              }}
+            >
+              {event.attendees.length > 1 ? 'Cancel event' : 'Delete'}
             </button>
-          ))}
+            <button type="button" className="btn" onClick={onEdit}>
+              Edit
+            </button>
+          </>
+        ) : undefined
+      }
+    >
+      <div className="modal-body event-detail">
+        <span className="acc">
+          <span className="acc-dot" style={{ background: acc?.color ?? event.color }} />
+          {acc?.displayName}
+        </span>
+        <div className="facts">
+          <span>{longDate(start)}</span>
+          <span>{event.isAllDay ? 'All day' : `${hhmm(start)} – ${hhmm(end)}`}</span>
+          {event.location && <span>{event.location}</span>}
+          {event.isOnlineMeeting && event.onlineMeetingUrl && (
+            <button type="button" className="link-button" style={{ alignSelf: 'flex-start', display: 'inline-flex', gap: 6, alignItems: 'center' }} onClick={() => api.openExternal(event.onlineMeetingUrl!)}>
+              Join Teams meeting <ExternalLink size={13} />
+            </button>
+          )}
         </div>
-      )}
-      {attendees.length > 0 && (
-        <>
-          <div className="form-label" style={{ paddingTop: 6 }}>
-            Attendees
-          </div>
-          <div className="attendees">
-            {shown.map((a) => (
-              <span key={a.address.email} title={a.address.email}>
-                {a.address.name || a.address.email}
-                {a.response === 'organizer' && <span className="muted"> · organiser</span>}
-                {a.response === 'declined' && <span className="muted"> · declined</span>}
-                {a.response === 'tentative' && <span className="muted"> · maybe</span>}
-              </span>
-            ))}
-            {!showAll && attendees.length > 3 && (
-              <button type="button" className="link-button muted" style={{ alignSelf: 'flex-start', color: 'var(--text-muted)' }} onClick={() => setShowAll(true)}>
-                + {attendees.length - 3} more
+        {!isOrganizer && (
+          <div className="rsvp">
+            {rsvp.map(([r, label]) => (
+              <button key={r} type="button" className={event.myResponse === r ? 'on' : ''} aria-pressed={event.myResponse === r} onClick={() => respond(r)}>
+                {label}
               </button>
-            )}
+            ))}
           </div>
-        </>
-      )}
-      {event.bodyHtml && <div className="description" dangerouslySetInnerHTML={{ __html: event.bodyHtml.replace(/<script[\s\S]*?<\/script>/gi, '') }} />}
-      {isOrganizer && (
-        <div className="actions">
-          <button type="button" className="btn" onClick={onEdit}>
-            Edit
-          </button>
-          <button
-            type="button"
-            className="btn btn-danger"
-            onClick={async () => {
-              await api.deleteEvent(event.id);
-              toast(event.attendees.length > 1 ? 'Event cancelled' : 'Event deleted');
-              onDeleted();
-            }}
-          >
-            {event.attendees.length > 1 ? 'Cancel event' : 'Delete'}
-          </button>
-        </div>
-      )}
-    </aside>
+        )}
+        {attendees.length > 0 && (
+          <>
+            <div className="form-label" style={{ paddingTop: 6 }}>
+              Attendees
+            </div>
+            <div className="attendees">
+              {shown.map((a) => (
+                <span key={a.address.email} title={a.address.email}>
+                  {a.address.name || a.address.email}
+                  {a.response === 'organizer' && <span className="muted"> · organiser</span>}
+                  {a.response === 'declined' && <span className="muted"> · declined</span>}
+                  {a.response === 'tentative' && <span className="muted"> · maybe</span>}
+                </span>
+              ))}
+              {!showAll && attendees.length > 3 && (
+                <button type="button" className="link-button muted" style={{ alignSelf: 'flex-start', color: 'var(--text-muted)' }} onClick={() => setShowAll(true)}>
+                  + {attendees.length - 3} more
+                </button>
+              )}
+            </div>
+          </>
+        )}
+        {event.bodyHtml && <div className="description" dangerouslySetInnerHTML={{ __html: event.bodyHtml.replace(/<script[\s\S]*?<\/script>/gi, '') }} />}
+      </div>
+    </Modal>
   );
 }
 
@@ -361,11 +368,15 @@ export function CalendarView() {
         {mode === 'month' ? monthGrid : timeGrid}
       </section>
       {selected && (
-        <EventPanel
+        <EventModal
           key={selected.id}
           event={selected}
+          onClose={() => setSelectedId(null)}
           onChanged={(e) => setEvents((list) => list.map((x) => (x.id === e.id ? e : x)))}
-          onEdit={() => setForm({ event: selected })}
+          onEdit={() => {
+            setSelectedId(null);
+            setForm({ event: selected });
+          }}
           onDeleted={() => {
             setSelectedId(null);
             setVersion((v) => v + 1);
