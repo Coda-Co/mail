@@ -24,7 +24,7 @@ The client id is not a secret.
 ```bash
 export MAIL_APP_CLIENT_ID=<application (client) id>
 export MAIL_APP_SECURITY_NOTE_URL=<public URL of SECURITY.md>
-npm run tauri build
+pnpm tauri build
 ```
 
 Both values are read at build time. `MAIL_APP_CLIENT_ID` can also be set when launching, which is useful during development.

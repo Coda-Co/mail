@@ -22,18 +22,18 @@ A lightweight, fast replacement for Outlook on Windows and macOS: mail, calendar
 ## Try it
 
 ```bash
-npm install
-npm run dev          # the interface in a browser, with built-in demo data
+pnpm install
+pnpm dev             # the interface in a browser, with built-in demo data
 ```
 
 That runs the React interface against an in-browser demo backend. For the real desktop app with the Rust core:
 
 ```bash
-MAIL_APP_DEMO=1 npm run tauri dev    # sample accounts, in memory, no sign-in
-MAIL_APP_CLIENT_ID=<client id> npm run tauri dev   # real accounts
+MAIL_APP_DEMO=1 pnpm tauri dev    # sample accounts, in memory, no sign-in
+MAIL_APP_CLIENT_ID=<client id> pnpm tauri dev   # real accounts
 ```
 
-Prerequisites are Node 22, Rust (stable), and on Linux the WebKitGTK development packages (see `.github/workflows/ci.yml`). Linux is for development only.
+Prerequisites are Node 22, pnpm 10 (`corepack enable` picks the version pinned in `package.json`), Rust (stable), and on Linux the WebKitGTK development packages (see `.github/workflows/ci.yml`). Linux is for development only.
 
 ## Layout
 
@@ -69,7 +69,7 @@ Sending is a queued operation like any other, with three rules:
 ## Tests
 
 ```bash
-npm run typecheck && npm test        # interface (vitest)
+pnpm typecheck && pnpm test          # interface (vitest)
 cargo test --workspace               # core, sync against a mock Graph server, MCP
 cargo clippy --workspace --all-targets -- -D warnings
 ```

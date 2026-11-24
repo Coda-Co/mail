@@ -5,7 +5,7 @@ The app is internal only (spec §6). Releases are signed, notarised on macOS, an
 ## Local builds
 
 ```bash
-npm ci
+pnpm install --frozen-lockfile
 cargo build --release -p mail-mcp
 ```
 
@@ -17,7 +17,7 @@ cp target/release/mail-mcp "src-tauri/binaries/mail-mcp-$(rustc -vV | sed -n 's/
 ```
 
 ```bash
-MAIL_APP_CLIENT_ID=<client id> npx tauri build -c src-tauri/tauri.bundle.conf.json
+MAIL_APP_CLIENT_ID=<client id> pnpm tauri build -c src-tauri/tauri.bundle.conf.json
 ```
 
 On Windows the sidecar is `mail-mcp.exe` and the copy is named `mail-mcp-x86_64-pc-windows-msvc.exe`. Installers are written to `target/release/bundle/` (`.app` and `.dmg` on macOS, NSIS `.exe` on Windows).
@@ -40,7 +40,7 @@ The updater is behind the `updater` cargo feature so that development builds don
 Generate the updater key pair once:
 
 ```bash
-npx tauri signer generate -w ~/.tauri/mail-updater.key
+pnpm tauri signer generate -w ~/.tauri/mail-updater.key
 ```
 
 Then:
@@ -50,7 +50,7 @@ Then:
 3. Release builds use:
 
    ```bash
-   npx tauri build --features updater -c src-tauri/tauri.bundle.conf.json -c src-tauri/tauri.updater.conf.json
+   pnpm tauri build --features updater -c src-tauri/tauri.bundle.conf.json -c src-tauri/tauri.updater.conf.json
    ```
 
 ## Before retiring Outlook
