@@ -11,6 +11,7 @@ import { MessageBody } from './MessageBody';
 import { FileIcon } from './FileIcon';
 import { keyLabel, isMac } from '../lib/platform';
 import { matches } from '../lib/shortcuts';
+import { hasNoContent } from '../lib/drafts';
 import { formatSize } from '../lib/text';
 import { fullTime } from '../lib/dates';
 import { useApp } from '../state/app';
@@ -152,14 +153,20 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
   };
 
   // Escape closes the draft, like closing a compose window in Outlook: a
-  // reply nobody has changed is discarded, anything else is saved. A pop-out
-  // window always takes it; an inline draft only while focus is inside it,
-  // so Escape elsewhere in the thread works as before.
+  // reply or forward nobody has changed, or a new message with no content,
+  // is discarded; anything else is saved. A pop-out window always takes it;
+  // an inline draft only while focus is inside it, so Escape elsewhere in
+  // the thread works as before.
+  const worthKeeping = async () => {
+    if (draft.mode !== 'new') return draft.edited !== false || touched.current;
+    const sig = draft.signatureId ? (await api.listSignatures(draft.accountId)).find((x) => x.id === draft.signatureId) : undefined;
+    return !hasNoContent(draft, sig?.html);
+  };
   useCommand('escape', () => {
     if (layout === 'inline' && !root.current?.contains(document.activeElement)) return false;
-    const untouchedReply = (draft.mode === 'reply' || draft.mode === 'replyAll') && draft.edited === false && !touched.current;
-    if (untouchedReply) void discard();
-    else void save().then(() => onDone('closed'));
+    void worthKeeping()
+      .catch(() => true)
+      .then((keep) => (keep ? save().then(() => onDone('closed')) : discard()));
   });
 
   const popOut = async () => {
