@@ -332,6 +332,8 @@ export interface MailApi {
   listCalendars(): Promise<CalendarInfo[]>;
   setCalendarVisible(calendarId: string, visible: boolean): Promise<void>;
   listEvents(start: string, end: string): Promise<CalendarEvent[]>;
+  /** Events whose title, location or people contain every word, latest first. */
+  searchEvents(text: string, limit: number): Promise<CalendarEvent[]>;
   agenda(days: number): Promise<AgendaDay[]>;
   createEvent(input: EventInput): Promise<CalendarEvent>;
   updateEvent(eventId: string, input: EventInput): Promise<CalendarEvent>;

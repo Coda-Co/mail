@@ -12,23 +12,20 @@ import { SyncIndicator } from './SyncIndicator';
 export const SearchSlot = createContext<HTMLElement | null>(null);
 export const useSearchSlot = () => useContext(SearchSlot);
 
-/** The bar across the top of the main area. Search lives here. */
+/**
+ * The bar across the top of the main area. Search lives here and follows the
+ * view: mail search in Mail, people in People, events in Calendar (those views
+ * put their own box in the slot).
+ */
 export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => void }) {
   const app = useApp();
-  const searching = app.route.view === 'mail' && app.searchActive;
+  const { view } = app.route;
+  // People and Calendar put their own search box in the slot.
+  const showTrigger = (view === 'mail' && !app.searchActive) || view === 'web';
   return (
     <header className="topbar">
-      <button
-        type="button"
-        className="btn btn-primary btn-icon topbar-new"
-        onClick={() => runCommand('newMessage')}
-        title={`New email (${keyLabel('Mod+N')})`}
-        aria-label="New email"
-      >
-        <SquarePen size={16} strokeWidth={2.2} />
-      </button>
       <div className="topbar-search" ref={slotRef}>
-        {!searching && (
+        {showTrigger && (
           <button
             type="button"
             className="search-trigger"
@@ -45,6 +42,15 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
       </div>
       <span className="spacer" />
       <SyncIndicator />
+      <button
+        type="button"
+        className="btn btn-ghost btn-icon topbar-new"
+        onClick={() => runCommand('newMessage')}
+        title={`New email (${keyLabel('Mod+N')})`}
+        aria-label="New email"
+      >
+        <SquarePen size={18} />
+      </button>
     </header>
   );
 }

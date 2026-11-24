@@ -1,15 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, LoaderCircle } from 'lucide-react';
 import { api } from '../api';
 import type { CalendarEvent, ResponseStatus } from '../api/types';
 import { useApp } from '../state/app';
-import { addDays, dayShort, hhmm, longDate, monthName, rangeTitle, sameDay, startOfDay, startOfWeek } from '../lib/dates';
+import { addDays, dayShort, hhmm, longDate, monthName, rangeTitle, sameDay, shortDate, startOfDay, startOfWeek } from '../lib/dates';
 import { now } from '../lib/clock';
 import { eventBorder, eventFill, eventSelectedFill } from '../lib/colors';
 import { EventForm } from './EventForm';
 import { eventWhere } from '../components/Agenda';
 import { Modal, useToast } from '../components/ui';
 import { eventTitle } from '../lib/text';
+import { TopSearch } from '../components/TopSearch';
 
 type Mode = 'day' | 'week' | 'month';
 const HOUR = 56;
@@ -146,6 +147,69 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
   );
 }
 
+/** Events matching the top bar's search: upcoming soonest first, then past, latest first. */
+function EventResults({ query, onOpen }: { query: string; onOpen: (e: CalendarEvent) => void }) {
+  const app = useApp();
+  const [found, setFound] = useState<{ query: string; events: CalendarEvent[] } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(() => {
+      api.searchEvents(query, 200).then(
+        (events) => !cancelled && setFound({ query, events }),
+        () => !cancelled && setFound({ query, events: [] }),
+      );
+    }, 100);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query, app.mailVersion]);
+
+  const nowIso = now().toISOString();
+  const pending = found?.query !== query;
+  const events = pending ? [] : found.events;
+  const upcoming = events.filter((e) => e.end > nowIso).sort((a, b) => a.start.localeCompare(b.start));
+  const past = events.filter((e) => e.end <= nowIso);
+  const row = (e: CalendarEvent) => {
+    const start = new Date(e.start);
+    return (
+      <button key={e.id} type="button" className="event-result" onClick={() => onOpen(e)}>
+        <span className="date">
+          {shortDate(start)}
+          {start.getFullYear() !== now().getFullYear() ? ` ${start.getFullYear()}` : ''}
+        </span>
+        <span className="time">{e.isAllDay ? 'All day' : hhmm(start)}</span>
+        <span className="bar" style={{ background: e.color }} />
+        <span className="text">
+          <span className="title">{eventTitle(e)}</span>
+          {eventWhere(e) && <span className="where">{eventWhere(e)}</span>}
+        </span>
+      </button>
+    );
+  };
+  return (
+    <section className="event-results" aria-label="Matching events">
+      {pending ? (
+        <div className="list-empty">
+          <span className="list-searching" role="status">
+            <LoaderCircle size={16} className="spin" aria-hidden />
+            Searching…
+          </span>
+        </div>
+      ) : events.length === 0 ? (
+        <div className="list-empty">No events match</div>
+      ) : (
+        <>
+          {upcoming.length > 0 && <div className="section-title">Upcoming</div>}
+          {upcoming.map(row)}
+          {past.length > 0 && <div className="section-title">Past</div>}
+          {past.map(row)}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function CalendarView() {
   const app = useApp();
   const [mode, setMode] = useState<Mode>('week');
@@ -154,6 +218,7 @@ export function CalendarView() {
   const [selectedId, setSelectedId] = useState<string | null>(app.calendarFocus?.eventId ?? null);
   const [form, setForm] = useState<{ event?: CalendarEvent; start?: Date } | null>(null);
   const [version, setVersion] = useState(0);
+  const [query, setQuery] = useState('');
   const scroller = useRef<HTMLDivElement>(null);
   const dark = document.documentElement.dataset.theme === 'dark';
 
@@ -346,6 +411,17 @@ export function CalendarView() {
 
   return (
     <div className="calendar-view">
+      <TopSearch value={query} onChange={setQuery} placeholder="Search events" />
+      {query.trim() ? (
+        <EventResults
+          query={query.trim()}
+          onOpen={(e) => {
+            setQuery('');
+            setAnchor(new Date(e.start));
+            setSelectedId(e.id);
+          }}
+        />
+      ) : (
       <section className="week-pane" aria-label="Calendar">
         <div className="cal-header">
           <h1 className="view-title">{title}</h1>
@@ -371,6 +447,7 @@ export function CalendarView() {
         </div>
         {mode === 'month' ? monthGrid : timeGrid}
       </section>
+      )}
       {selected && (
         <EventModal
           key={selected.id}

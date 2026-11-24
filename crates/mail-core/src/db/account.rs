@@ -1073,6 +1073,22 @@ impl AccountDb {
         Ok(rows)
     }
 
+    /// Events whose title, location, organizer or attendees contain every word of `text`.
+    pub fn search_events(&self, text: &str, limit: i64, color: &str) -> Result<Vec<CalendarEvent>> {
+        let words: Vec<String> = text.split_whitespace().map(|w| format!("%{}%", w.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"))).collect();
+        if words.is_empty() {
+            return Ok(vec![]);
+        }
+        // Names and addresses only, not the JSON keys around them.
+        let hay = "(subject || ' ' || location || ' ' || coalesce(json_extract(organizer_json, '$.name'), '') || ' ' || coalesce(json_extract(organizer_json, '$.email'), '') || ' '
+            || coalesce((SELECT group_concat(coalesce(json_extract(j.value, '$.address.name'), '') || ' ' || coalesce(json_extract(j.value, '$.address.email'), ''), ' ') FROM json_each(attendees_json) j), ''))";
+        let wh = vec![format!("{hay} LIKE ? ESCAPE '\\'"); words.len()].join(" AND ");
+        let sql = format!("SELECT {} FROM events WHERE is_cancelled = 0 AND {wh} ORDER BY start_at DESC LIMIT {}", Self::EVENT_COLS, limit.clamp(1, 500));
+        let mut st = self.conn.prepare(&sql)?;
+        let rows = st.query_map(params_from_iter(words), |r| self.row_event(r, color))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
     pub fn get_event(&self, raw_id: &str, color: &str) -> Result<CalendarEvent> {
         self.conn
             .query_row(&format!("SELECT {} FROM events WHERE id = ?1", Self::EVENT_COLS), [raw_id], |r| self.row_event(r, color))

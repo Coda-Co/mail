@@ -719,6 +719,18 @@ export const demoApi: MailApi = {
   async listEvents(start, end) {
     return clone(visibleEvents().filter((e) => e.end > start && e.start < end).sort((a, b) => a.start.localeCompare(b.start)));
   },
+  async searchEvents(text, limit) {
+    const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    const hay = (e: CalendarEvent) =>
+      [e.subject, e.location, e.organizer.name, e.organizer.email, ...e.attendees.flatMap((a) => [a.address.name, a.address.email])].join(' ').toLowerCase();
+    return clone(
+      visibleEvents()
+        .filter((e) => words.every((w) => hay(e).includes(w)))
+        .sort((a, b) => b.start.localeCompare(a.start))
+        .slice(0, limit),
+    );
+  },
   async agenda(days) {
     const ref = now();
     const today = startOfDay(ref);

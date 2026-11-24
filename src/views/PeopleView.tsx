@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Search } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { api } from '../api';
 import type { MessageSummary, Person } from '../api/types';
 import { useApp } from '../state/app';
 import { Avatar, useToast } from '../components/ui';
+import { TopSearch } from '../components/TopSearch';
 import { MessageRow } from '../components/MessageList';
 import { listTime } from '../lib/dates';
 import { plural } from '../lib/text';
@@ -48,14 +49,8 @@ export function PeopleView() {
 
   return (
     <div className={`people-view${selectedEmail ? ' has-selection' : ''}`}>
+      <TopSearch value={q} onChange={setQ} placeholder="Search people" />
       <section className="people-list" aria-label="People">
-        <div className="list-header" style={{ paddingBottom: 12 }}>
-          <h1 className="view-title">People</h1>
-          <label className="people-search">
-            <Search size={15} />
-            <input placeholder="Find a person" aria-label="Find a person" value={q} onChange={(e) => setQ(e.target.value)} />
-          </label>
-        </div>
         <div className="message-rows">
           {people === null && <div className="list-empty">Loading…</div>}
           {people?.length === 0 && <div className="list-empty">{q ? 'No one matches' : 'People appear here as mail syncs'}</div>}

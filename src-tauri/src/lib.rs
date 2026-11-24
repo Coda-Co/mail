@@ -153,6 +153,7 @@ pub fn run() {
             commands::list_calendars,
             commands::set_calendar_visible,
             commands::list_events,
+            commands::search_events,
             commands::agenda,
             commands::create_event,
             commands::update_event,

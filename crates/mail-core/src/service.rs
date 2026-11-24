@@ -956,6 +956,21 @@ impl MailService {
         Ok(out)
     }
 
+    /// Events in visible calendars matching `text`, latest first.
+    pub fn search_events(&self, text: &str, limit: i64) -> Result<Vec<CalendarEvent>> {
+        let mut out = vec![];
+        for a in self.graph_accounts()? {
+            for e in self.with_account(&a.id, |db| db.search_events(text, limit, &a.color))? {
+                if self.app().calendar_visible(&e.calendar_id)? {
+                    out.push(e);
+                }
+            }
+        }
+        out.sort_by(|a, b| b.start.cmp(&a.start));
+        out.truncate(limit.clamp(1, 500) as usize);
+        Ok(out)
+    }
+
     pub fn agenda(&self, days: i64) -> Result<Vec<AgendaDay>> {
         self.agenda_at(days, Local::now())
     }

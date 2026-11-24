@@ -155,6 +155,21 @@ fn search_filters_the_view() {
 }
 
 #[test]
+fn search_events_by_title_place_and_people() {
+    let (svc, _) = setup();
+    let subjects = |text: &str| svc.search_events(text, 50).unwrap().into_iter().map(|e| e.subject).collect::<Vec<_>>();
+    assert_eq!(subjects("steering"), vec!["Steering committee"]);
+    assert_eq!(subjects("3rd floor"), vec!["Steering committee"]);
+    // Organizer or attendee, by name or address; latest first.
+    assert_eq!(subjects("okafor"), vec!["Debrief", "Steering committee", "Portfolio scan check-in"]);
+    assert_eq!(subjects("priya.nair@"), vec!["Warehouse design session", "Data review"]);
+    // JSON keys and LIKE wildcards don't match.
+    assert!(subjects("email").is_empty());
+    assert!(subjects("%").is_empty());
+    assert!(subjects("  ").is_empty());
+}
+
+#[test]
 fn people_ranked() {
     let (svc, _) = setup();
     let people = svc.list_people("", 10).unwrap();
