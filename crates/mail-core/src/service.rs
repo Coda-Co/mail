@@ -700,6 +700,10 @@ impl MailService {
         self.with_account(acc, |db| db.save_draft(raw, &d, None, "user"))?;
         self.enqueue(acc, &Op::SaveDraft { draft_id: raw.to_string() })?;
         self.events().draft_changed(&d.id);
+        if !current.edited {
+            // The conversation's row now shows it has a draft.
+            self.changed(vec![acc.to_string()]);
+        }
         Ok(d)
     }
 
@@ -840,6 +844,8 @@ impl MailService {
         self.enqueue(acc, &Op::Send { draft_id: raw.to_string() })?;
         self.events().draft_changed(id);
         self.events().sync_status();
+        // The conversation's row no longer shows a draft to finish.
+        self.changed(vec![acc.to_string()]);
         Ok(d)
     }
 

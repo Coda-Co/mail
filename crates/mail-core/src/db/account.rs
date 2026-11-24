@@ -409,14 +409,24 @@ impl AccountDb {
             is_flagged: r.get(10)?,
             has_attachments: r.get(11)?,
             is_draft: r.get(12)?,
+            has_draft: false,
         })
     }
 
     pub fn list_messages(&self, f: &MessageFilter) -> Result<Vec<MessageSummary>> {
         let (sql, args) = self.filter_sql(f, &format!("SELECT {MSG_COLS}"), true);
         let mut st = self.conn.prepare(&sql)?;
-        let rows = st.query_map(params_from_iter(args), |r| self.row_summary(r))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut rows = st.query_map(params_from_iter(args), |r| self.row_summary(r))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        self.mark_unfinished_drafts(&mut rows)?;
         Ok(rows)
+    }
+
+    fn mark_unfinished_drafts(&self, rows: &mut [MessageSummary]) -> Result<()> {
+        let with_drafts = self.conversations_with_unfinished_drafts()?;
+        for m in rows.iter_mut().filter(|m| !m.is_draft) {
+            m.has_draft = with_drafts.contains(&m.conversation_id);
+        }
+        Ok(())
     }
 
     /// A page of matches and the total number of matches, in one pass.
@@ -431,7 +441,20 @@ impl AccountDb {
                 m
             }))
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut rows = rows;
+        self.mark_unfinished_drafts(&mut rows)?;
         Ok((rows, total))
+    }
+
+    /// Conversations with a draft the user has started and not sent: edited, and
+    /// still editable (a queued or sending draft is on its way out).
+    pub fn conversations_with_unfinished_drafts(&self) -> Result<std::collections::HashSet<String>> {
+        let mut st = self.conn.prepare(
+            "SELECT DISTINCT conversation_id FROM drafts
+             WHERE conversation_id IS NOT NULL AND edited = 1 AND status IN ('editing', 'failed')",
+        )?;
+        let ids = st.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
+        Ok(ids)
     }
 
     pub fn count_messages(&self, f: &MessageFilter) -> Result<i64> {
@@ -838,6 +861,7 @@ impl AccountDb {
                 is_flagged: false,
                 has_attachments: !d.attachments.is_empty(),
                 is_draft: true,
+                has_draft: false,
             })
             .collect();
         let mut st = self.conn.prepare(&format!(

@@ -232,6 +232,9 @@ pub struct MessageSummary {
     pub is_flagged: bool,
     pub has_attachments: bool,
     pub is_draft: bool,
+    /// The conversation has a reply or forward the user started and hasn't sent.
+    #[serde(default)]
+    pub has_draft: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

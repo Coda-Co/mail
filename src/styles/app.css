@@ -2667,6 +2667,12 @@ h3 {
   gap: 20px;
 }
 
+/* The body scrolls as a whole: children keep their content height rather than
+   shrinking to fit, which let the reply overflow on top of the quoted message. */
+.popout-body > * {
+  flex-shrink: 0;
+}
+
 .popout-body .draft-editor {
   padding: 0;
   min-height: 120px;

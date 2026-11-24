@@ -137,7 +137,8 @@ const graphIds = () => state.accounts.filter((a) => a.kind === 'graph').map((a) 
 
 function summary(m: Message): MessageSummary {
   const { id, accountId, folderId, conversationId, from, to, subject, snippet, receivedAt, isRead, isFlagged, hasAttachments, isDraft } = m;
-  return { id, accountId, folderId, conversationId, from, to, subject, snippet, receivedAt, isRead, isFlagged, hasAttachments, isDraft };
+  const hasDraft = !isDraft && state.drafts.some((d) => d.conversationId === conversationId && d.edited !== false && (d.status === 'editing' || d.status === 'failed'));
+  return { id, accountId, folderId, conversationId, from, to, subject, snippet, receivedAt, isRead, isFlagged, hasAttachments, isDraft, hasDraft };
 }
 
 function draftSummary(d: Draft): MessageSummary {
@@ -592,9 +593,12 @@ export const demoApi: MailApi = {
   async updateDraft(draft) {
     const existing = getDraftState(draft.id);
     const { accountId, poppedOut, status } = existing;
+    const firstEdit = existing.edited === false;
     Object.assign(existing, clone(draft), { accountId, poppedOut, status, edited: true, updatedAt: now().toISOString(), savedToServer: true });
     save();
     emit(EVENTS.draftChanged, { draftId: draft.id });
+    // The conversation's row now shows it has a draft.
+    if (firstEdit) changed([accountId]);
     return clone(existing);
   },
   async changeDraftAccount(draftId, accountId) {
@@ -648,6 +652,7 @@ export const demoApi: MailApi = {
     if (!online) {
       d.status = 'queued';
       save();
+      changed([d.accountId]);
       return clone(d);
     }
     d.status = 'sent';
