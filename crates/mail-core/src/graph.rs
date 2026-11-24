@@ -224,6 +224,43 @@ pub fn message_record(v: &Value, with_body: bool) -> MessageRecord {
 }
 
 pub fn event_record(v: &Value, calendar_id: &str) -> EventRecord {
+    event_record_over(v, calendar_id, None)
+}
+
+/// Builds a record from a Graph event, keeping `base`'s value for every property the
+/// item leaves out. calendarView/delta sends occurrences of a recurring series (and
+/// some updates) with only id, type, start, end and seriesMasterId; overwriting the
+/// stored row with those would blank the title and details.
+pub fn event_record_over(v: &Value, calendar_id: &str, base: Option<&EventRecord>) -> EventRecord {
+    let has = |k: &str| v.get(k).is_some();
+    let Some(b) = base else { return event_record_full(v, calendar_id) };
+    let n = event_record_full(v, calendar_id);
+    EventRecord {
+        id: if has("id") { n.id } else { b.id.clone() },
+        calendar_id: n.calendar_id,
+        subject: if has("subject") { n.subject } else { b.subject.clone() },
+        start: if has("start") { n.start } else { b.start.clone() },
+        end: if has("end") { n.end } else { b.end.clone() },
+        is_all_day: if has("isAllDay") { n.is_all_day } else { b.is_all_day },
+        location: if has("location") { n.location } else { b.location.clone() },
+        body_html: if has("body") { n.body_html } else { b.body_html.clone() },
+        organizer: if has("organizer") { n.organizer } else { b.organizer.clone() },
+        attendees: if has("attendees") { n.attendees } else { b.attendees.clone() },
+        my_response: if has("responseStatus") { n.my_response } else { b.my_response },
+        is_online_meeting: if has("isOnlineMeeting") { n.is_online_meeting } else { b.is_online_meeting },
+        online_meeting_url: if has("onlineMeeting") { n.online_meeting_url } else { b.online_meeting_url.clone() },
+        reminder_minutes: if has("isReminderOn") || has("reminderMinutesBeforeStart") { n.reminder_minutes } else { b.reminder_minutes },
+        is_cancelled: if has("isCancelled") { n.is_cancelled } else { b.is_cancelled },
+        local_only: false,
+    }
+}
+
+/// True for a recurring occurrence that arrived without its own details.
+pub fn is_bare_occurrence(v: &Value) -> bool {
+    v.get("subject").is_none() && v.get("seriesMasterId").and_then(|x| x.as_str()).is_some_and(|s| !s.is_empty())
+}
+
+fn event_record_full(v: &Value, calendar_id: &str) -> EventRecord {
     let attendees = v
         .get("attendees")
         .and_then(|a| a.as_array())
@@ -346,5 +383,28 @@ mod tests {
         let p = event_payload(&e);
         assert_eq!(p["start"]["dateTime"], "2026-11-26T10:00:00");
         assert_eq!(p["start"]["timeZone"], "UTC");
+    }
+
+    #[test]
+    fn partial_delta_item_keeps_stored_details() {
+        let full = json!({
+            "id": "occ1", "subject": "Pacifica daily sync", "type": "occurrence", "seriesMasterId": "m1",
+            "start": {"dateTime": "2026-11-23T16:00:00.0000000", "timeZone": "UTC"},
+            "end": {"dateTime": "2026-11-23T16:45:00.0000000", "timeZone": "UTC"},
+            "location": {"displayName": "Teams"}, "isReminderOn": true, "reminderMinutesBeforeStart": 10
+        });
+        let base = event_record(&full, "cal1");
+        let bare = json!({
+            "id": "occ1", "type": "occurrence", "seriesMasterId": "m1",
+            "start": {"dateTime": "2026-11-23T16:30:00.0000000", "timeZone": "UTC"},
+            "end": {"dateTime": "2026-11-23T17:00:00.0000000", "timeZone": "UTC"}
+        });
+        assert!(is_bare_occurrence(&bare) && !is_bare_occurrence(&full));
+        assert_eq!(event_record(&bare, "cal1").subject, "", "no base: nothing to keep");
+        let merged = event_record_over(&bare, "cal1", Some(&base));
+        assert_eq!(merged.subject, "Pacifica daily sync");
+        assert_eq!(merged.location, "Teams");
+        assert_eq!(merged.reminder_minutes, Some(10));
+        assert_eq!(merged.start, "2026-11-23T16:30:00Z", "new times win");
     }
 }

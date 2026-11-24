@@ -4,6 +4,7 @@ import type { AgendaDay, CalendarEvent } from '../api/types';
 import { useApp } from '../state/app';
 import { hhmm, shortDate } from '../lib/dates';
 import { now } from '../lib/clock';
+import { eventTitle } from '../lib/text';
 
 /** Second line under an agenda or calendar entry. */
 export function eventWhere(e: CalendarEvent): string {
@@ -47,7 +48,7 @@ export function Agenda() {
               <span className="time">{e.isAllDay ? 'All day' : hhmm(new Date(e.start))}</span>
               <span className="bar" style={{ background: e.color }} />
               <span className="text">
-                <span className="title">{e.subject}</span>
+                <span className="title">{eventTitle(e)}</span>
                 {eventWhere(e) && <span className="where">{eventWhere(e)}</span>}
               </span>
             </button>

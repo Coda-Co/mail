@@ -281,3 +281,43 @@ async fn expired_sign_in_marks_account() {
     assert_eq!(again.id, acc.id);
     assert_eq!(svc.get_account(&acc.id).unwrap().sync_state, SyncState::Idle);
 }
+
+#[tokio::test]
+async fn bare_calendar_occurrences_keep_their_titles() {
+    let (server, svc, acc, _events) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+
+    // The next delta round sends occurrences with only id, type, times and seriesMasterId:
+    // EV1 (already stored) moved by an hour, OCC1 is new and only its series master has a title.
+    let day = chrono::Utc::now() + chrono::Duration::days(1);
+    let t = |h: u32| json!({"dateTime": day.format(&format!("%Y-%m-%dT{h:02}:00:00.0000000")).to_string(), "timeZone": "UTC"});
+    Mock::given(method("GET"))
+        .and(path("/me/calendarView/delta"))
+        .and(query_param("$deltatoken", "c1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "value": [
+                {"id": "EV1", "type": "occurrence", "seriesMasterId": "MASTER0", "start": t(11), "end": t(12)},
+                {"id": "OCC1", "type": "occurrence", "seriesMasterId": "MASTER1", "start": t(16), "end": t(17)}
+            ],
+            "@odata.deltaLink": format!("{}/me/calendarView/delta?$deltatoken=c2", server.uri())
+        })))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/me/events/MASTER1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"id": "MASTER1", "subject": "Pacifica daily sync", "location": {"displayName": "Teams"}})))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+
+    let events = svc.list_events("2000-01-01T00:00:00Z", "2100-01-01T00:00:00Z").unwrap();
+    let ev1 = events.iter().find(|e| e.id.ends_with("EV1")).unwrap();
+    assert_eq!(ev1.subject, "Steering committee", "stored title kept");
+    assert!(ev1.start.contains("T11:00:00"), "new time applied");
+    let occ = events.iter().find(|e| e.id.ends_with("OCC1")).unwrap();
+    assert_eq!(occ.subject, "Pacifica daily sync", "title from the series master");
+    assert_eq!(occ.location, "Teams");
+}
