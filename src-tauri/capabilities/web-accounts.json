@@ -1,0 +1,22 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "web-accounts",
+  "description": "Outlook on the web inside web-account views: may only report unread counts and notifications.",
+  "webviews": [
+    "web-*"
+  ],
+  "windows": [
+    "main",
+    "web-*"
+  ],
+  "remote": {
+    "urls": [
+      "https://outlook.office.com/*",
+      "https://outlook.office365.com/*",
+      "https://outlook.live.com/*"
+    ]
+  },
+  "permissions": [
+    "web-account-reporting"
+  ]
+}

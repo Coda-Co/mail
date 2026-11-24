@@ -1,0 +1,21 @@
+//! mail-core: everything except the window. Storage, Microsoft Graph sync, search,
+//! people, drafts and the outbox, used by the desktop app and the MCP server.
+
+pub mod auth;
+pub mod db;
+pub mod demo;
+pub mod disk;
+pub mod error;
+pub mod graph;
+pub mod html;
+pub mod ids;
+pub mod model;
+pub mod ops;
+pub mod people;
+pub mod secrets;
+pub mod service;
+pub mod sync;
+pub mod text;
+
+pub use error::{Error, Result};
+pub use service::{EventSink, MailService};

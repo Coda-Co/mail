@@ -1,0 +1,66 @@
+# Permission sets for the app's own commands.
+
+[[set]]
+identifier = "app-windows"
+description = "Everything the main, compose and message windows may call."
+permissions = [
+  "allow-me",
+  "allow-list-accounts",
+  "allow-add-account",
+  "allow-add-web-account",
+  "allow-upgrade-web-account",
+  "allow-update-account",
+  "allow-remove-account",
+  "allow-list-folders",
+  "allow-list-messages",
+  "allow-get-thread",
+  "allow-get-message",
+  "allow-mark-read",
+  "allow-set-flag",
+  "allow-archive",
+  "allow-delete-messages",
+  "allow-move-messages",
+  "allow-allow-remote-images",
+  "allow-show-remote-images-once",
+  "allow-open-attachment",
+  "allow-create-draft",
+  "allow-get-draft",
+  "allow-update-draft",
+  "allow-change-draft-account",
+  "allow-add-attachment",
+  "allow-remove-attachment",
+  "allow-discard-draft",
+  "allow-send-draft",
+  "allow-search",
+  "allow-search-server",
+  "allow-list-people",
+  "allow-get-person",
+  "allow-list-calendars",
+  "allow-set-calendar-visible",
+  "allow-list-events",
+  "allow-agenda",
+  "allow-create-event",
+  "allow-update-event",
+  "allow-respond-event",
+  "allow-delete-event",
+  "allow-list-signatures",
+  "allow-save-signature",
+  "allow-delete-signature",
+  "allow-get-settings",
+  "allow-update-settings",
+  "allow-sync-now",
+  "allow-sync-status",
+  "allow-disk-encryption",
+  "allow-mcp-info",
+  "allow-pop-out",
+  "allow-dock-back",
+  "allow-open-external",
+  "allow-show-web-account",
+  "allow-hide-web-accounts",
+  "allow-reload-web-account",
+]
+
+[[set]]
+identifier = "web-account-reporting"
+description = "What an Outlook on the web page may call: report its unread count and forward notifications."
+permissions = ["allow-web-account-report", "allow-web-account-notify"]
