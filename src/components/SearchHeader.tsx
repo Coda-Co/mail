@@ -72,7 +72,6 @@ export function SearchHeader({
   onClose,
   scopeLabel,
   resultCount,
-  busy,
   onSubmit,
   inputRef,
 }: {
@@ -81,7 +80,6 @@ export function SearchHeader({
   onClose: () => void;
   scopeLabel: string;
   resultCount: number | null;
-  busy?: boolean;
   /** Enter in the search box. */
   onSubmit?: () => void;
   inputRef: React.RefObject<HTMLInputElement>;
@@ -167,7 +165,7 @@ export function SearchHeader({
           {q.accountId ? accountById(q.accountId)?.displayName : 'Account'} ▾
         </button>
         <span className="spacer" />
-        {busy ? <span className="count">Searching…</span> : resultCount !== null && <span className="count">{plural(resultCount, 'result')}</span>}
+        {resultCount !== null && <span className="count">{plural(resultCount, 'result')}</span>}
       </div>
 
       {open?.kind === 'from' && <PersonPicker anchor={open.anchor} onClose={() => setOpen(null)} onPick={(p) => set({ from: p.email }, { fromName: p.name })} />}

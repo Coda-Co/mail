@@ -51,7 +51,7 @@ export function MessageList({
   messages: MessageSummary[];
   selectedId: string | null;
   onSelect: (m: MessageSummary) => void;
-  empty: string;
+  empty: React.ReactNode;
   onLoadMore?: () => void;
   footer?: React.ReactNode;
   header?: React.ReactNode;

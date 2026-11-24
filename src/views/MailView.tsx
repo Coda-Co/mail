@@ -1,3 +1,4 @@
+import { LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import type { Folder, ListTab, MessageSummary, SearchResult } from '../api/types';
@@ -274,7 +275,12 @@ export function MailView() {
                 ? searchError
                   ? `Search failed: ${searchError}`
                   : searchPending || !result
-                    ? 'Searching…'
+                    ? (
+                        <span className="list-searching" role="status">
+                          <LoaderCircle size={16} className="spin" aria-hidden />
+                          Searching…
+                        </span>
+                      )
                     : 'No messages match these filters'
                 : scope.tab === 'unread'
                   ? 'No unread messages'
@@ -303,7 +309,7 @@ export function MailView() {
     return (
       <div className="mail-view">
         <div className="mail-center search-mode">
-          <SearchHeader state={search} onChange={setSearch} onClose={closeSearch} scopeLabel={scopeLabel} resultCount={result && !searchPending ? result.total : null} busy={searchPending} onSubmit={submitSearch} inputRef={searchInput} />
+          <SearchHeader state={search} onChange={setSearch} onClose={closeSearch} scopeLabel={scopeLabel} resultCount={result && !searchPending ? result.total : null} onSubmit={submitSearch} inputRef={searchInput} />
           {panes}
         </div>
       </div>
