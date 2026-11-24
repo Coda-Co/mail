@@ -2,13 +2,22 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, X } from 'lucide-react';
 import { api } from '../api';
-import type { DateFilter, Person, SearchQuery } from '../api/types';
+import type { DateFilter, Person, SearchField, SearchQuery } from '../api/types';
 import { useApp } from '../state/app';
 import { Menu, Popover, type Anchor } from './ui';
 import { plural } from '../lib/text';
 import { useSearchSlot } from './TopBar';
 
 const DATE_LABELS: Record<DateFilter, string> = { any: 'any time', week: 'past week', month: 'past month', year: 'past year' };
+
+export const FIELD_LABELS: Record<SearchField, string> = { from: 'From', to: 'To', subject: 'Subject', content: 'Subject + body', all: 'Everything' };
+const FIELD_PLACEHOLDERS: Record<SearchField, string> = {
+  from: 'Sender name or address',
+  to: 'Recipient name or address',
+  subject: 'Words in the subject',
+  content: 'Words in the subject or body',
+  all: 'Search everything',
+};
 
 export interface SearchState {
   query: SearchQuery;
@@ -72,6 +81,7 @@ export function SearchHeader({
   onClose,
   scopeLabel,
   resultCount,
+  onSubmit,
   inputRef,
 }: {
   state: SearchState;
@@ -79,11 +89,14 @@ export function SearchHeader({
   onClose: () => void;
   scopeLabel: string;
   resultCount: number | null;
+  /** Enter in the search box. */
+  onSubmit?: () => void;
   inputRef: React.RefObject<HTMLInputElement>;
 }) {
   const { graphAccounts, accountById } = useApp();
-  const [open, setOpen] = useState<null | { kind: 'from' | 'to' | 'date' | 'account' | 'scope'; anchor: HTMLElement }>(null);
+  const [open, setOpen] = useState<null | { kind: 'from' | 'to' | 'date' | 'account' | 'scope' | 'field'; anchor: HTMLElement }>(null);
   const q = state.query;
+  const field = q.field ?? 'all';
   const set = (patch: Partial<SearchQuery>, names?: Partial<SearchState>) => onChange({ ...state, ...names, query: { ...q, ...patch } });
   const local = useRef<HTMLInputElement>(null);
   const ref = inputRef ?? local;
@@ -99,12 +112,21 @@ export function SearchHeader({
   const box = (
       <div className="search-box">
         <Search size={16} />
+        <button type="button" className="scope-chip field-chip" aria-label={`Search in: ${FIELD_LABELS[field]}`} aria-haspopup="menu" onClick={toggle('field')}>
+          {FIELD_LABELS[field]} ▾
+        </button>
         <input
           ref={ref}
-          aria-label={`Search ${scopeLabel}`}
-          placeholder={`Search ${scopeLabel}`}
+          aria-label={`Search ${FIELD_LABELS[field].toLowerCase()}, ${scopeLabel}`}
+          placeholder={FIELD_PLACEHOLDERS[field]}
           value={q.text}
           onChange={(e) => set({ text: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              onSubmit?.();
+            }
+          }}
         />
         <button type="button" className="scope-chip" onClick={toggle('scope')}>
           In: {q.allFolders ? `All folders${q.accountId || q.scope.accountId ? '' : ', all accounts'}` : scopeLabel} ▾
@@ -185,6 +207,20 @@ export function SearchHeader({
               onSelect: () => set({ accountId: a.id }),
             })),
           ]}
+        />
+      )}
+      {open?.kind === 'field' && (
+        <Menu
+          anchor={open.anchor}
+          onClose={() => setOpen(null)}
+          items={(Object.keys(FIELD_LABELS) as SearchField[]).map((f) => ({
+            label: FIELD_LABELS[f],
+            checked: field === f,
+            onSelect: () => {
+              set({ field: f });
+              setTimeout(() => ref.current?.focus(), 0);
+            },
+          }))}
         />
       )}
       {open?.kind === 'scope' && (

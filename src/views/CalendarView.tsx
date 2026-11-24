@@ -1,15 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, LoaderCircle } from 'lucide-react';
 import { api } from '../api';
-import type { CalendarEvent, ResponseStatus } from '../api/types';
+import type { CalendarEvent, EventField, ResponseStatus } from '../api/types';
 import { useApp } from '../state/app';
-import { addDays, dayShort, hhmm, longDate, monthName, rangeTitle, sameDay, startOfDay, startOfWeek } from '../lib/dates';
+import { addDays, dayShort, hhmm, longDate, monthName, rangeTitle, sameDay, shortDate, startOfDay, startOfWeek } from '../lib/dates';
 import { now } from '../lib/clock';
 import { eventBorder, eventFill, eventSelectedFill } from '../lib/colors';
 import { EventForm } from './EventForm';
 import { eventWhere } from '../components/Agenda';
-import { Modal, useToast } from '../components/ui';
-import { eventTitle } from '../lib/text';
+import { Menu, Modal, useToast } from '../components/ui';
+import { eventTitle, plural } from '../lib/text';
+import { TopSearch } from '../components/TopSearch';
 
 type Mode = 'day' | 'week' | 'month';
 const HOUR = 56;
@@ -146,6 +147,141 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
   );
 }
 
+type EventDate = 'any' | 'upcoming' | 'past' | 'nextMonth' | 'pastMonth' | 'pastYear';
+const EVENT_DATES: Record<EventDate, string> = {
+  any: 'Any time',
+  upcoming: 'Upcoming',
+  past: 'Past',
+  nextMonth: 'Next 30 days',
+  pastMonth: 'Past 30 days',
+  pastYear: 'Past year',
+};
+const EVENT_FIELDS: Record<EventField, string> = { all: 'Everything', title: 'Title', people: 'Invitees' };
+const FIELD_KEY = 'calendar.searchField';
+
+function lastEventField(): EventField {
+  try {
+    const v = localStorage.getItem(FIELD_KEY) as EventField | null;
+    if (v && v in EVENT_FIELDS) return v;
+  } catch {
+    // Storage unavailable: use the default.
+  }
+  return 'all';
+}
+
+/** The after/before bounds for a date filter, from now. */
+function dateBounds(d: EventDate): { after?: string; before?: string } {
+  const t = now();
+  const iso = (days: number) => addDays(t, days).toISOString();
+  switch (d) {
+    case 'upcoming':
+      return { after: t.toISOString() };
+    case 'past':
+      return { before: t.toISOString() };
+    case 'nextMonth':
+      return { after: t.toISOString(), before: iso(30) };
+    case 'pastMonth':
+      return { after: iso(-30), before: t.toISOString() };
+    case 'pastYear':
+      return { after: iso(-366), before: t.toISOString() };
+    default:
+      return {};
+  }
+}
+
+/** Events matching the top bar's search: upcoming soonest first, then past, latest first. */
+function EventResults({
+  text,
+  field,
+  date,
+  onDate,
+  onOpen,
+}: {
+  text: string;
+  field: EventField;
+  date: EventDate;
+  onDate: (d: EventDate) => void;
+  onOpen: (e: CalendarEvent) => void;
+}) {
+  const app = useApp();
+  const key = JSON.stringify([text, field, date]);
+  const [found, setFound] = useState<{ key: string; events: CalendarEvent[]; error?: string } | null>(null);
+  const [menu, setMenu] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(() => {
+      api.searchEvents({ text, field, ...dateBounds(date), limit: 200 }).then(
+        (events) => !cancelled && setFound({ key, events }),
+        (e) => !cancelled && setFound({ key, events: [], error: typeof e === 'string' ? e : (e as Error)?.message || 'Search failed' }),
+      );
+    }, 100);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [key, text, field, date, app.mailVersion]);
+
+  const nowIso = now().toISOString();
+  const pending = found?.key !== key;
+  const events = pending ? [] : found.events;
+  const upcoming = events.filter((e) => e.end > nowIso).sort((a, b) => a.start.localeCompare(b.start));
+  const past = events.filter((e) => e.end <= nowIso);
+  const row = (e: CalendarEvent) => {
+    const start = new Date(e.start);
+    return (
+      <button key={e.id} type="button" className="event-result" onClick={() => onOpen(e)}>
+        <span className="date">
+          {shortDate(start)}
+          {start.getFullYear() !== now().getFullYear() ? ` ${start.getFullYear()}` : ''}
+        </span>
+        <span className="time">{e.isAllDay ? 'All day' : hhmm(start)}</span>
+        <span className="bar" style={{ background: e.color }} />
+        <span className="text">
+          <span className="title">{eventTitle(e)}</span>
+          {eventWhere(e) && <span className="where">{eventWhere(e)}</span>}
+        </span>
+      </button>
+    );
+  };
+  return (
+    <section className="event-results" aria-label="Matching events">
+      <div className="facets" role="group" aria-label="Filters">
+        <button type="button" className={`chip${date !== 'any' ? ' active' : ''}`} aria-haspopup="menu" onClick={(e) => setMenu(menu ? null : e.currentTarget)}>
+          Date: {EVENT_DATES[date].toLowerCase()} ▾
+        </button>
+        <span className="spacer" />
+        {!pending && !found.error && <span className="count">{plural(events.length, 'event')}</span>}
+      </div>
+      {menu && (
+        <Menu
+          anchor={menu}
+          onClose={() => setMenu(null)}
+          items={(Object.keys(EVENT_DATES) as EventDate[]).map((d) => ({ label: EVENT_DATES[d], checked: date === d, onSelect: () => onDate(d) }))}
+        />
+      )}
+      {pending ? (
+        <div className="list-empty">
+          <span className="list-searching" role="status">
+            <LoaderCircle size={16} className="spin" aria-hidden />
+            Searching…
+          </span>
+        </div>
+      ) : found.error ? (
+        <div className="list-empty">Search failed: {found.error}</div>
+      ) : events.length === 0 ? (
+        <div className="list-empty">No events match</div>
+      ) : (
+        <>
+          {upcoming.length > 0 && <div className="section-title">Upcoming</div>}
+          {upcoming.map(row)}
+          {past.length > 0 && <div className="section-title">Past</div>}
+          {past.map(row)}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function CalendarView() {
   const app = useApp();
   const [mode, setMode] = useState<Mode>('week');
@@ -154,6 +290,18 @@ export function CalendarView() {
   const [selectedId, setSelectedId] = useState<string | null>(app.calendarFocus?.eventId ?? null);
   const [form, setForm] = useState<{ event?: CalendarEvent; start?: Date } | null>(null);
   const [version, setVersion] = useState(0);
+  const [query, setQuery] = useState('');
+  const [field, setField] = useState<EventField>(lastEventField);
+  const [dateFilter, setDateFilter] = useState<EventDate>('any');
+  const searching = !!query.trim() || dateFilter !== 'any';
+  const pickField = (f: EventField) => {
+    setField(f);
+    try {
+      localStorage.setItem(FIELD_KEY, f);
+    } catch {
+      // Not remembered; fine.
+    }
+  };
   const scroller = useRef<HTMLDivElement>(null);
   const dark = document.documentElement.dataset.theme === 'dark';
 
@@ -346,6 +494,31 @@ export function CalendarView() {
 
   return (
     <div className="calendar-view">
+      <TopSearch
+        value={query}
+        onChange={setQuery}
+        placeholder={field === 'title' ? 'Words in the title' : field === 'people' ? 'Invitee name or address' : 'Search events'}
+        field={{ labels: EVENT_FIELDS, value: field, onChange: pickField }}
+        active={searching}
+        onClear={() => {
+          setQuery('');
+          setDateFilter('any');
+        }}
+      />
+      {searching ? (
+        <EventResults
+          text={query.trim()}
+          field={field}
+          date={dateFilter}
+          onDate={setDateFilter}
+          onOpen={(e) => {
+            setQuery('');
+            setDateFilter('any');
+            setAnchor(new Date(e.start));
+            setSelectedId(e.id);
+          }}
+        />
+      ) : (
       <section className="week-pane" aria-label="Calendar">
         <div className="cal-header">
           <h1 className="view-title">{title}</h1>
@@ -371,6 +544,7 @@ export function CalendarView() {
         </div>
         {mode === 'month' ? monthGrid : timeGrid}
       </section>
+      )}
       {selected && (
         <EventModal
           key={selected.id}

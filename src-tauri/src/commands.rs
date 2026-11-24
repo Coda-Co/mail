@@ -306,7 +306,15 @@ pub async fn send_draft(app: AppHandle, s: State<'_, AppState>, draft_id: String
 
 #[tauri::command]
 pub async fn search(s: State<'_, AppState>, query: SearchQuery) -> R<SearchResult> {
-    s.svc.search(&query)
+    // Typing fires a search per pause; once a newer one arrives, older ones stop instead of
+    // holding the database while the newest waits.
+    use std::sync::atomic::Ordering::SeqCst;
+    let gen = s.search_gen.fetch_add(1, SeqCst) + 1;
+    let svc = s.svc.clone();
+    let latest = s.search_gen.clone();
+    tauri::async_runtime::spawn_blocking(move || svc.search_unless(&query, || latest.load(SeqCst) != gen))
+        .await
+        .map_err(|e| Error::Other(e.to_string()))?
 }
 
 /// Extend results beyond the offline window.
@@ -351,6 +359,11 @@ pub async fn list_calendars(s: State<'_, AppState>) -> R<Vec<CalendarInfo>> {
 #[tauri::command]
 pub async fn set_calendar_visible(s: State<'_, AppState>, calendar_id: String, visible: bool) -> R<()> {
     s.svc.set_calendar_visible(&calendar_id, visible)
+}
+
+#[tauri::command]
+pub async fn search_events(s: State<'_, AppState>, query: EventQuery) -> R<Vec<CalendarEvent>> {
+    s.svc.search_events(&query)
 }
 
 #[tauri::command]

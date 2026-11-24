@@ -46,6 +46,7 @@ export const tauriApi: MailApi = {
   listCalendars: () => call('list_calendars'),
   setCalendarVisible: (calendarId, visible) => call('set_calendar_visible', { calendarId, visible }),
   listEvents: (start, end) => call('list_events', { start, end }),
+  searchEvents: (query) => call('search_events', { query }),
   agenda: (days) => call('agenda', { days }),
   createEvent: (input) => call('create_event', { input }),
   updateEvent: (eventId, input) => call('update_event', { eventId, input }),

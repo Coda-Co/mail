@@ -16,6 +16,8 @@ pub struct AppState {
     pub http: reqwest::Client,
     pub graph_base: String,
     pub demo: bool,
+    /// Bumped by each local search; a search that is no longer the latest stops early.
+    pub search_gen: Arc<std::sync::atomic::AtomicU64>,
 }
 
 /// Coda & Co's multi-tenant app registration (docs/APP_REGISTRATION.md). Not a secret:
@@ -50,6 +52,7 @@ impl AppState {
             http: GraphClient::http(),
             graph_base: std::env::var("MAIL_APP_GRAPH_BASE").unwrap_or_else(|_| GRAPH_BASE.to_string()),
             demo,
+            search_gen: Arc::default(),
         }
     }
 

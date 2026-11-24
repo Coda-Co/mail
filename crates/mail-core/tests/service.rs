@@ -115,7 +115,7 @@ fn outbox_rules() {
 #[test]
 fn search_filters_the_view() {
     let (svc, ids) = setup();
-    let q = |text: &str| SearchQuery { text: text.into(), scope: ViewScope::unified_inbox(), all_folders: false, from: None, to: None, has_attachment: None, unread: None, date: None, account_id: None };
+    let q = |text: &str| SearchQuery { text: text.into(), scope: ViewScope::unified_inbox(), all_folders: false, from: None, to: None, has_attachment: None, unread: None, date: None, account_id: None, field: SearchField::All };
     let r = svc.search(&q("steering")).unwrap();
     assert_eq!(r.total, 3);
     let mut from = q("steering");
@@ -143,6 +143,43 @@ fn search_filters_the_view() {
     to.to = Some("elena@marsh.example".into());
     to.all_folders = true;
     assert_eq!(svc.search(&to).unwrap().total, 1);
+    // By field: the sender's name finds their mail; the subject field doesn't look at senders.
+    let mut sender = q("okafor");
+    sender.field = SearchField::From;
+    let r = svc.search(&sender).unwrap();
+    assert!(r.total > 0 && r.messages.iter().all(|m| m.from.name == "Sarah Okafor"));
+    sender.field = SearchField::Subject;
+    assert_eq!(svc.search(&sender).unwrap().total, 0);
+    // A superseded search stops.
+    assert!(svc.search_unless(&q("steering"), || true).is_err());
+}
+
+#[test]
+fn search_events_by_title_place_and_people() {
+    let (svc, _) = setup();
+    let find = |q: EventQuery| svc.search_events(&q).unwrap().into_iter().map(|e| e.subject).collect::<Vec<_>>();
+    let subjects = |text: &str| find(EventQuery { text: text.into(), ..Default::default() });
+    assert_eq!(subjects("steering"), vec!["Steering committee"]);
+    assert_eq!(subjects("3rd floor"), vec!["Steering committee"]);
+    // Organizer or attendee, by name or address; latest first.
+    assert_eq!(subjects("okafor"), vec!["Debrief", "Steering committee", "Portfolio scan check-in"]);
+    assert_eq!(subjects("priya.nair@"), vec!["Warehouse design session", "Data review"]);
+    // JSON keys and LIKE wildcards don't match.
+    assert!(subjects("email").is_empty());
+    assert!(subjects("%").is_empty());
+    assert!(subjects("  ").is_empty());
+    // By field.
+    assert!(find(EventQuery { text: "okafor".into(), field: EventField::Title, ..Default::default() }).is_empty());
+    assert_eq!(find(EventQuery { text: "debrief".into(), field: EventField::Title, ..Default::default() }), vec!["Debrief"]);
+    assert_eq!(find(EventQuery { text: "priya".into(), field: EventField::People, ..Default::default() }).len(), 2);
+    assert!(find(EventQuery { text: "floor".into(), field: EventField::People, ..Default::default() }).is_empty());
+    // By date, with or without words.
+    let steering = svc.search_events(&EventQuery { text: "steering".into(), ..Default::default() }).unwrap().remove(0);
+    let before_it = EventQuery { text: "okafor".into(), before: Some(steering.start.clone()), ..Default::default() };
+    assert_eq!(find(before_it), vec!["Portfolio scan check-in"]);
+    let after_it = EventQuery { after: Some(steering.end.clone()), field: EventField::Title, ..Default::default() };
+    assert!(find(after_it.clone()).contains(&"Debrief".to_string()));
+    assert!(!find(after_it).contains(&"Steering committee".to_string()));
 }
 
 #[test]

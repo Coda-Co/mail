@@ -16,6 +16,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+/// The error a search gives when a newer search replaced it before it finished.
+pub const SUPERSEDED: &str = "search superseded";
+
 /// Notifications from the service to whoever hosts it (Tauri emits these to windows).
 pub trait EventSink: Send + Sync {
     fn mail_changed(&self, _account_ids: &[String]) {}
@@ -843,6 +846,11 @@ impl MailService {
     // ================================================================= search & people
 
     pub fn search(&self, q: &SearchQuery) -> Result<SearchResult> {
+        self.search_unless(q, || false)
+    }
+
+    /// Search, giving up between accounts once `superseded` says a newer search has started.
+    pub fn search_unless(&self, q: &SearchQuery, superseded: impl Fn() -> bool) -> Result<SearchResult> {
         let after = match q.date.unwrap_or_default() {
             DateFilter::Any => None,
             DateFilter::Week => Some(Utc::now() - Duration::days(7)),
@@ -850,7 +858,7 @@ impl MailService {
             DateFilter::Year => Some(Utc::now() - Duration::days(366)),
         }
         .map(|d| d.to_rfc3339_opts(chrono::SecondsFormat::Secs, true));
-        let fts = fts_query(&q.text);
+        let fts = fts_query(&q.text, q.field);
         let mut all = vec![];
         let mut total = 0;
         for (acc, folders) in self.scope_targets(&q.scope, q.account_id.as_deref(), q.all_folders)? {
@@ -865,7 +873,10 @@ impl MailService {
                 received_after: after.clone(),
                 limit: 300,
             };
-            let (list, n) = self.with_account(&acc, |db| Ok((db.list_messages(&f)?, db.count_messages(&f)?)))?;
+            if superseded() {
+                return Err(Error::Other(SUPERSEDED.into()));
+            }
+            let (list, n) = self.with_account(&acc, |db| db.list_messages_counted(&f))?;
             total += n;
             all.extend(list);
         }
@@ -942,6 +953,23 @@ impl MailService {
             }
         }
         out.sort_by(|a, b| a.start.cmp(&b.start).then_with(|| a.end.cmp(&b.end)));
+        Ok(out)
+    }
+
+    /// Events in visible calendars matching the query, latest first.
+    pub fn search_events(&self, q: &EventQuery) -> Result<Vec<CalendarEvent>> {
+        let after = q.after.as_deref().map(normalize_time).transpose()?;
+        let before = q.before.as_deref().map(normalize_time).transpose()?;
+        let mut out = vec![];
+        for a in self.graph_accounts()? {
+            for e in self.with_account(&a.id, |db| db.search_events(q, after.as_deref(), before.as_deref(), &a.color))? {
+                if self.app().calendar_visible(&e.calendar_id)? {
+                    out.push(e);
+                }
+            }
+        }
+        out.sort_by(|a, b| b.start.cmp(&a.start));
+        out.truncate(q.limit.unwrap_or(200).clamp(1, 500) as usize);
         Ok(out)
     }
 

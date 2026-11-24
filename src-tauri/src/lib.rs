@@ -155,6 +155,7 @@ pub fn run() {
             commands::list_calendars,
             commands::set_calendar_visible,
             commands::list_events,
+            commands::search_events,
             commands::agenda,
             commands::create_event,
             commands::update_event,
@@ -179,4 +180,40 @@ pub fn run() {
         ])
         .run(context())
         .expect("error while running the mail app");
+}
+
+#[cfg(test)]
+mod tests {
+    /// The names between `start` and `end`: `"name"` in build.rs and app.toml, `call('name'`
+    /// in the interface.
+    fn names(src: &str, start: &str, end: char) -> Vec<String> {
+        src.split(start).skip(1).filter_map(|s| s.split(end).next()).map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()
+    }
+
+    /// A command the interface calls must be registered, listed in build.rs and allowed in
+    /// app.toml, or Tauri refuses it at run time.
+    #[test]
+    fn every_command_is_allowed() {
+        let lib = include_str!("lib.rs");
+        let handlers = &lib[lib.find("generate_handler![").unwrap()..];
+        let handlers: Vec<String> = handlers["generate_handler![".len()..handlers.find(']').unwrap()]
+            .split(',')
+            .filter_map(|h| h.trim().rsplit("::").next())
+            .filter(|h| !h.is_empty())
+            .map(String::from)
+            .collect();
+        let build = include_str!("../build.rs");
+        let listed = names(&build[build.find("COMMANDS").unwrap()..build.find("];").unwrap()], "\"", '"');
+        let toml = include_str!("../permissions/app.toml");
+        let allowed = names(toml, "\"allow-", '"');
+        let called = names(include_str!("../../src/api/tauri.ts"), "call('", '\'');
+        assert!(handlers.len() > 40, "parsed {} handlers", handlers.len());
+        for c in &called {
+            assert!(handlers.contains(c), "the interface calls `{c}`, which isn't in generate_handler!");
+        }
+        for h in &handlers {
+            assert!(listed.contains(h), "`{h}` is missing from COMMANDS in build.rs");
+            assert!(allowed.contains(&h.replace('_', "-")), "`allow-{}` is missing from permissions/app.toml", h.replace('_', "-"));
+        }
+    }
 }

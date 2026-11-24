@@ -130,8 +130,13 @@ export interface Thread {
 
 export type DateFilter = 'any' | 'week' | 'month' | 'year';
 
+/** What the search text is matched against. "content" is subject and body. */
+export type SearchField = 'from' | 'to' | 'subject' | 'content' | 'all';
+
 export interface SearchQuery {
   text: string;
+  /** Defaults to "all". */
+  field?: SearchField;
   scope: ViewScope;
   /** Widen "In: Inbox" to all folders. */
   allFolders: boolean;
@@ -196,6 +201,20 @@ export interface CalendarEvent {
   reminderMinutes?: number;
   isCancelled: boolean;
   color: string;
+}
+
+/** What event search text is matched against. "people" is organizer and attendees. */
+export type EventField = 'title' | 'people' | 'all';
+
+export interface EventQuery {
+  text: string;
+  /** Defaults to "all". */
+  field?: EventField;
+  /** Only events ending after this time. */
+  after?: string;
+  /** Only events starting before this time. */
+  before?: string;
+  limit?: number;
 }
 
 export interface EventInput {
@@ -317,6 +336,8 @@ export interface MailApi {
   listCalendars(): Promise<CalendarInfo[]>;
   setCalendarVisible(calendarId: string, visible: boolean): Promise<void>;
   listEvents(start: string, end: string): Promise<CalendarEvent[]>;
+  /** Events matching every word in the query's field, within its dates, latest first. */
+  searchEvents(query: EventQuery): Promise<CalendarEvent[]>;
   agenda(days: number): Promise<AgendaDay[]>;
   createEvent(input: EventInput): Promise<CalendarEvent>;
   updateEvent(eventId: string, input: EventInput): Promise<CalendarEvent>;
