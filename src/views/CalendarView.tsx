@@ -9,6 +9,7 @@ import { eventBorder, eventFill, eventSelectedFill } from '../lib/colors';
 import { EventForm } from './EventForm';
 import { eventWhere } from '../components/Agenda';
 import { useToast } from '../components/ui';
+import { eventTitle } from '../lib/text';
 
 type Mode = 'day' | 'week' | 'month';
 const HOUR = 56;
@@ -72,7 +73,7 @@ function EventPanel({ event, onChanged, onEdit, onDeleted }: { event: CalendarEv
         <span className="acc-dot" style={{ background: acc?.color ?? event.color }} />
         {acc?.displayName}
       </span>
-      <h2>{event.subject}</h2>
+      <h2>{eventTitle(event)}</h2>
       <div className="facts">
         <span>{longDate(start)}</span>
         <span>{event.isAllDay ? 'All day' : `${hhmm(start)} – ${hhmm(end)}`}</span>
@@ -222,7 +223,7 @@ export function CalendarView() {
                 .filter((e) => e.isAllDay)
                 .map((e) => (
                   <button key={e.id} type="button" className="all-day-event" style={style(e, e.id === selectedId)} onClick={() => setSelectedId(e.id)}>
-                    {e.subject}
+                    {eventTitle(e)}
                   </button>
                 ))}
             </div>
@@ -276,9 +277,9 @@ export function CalendarView() {
                       }}
                       onClick={() => setSelectedId(e.id)}
                       onDoubleClick={() => e.myResponse === 'organizer' && setForm({ event: e })}
-                      title={`${e.subject} · ${hhmm(s)} – ${hhmm(en)}${eventWhere(e) ? ' · ' + eventWhere(e) : ''}`}
+                      title={`${eventTitle(e)} · ${hhmm(s)} – ${hhmm(en)}${eventWhere(e) ? ' · ' + eventWhere(e) : ''}`}
                     >
-                      <span className="title">{e.subject}</span>
+                      <span className="title">{eventTitle(e)}</span>
                       {!short && (
                         <span className="time">
                           {hhmm(s)} – {hhmm(en)}
@@ -321,7 +322,7 @@ export function CalendarView() {
                 <button key={e.id} type="button" className="month-event" onClick={() => setSelectedId(e.id)} style={e.id === selectedId ? { background: eventFill(e.color, dark) } : undefined}>
                   <span className="acc-dot" style={{ background: e.color }} />
                   {!e.isAllDay && <span className="t">{hhmm(new Date(e.start))}</span>}
-                  <span className="s">{e.subject}</span>
+                  <span className="s">{eventTitle(e)}</span>
                 </button>
               ))}
               {list.length > 3 && <span className="month-more">{list.length - 3} more</span>}

@@ -50,3 +50,8 @@ export function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
+
+/** Event title as shown in the calendar; Outlook allows events with no subject. */
+export function eventTitle(e: { subject: string }): string {
+  return e.subject.trim() || '(No title)';
+}

@@ -17,6 +17,8 @@ use std::sync::Arc;
 /// Calendar window: 3 months back, 12 months forward.
 pub const CAL_BACK_DAYS: i64 = 92;
 pub const CAL_FORWARD_DAYS: i64 = 366;
+/// Bumped to force one full calendar re-read after a change in how delta items are stored.
+const CAL_DELTA_VERSION: &str = "2";
 /// Graph accepts simple attachments up to 3 MB; larger ones use an upload session.
 const SMALL_ATTACHMENT: u64 = 3 * 1024 * 1024;
 const CHUNK: usize = 5 * 320 * 1024;
@@ -381,7 +383,16 @@ impl<'a> Syncer<'a> {
     /// calendarView/delta for the default calendar; restarted when the window moves on a day.
     async fn sync_default_calendar(&self, cal: &str, start: &str, end: &str, report: &mut SyncReport) -> Result<()> {
         let window = format!("{start}|{end}");
+        // Rows written before partial delta items were merged may have lost their titles:
+        // drop the saved delta link once so the next round re-reads the whole window.
+        if self.db(|db| db.kv_get("calDeltaVersion"))?.as_deref() != Some(CAL_DELTA_VERSION) {
+            self.db(|db| {
+                db.kv_set("calWindow", "")?;
+                db.kv_set("calDeltaVersion", CAL_DELTA_VERSION)
+            })?;
+        }
         let saved_window = self.db(|db| db.kv_get("calWindow"))?;
+        let mut masters = std::collections::HashMap::new();
         let mut url = match (self.db(|db| db.kv_get("calDelta"))?, saved_window.as_deref() == Some(window.as_str())) {
             (Some(link), true) => link,
             _ => format!("/me/calendarView/delta?startDateTime={start}&endDateTime={end}"),
@@ -404,7 +415,7 @@ impl<'a> Syncer<'a> {
                 if item.get("@removed").is_some() {
                     self.db(|db| db.delete_event(&id))?;
                 } else {
-                    let rec = graph::event_record(&item, cal);
+                    let rec = self.merged_event(&item, cal, &mut masters).await?;
                     self.db(|db| db.upsert_event(&rec))?;
                     seen.push(id);
                 }
@@ -426,6 +437,37 @@ impl<'a> Syncer<'a> {
             self.db(|db| db.retain_events_in_range(cal, start, end, &seen))?;
         }
         Ok(())
+    }
+
+    /// A delta item merged onto what is stored for it. An occurrence that arrives with no
+    /// details and has nothing stored takes them from its series master.
+    async fn merged_event(&self, item: &Value, cal: &str, masters: &mut std::collections::HashMap<String, Option<Value>>) -> Result<crate::db::account::EventRecord> {
+        let id = item["id"].as_str().unwrap_or("").to_string();
+        if item["type"].as_str() == Some("seriesMaster") {
+            masters.insert(id.clone(), Some(item.clone()));
+        }
+        let stored = self.db(|db| db.get_event_record(&id))?.filter(|r| !r.subject.is_empty());
+        if stored.is_some() || !graph::is_bare_occurrence(item) {
+            return Ok(graph::event_record_over(item, cal, stored.as_ref()));
+        }
+        let master_id = item["seriesMasterId"].as_str().unwrap_or("").to_string();
+        if !masters.contains_key(&master_id) {
+            let fetched = self
+                .graph
+                .get(&format!(
+                    "/me/events/{}?$select=subject,isAllDay,location,body,organizer,attendees,responseStatus,isOnlineMeeting,onlineMeeting,isReminderOn,reminderMinutesBeforeStart,isCancelled",
+                    quote(&master_id)
+                ))
+                .await;
+            let master = match fetched {
+                Ok(v) => Some(v),
+                Err(e) if e.is_network() => return Err(e),
+                Err(_) => None,
+            };
+            masters.insert(master_id.clone(), master);
+        }
+        let base = masters.get(&master_id).cloned().flatten().map(|m| graph::event_record(&m, cal));
+        Ok(graph::event_record_over(item, cal, base.as_ref()))
     }
 
     async fn sync_other_calendar(&self, cal: &str, start: &str, end: &str, report: &mut SyncReport) -> Result<()> {

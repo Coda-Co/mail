@@ -861,6 +861,34 @@ impl AccountDb {
         Ok(())
     }
 
+    /// The stored row for an event, as written by `upsert_event`.
+    pub fn get_event_record(&self, raw_id: &str) -> Result<Option<EventRecord>> {
+        Ok(self
+            .conn
+            .query_row(&format!("SELECT {}, local_only FROM events WHERE id = ?1", Self::EVENT_COLS), [raw_id], |r| {
+                let resp: String = r.get(10)?;
+                Ok(EventRecord {
+                    id: r.get(0)?,
+                    calendar_id: r.get(1)?,
+                    subject: r.get(2)?,
+                    start: r.get(3)?,
+                    end: r.get(4)?,
+                    is_all_day: r.get(5)?,
+                    location: r.get(6)?,
+                    body_html: r.get(7)?,
+                    organizer: from_json(r.get(8)?),
+                    attendees: from_json(r.get(9)?),
+                    my_response: serde_json::from_value(serde_json::Value::String(resp)).unwrap_or_default(),
+                    is_online_meeting: r.get(11)?,
+                    online_meeting_url: r.get(12)?,
+                    reminder_minutes: r.get(13)?,
+                    is_cancelled: r.get(14)?,
+                    local_only: r.get(15)?,
+                })
+            })
+            .optional()?)
+    }
+
     pub fn delete_event(&self, raw_id: &str) -> Result<()> {
         self.conn.execute("DELETE FROM events WHERE id = ?1", [raw_id])?;
         Ok(())
