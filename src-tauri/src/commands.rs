@@ -332,8 +332,8 @@ pub async fn set_calendar_visible(s: State<'_, AppState>, calendar_id: String, v
 }
 
 #[tauri::command]
-pub async fn search_events(s: State<'_, AppState>, text: String, limit: i64) -> R<Vec<CalendarEvent>> {
-    s.svc.search_events(&text, limit)
+pub async fn search_events(s: State<'_, AppState>, query: EventQuery) -> R<Vec<CalendarEvent>> {
+    s.svc.search_events(&query)
 }
 
 #[tauri::command]

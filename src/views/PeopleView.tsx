@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, LoaderCircle } from 'lucide-react';
 import { api } from '../api';
 import type { MessageSummary, Person } from '../api/types';
 import { useApp } from '../state/app';
@@ -16,7 +16,9 @@ export function PeopleView() {
   const [people, setPeople] = useState<Person[] | null>(null);
   const selectedEmail = app.route.param ?? null;
   const [person, setPerson] = useState<Person | null>(null);
-  const [recent, setRecent] = useState<MessageSummary[]>([]);
+  // Recent mail with the selected person; null while loading.
+  const [recent, setRecent] = useState<MessageSummary[] | null>(null);
+  const loadedFor = useRef<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => api.listPeople(q, 200).then(setPeople), 80);
@@ -24,19 +26,30 @@ export function PeopleView() {
   }, [q, app.mailVersion]);
 
   useEffect(() => {
+    // A new person: clear the last one's mail. A sync refreshes in place, without the spinner.
+    if (loadedFor.current !== selectedEmail) setRecent(null);
+    loadedFor.current = selectedEmail;
     if (!selectedEmail) {
       setPerson(null);
       return;
     }
-    api.getPerson(selectedEmail).then(setPerson);
+    let cancelled = false;
+    api.getPerson(selectedEmail).then((p) => !cancelled && setPerson(p));
     const scope = { folder: { role: 'inbox' as const }, tab: 'all' as const };
     Promise.all([
       api.search({ text: '', scope, allFolders: true, from: selectedEmail }),
       api.search({ text: '', scope, allFolders: true, to: selectedEmail }),
-    ]).then(([a, b]) => {
-      const all = [...a.messages, ...b.messages.filter((m) => !a.messages.some((x) => x.id === m.id))];
-      setRecent(all.sort((x, y) => y.receivedAt.localeCompare(x.receivedAt)).slice(0, 30));
-    });
+    ]).then(
+      ([a, b]) => {
+        if (cancelled) return;
+        const all = [...a.messages, ...b.messages.filter((m) => !a.messages.some((x) => x.id === m.id))];
+        setRecent(all.sort((x, y) => y.receivedAt.localeCompare(x.receivedAt)).slice(0, 30));
+      },
+      () => !cancelled && setRecent([]),
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [selectedEmail, app.mailVersion]);
 
   const select = (email: string | null) => app.navigate(email ? { view: 'people', param: email } : { view: 'people' });
@@ -100,7 +113,15 @@ export function PeopleView() {
             </div>
             <div className="section-title">Recent mail</div>
             <div className="message-rows">
-              {recent.map((m) => (
+              {recent === null && (
+                <div className="list-empty">
+                  <span className="list-searching" role="status">
+                    <LoaderCircle size={16} className="spin" aria-hidden />
+                    Loading recent mail…
+                  </span>
+                </div>
+              )}
+              {recent?.map((m) => (
                 <MessageRow
                   key={m.id}
                   m={m}
@@ -108,7 +129,7 @@ export function PeopleView() {
                   onSelect={() => api.popOut('message', m.id)}
                 />
               ))}
-              {recent.length === 0 && <div className="list-empty">No messages in the offline window</div>}
+              {recent?.length === 0 && <div className="list-empty">No messages in the offline window</div>}
             </div>
           </>
         ) : (

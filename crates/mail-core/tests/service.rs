@@ -157,7 +157,8 @@ fn search_filters_the_view() {
 #[test]
 fn search_events_by_title_place_and_people() {
     let (svc, _) = setup();
-    let subjects = |text: &str| svc.search_events(text, 50).unwrap().into_iter().map(|e| e.subject).collect::<Vec<_>>();
+    let find = |q: EventQuery| svc.search_events(&q).unwrap().into_iter().map(|e| e.subject).collect::<Vec<_>>();
+    let subjects = |text: &str| find(EventQuery { text: text.into(), ..Default::default() });
     assert_eq!(subjects("steering"), vec!["Steering committee"]);
     assert_eq!(subjects("3rd floor"), vec!["Steering committee"]);
     // Organizer or attendee, by name or address; latest first.
@@ -167,6 +168,18 @@ fn search_events_by_title_place_and_people() {
     assert!(subjects("email").is_empty());
     assert!(subjects("%").is_empty());
     assert!(subjects("  ").is_empty());
+    // By field.
+    assert!(find(EventQuery { text: "okafor".into(), field: EventField::Title, ..Default::default() }).is_empty());
+    assert_eq!(find(EventQuery { text: "debrief".into(), field: EventField::Title, ..Default::default() }), vec!["Debrief"]);
+    assert_eq!(find(EventQuery { text: "priya".into(), field: EventField::People, ..Default::default() }).len(), 2);
+    assert!(find(EventQuery { text: "floor".into(), field: EventField::People, ..Default::default() }).is_empty());
+    // By date, with or without words.
+    let steering = svc.search_events(&EventQuery { text: "steering".into(), ..Default::default() }).unwrap().remove(0);
+    let before_it = EventQuery { text: "okafor".into(), before: Some(steering.start.clone()), ..Default::default() };
+    assert_eq!(find(before_it), vec!["Portfolio scan check-in"]);
+    let after_it = EventQuery { after: Some(steering.end.clone()), field: EventField::Title, ..Default::default() };
+    assert!(find(after_it.clone()).contains(&"Debrief".to_string()));
+    assert!(!find(after_it).contains(&"Steering committee".to_string()));
 }
 
 #[test]

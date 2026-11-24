@@ -956,18 +956,20 @@ impl MailService {
         Ok(out)
     }
 
-    /// Events in visible calendars matching `text`, latest first.
-    pub fn search_events(&self, text: &str, limit: i64) -> Result<Vec<CalendarEvent>> {
+    /// Events in visible calendars matching the query, latest first.
+    pub fn search_events(&self, q: &EventQuery) -> Result<Vec<CalendarEvent>> {
+        let after = q.after.as_deref().map(normalize_time).transpose()?;
+        let before = q.before.as_deref().map(normalize_time).transpose()?;
         let mut out = vec![];
         for a in self.graph_accounts()? {
-            for e in self.with_account(&a.id, |db| db.search_events(text, limit, &a.color))? {
+            for e in self.with_account(&a.id, |db| db.search_events(q, after.as_deref(), before.as_deref(), &a.color))? {
                 if self.app().calendar_visible(&e.calendar_id)? {
                     out.push(e);
                 }
             }
         }
         out.sort_by(|a, b| b.start.cmp(&a.start));
-        out.truncate(limit.clamp(1, 500) as usize);
+        out.truncate(q.limit.unwrap_or(200).clamp(1, 500) as usize);
         Ok(out)
     }
 

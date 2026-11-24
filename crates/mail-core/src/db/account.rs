@@ -466,6 +466,10 @@ impl AccountDb {
             args.push(Value::Text(e.to_lowercase()));
         }
         if let Some(e) = &f.to_email {
+            // The index narrows to messages with these words among the recipients; the JSON
+            // check then keeps exact matches. Scanning every message's JSON is slow on a big mailbox.
+            wh.push("m.pk IN (SELECT rowid FROM messages_fts WHERE messages_fts MATCH ?)".into());
+            args.push(Value::Text(format!("{{recipients}}: \"{}\"", e.replace('"', ""))));
             wh.push(
                 "(EXISTS (SELECT 1 FROM json_each(m.to_json) j WHERE lower(json_extract(j.value, '$.email')) = ?)
                   OR EXISTS (SELECT 1 FROM json_each(m.cc_json) j WHERE lower(json_extract(j.value, '$.email')) = ?))"
@@ -1073,19 +1077,39 @@ impl AccountDb {
         Ok(rows)
     }
 
-    /// Events whose title, location, organizer or attendees contain every word of `text`.
-    pub fn search_events(&self, text: &str, limit: i64, color: &str) -> Result<Vec<CalendarEvent>> {
-        let words: Vec<String> = text.split_whitespace().map(|w| format!("%{}%", w.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"))).collect();
-        if words.is_empty() {
+    /// Events matching every word of the query in its field, within its date range; latest first.
+    /// `after` and `before` are normalised UTC times.
+    pub fn search_events(&self, q: &EventQuery, after: Option<&str>, before: Option<&str>, color: &str) -> Result<Vec<CalendarEvent>> {
+        let words: Vec<String> = q.text.split_whitespace().map(|w| format!("%{}%", w.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"))).collect();
+        if words.is_empty() && after.is_none() && before.is_none() {
             return Ok(vec![]);
         }
         // Names and addresses only, not the JSON keys around them.
-        let hay = "(subject || ' ' || location || ' ' || coalesce(json_extract(organizer_json, '$.name'), '') || ' ' || coalesce(json_extract(organizer_json, '$.email'), '') || ' '
-            || coalesce((SELECT group_concat(coalesce(json_extract(j.value, '$.address.name'), '') || ' ' || coalesce(json_extract(j.value, '$.address.email'), ''), ' ') FROM json_each(attendees_json) j), ''))";
-        let wh = vec![format!("{hay} LIKE ? ESCAPE '\\'"); words.len()].join(" AND ");
-        let sql = format!("SELECT {} FROM events WHERE is_cancelled = 0 AND {wh} ORDER BY start_at DESC LIMIT {}", Self::EVENT_COLS, limit.clamp(1, 500));
+        let people = "coalesce(json_extract(organizer_json, '$.name'), '') || ' ' || coalesce(json_extract(organizer_json, '$.email'), '') || ' '
+            || coalesce((SELECT group_concat(coalesce(json_extract(j.value, '$.address.name'), '') || ' ' || coalesce(json_extract(j.value, '$.address.email'), ''), ' ') FROM json_each(attendees_json) j), '')";
+        let hay = match q.field {
+            EventField::Title => "subject".to_string(),
+            EventField::People => format!("({people})"),
+            EventField::All => format!("(subject || ' ' || location || ' ' || {people} || ' ' || body_html)"),
+        };
+        let mut wh = vec!["is_cancelled = 0".to_string()];
+        let mut args: Vec<String> = vec![];
+        for w in words {
+            wh.push(format!("{hay} LIKE ? ESCAPE '\\'"));
+            args.push(w);
+        }
+        if let Some(a) = after {
+            wh.push("end_at > ?".into());
+            args.push(a.to_string());
+        }
+        if let Some(b) = before {
+            wh.push("start_at < ?".into());
+            args.push(b.to_string());
+        }
+        let limit = q.limit.unwrap_or(200).clamp(1, 500);
+        let sql = format!("SELECT {} FROM events WHERE {} ORDER BY start_at DESC LIMIT {limit}", Self::EVENT_COLS, wh.join(" AND "));
         let mut st = self.conn.prepare(&sql)?;
-        let rows = st.query_map(params_from_iter(words), |r| self.row_event(r, color))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        let rows = st.query_map(params_from_iter(args), |r| self.row_event(r, color))?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
 
