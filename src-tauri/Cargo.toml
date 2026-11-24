@@ -33,3 +33,4 @@ reqwest.workspace = true
 chrono.workspace = true
 tracing.workspace = true
 sha2 = "0.10"
+clipboard-rs = { version = "0.3", default-features = false }

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ExternalLink, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, Copy, ExternalLink, MoreHorizontal } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
 import type { Draft, DraftMode, Folder, Message, Thread } from '../api/types';
 import { useApp } from '../state/app';
 import { useCommand } from '../lib/commands';
+import { isMac } from '../lib/platform';
 import { fullTime } from '../lib/dates';
 import { formatSize } from '../lib/text';
 import { Avatar, Menu, useToast, type Anchor, type MenuItem } from './ui';
@@ -18,6 +19,75 @@ function recipients(m: Message, meName: string, myEmails: string[]): string {
   const names = m.to.map((a) => (myEmails.includes(a.email.toLowerCase()) ? meName : a.name || a.email));
   if (names.length <= 2) return names.join(', ');
   return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+}
+
+/** Click selects (Ctrl/Cmd+click adds), Ctrl/Cmd+C copies the files, double-click or Enter opens. */
+export function AttachmentList({ message }: { message: Message }) {
+  const toast = useToast();
+  const files = message.attachments.filter((a) => !a.isInline);
+  const [selected, setSelected] = useState<string[]>([]);
+  if (files.length === 0) return null;
+
+  const copy = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    try {
+      await api.copyAttachments(message.id, ids);
+      toast(ids.length === 1 ? `Copied ${files.find((a) => a.id === ids[0])?.name ?? 'attachment'}` : `Copied ${ids.length} attachments`);
+    } catch (e) {
+      toast(`Couldn't copy: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  return (
+    <div
+      className="attachments"
+      onBlur={(e) => {
+        // Clicking anywhere else clears the selection, like a file manager.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setSelected([]);
+      }}
+    >
+      {files.map((a) => (
+        <button
+          key={a.id}
+          type="button"
+          className="attachment-chip"
+          aria-pressed={selected.includes(a.id)}
+          title={`${a.name}\nDouble-click to open, ${isMac ? 'Cmd' : 'Ctrl'}+C to copy`}
+          onClick={(e) => {
+            const add = isMac ? e.metaKey : e.ctrlKey;
+            setSelected((cur) => (add ? (cur.includes(a.id) ? cur.filter((x) => x !== a.id) : [...cur, a.id]) : [a.id]));
+          }}
+          onDoubleClick={() => void api.openAttachment(message.id, a.id)}
+          onKeyDown={(e) => {
+            const mod = isMac ? e.metaKey : e.ctrlKey;
+            if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'c') {
+              e.preventDefault();
+              void copy(selected.length > 0 ? selected : [a.id]);
+            } else if (mod && e.key.toLowerCase() === 'a') {
+              e.preventDefault();
+              setSelected(files.map((f) => f.id));
+            } else if (e.key === 'Enter') {
+              e.preventDefault();
+              void api.openAttachment(message.id, a.id);
+            }
+          }}
+        >
+          <FileIcon name={a.name} contentType={a.contentType} />
+          <span className="name">{a.name}</span>
+          <span className="size">{formatSize(a.size)}</span>
+        </button>
+      ))}
+      <button
+        type="button"
+        className="btn btn-ghost btn-icon attachments-copy"
+        aria-label={files.length === 1 ? 'Copy attachment' : 'Copy all attachments'}
+        title={files.length === 1 ? 'Copy attachment' : 'Copy all attachments'}
+        onClick={() => void copy(files.map((a) => a.id))}
+      >
+        <Copy size={15} />
+      </button>
+    </div>
+  );
 }
 
 function MessageView({
@@ -106,19 +176,7 @@ function MessageView({
           </button>
         </div>
       )}
-      {message.attachments.filter((a) => !a.isInline).length > 0 && (
-        <div className="attachments">
-          {message.attachments
-            .filter((a) => !a.isInline)
-            .map((a) => (
-              <button key={a.id} type="button" className="attachment-chip" onClick={() => api.openAttachment(message.id, a.id)} title={`Open ${a.name}`}>
-                <FileIcon name={a.name} contentType={a.contentType} />
-                <span className="name">{a.name}</span>
-                <span className="size">{formatSize(a.size)}</span>
-              </button>
-            ))}
-        </div>
-      )}
+      <AttachmentList message={message} />
       <MessageBody html={showQuoted ? message.bodyHtml : split.main} cacheKey={showQuoted || !split.hasQuote ? message.id : `${message.id}:new`} />
       {split.hasQuote && (
         <button

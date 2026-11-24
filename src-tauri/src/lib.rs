@@ -2,6 +2,7 @@
 //! and the bridge from the React interface to mail-core.
 
 mod commands;
+mod clipboard;
 mod events;
 mod state;
 mod tray;
@@ -138,6 +139,7 @@ pub fn run() {
             commands::allow_remote_images,
             commands::show_remote_images_once,
             commands::open_attachment,
+            commands::copy_attachments,
             commands::create_draft,
             commands::get_draft,
             commands::update_draft,
