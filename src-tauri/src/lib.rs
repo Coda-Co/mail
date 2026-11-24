@@ -89,7 +89,9 @@ pub fn run() {
             create_main_window(app)?;
             tray::create(&handle)?;
             if !demo {
-                tauri::async_runtime::spawn(mail_core::sync::run_loop(svc.clone(), clients, wake, std::time::Duration::from_secs(45)));
+                // New mail within ~10 seconds; folders, other mail folders and calendars every 2 minutes.
+                let (inbox_every, full_every) = (std::time::Duration::from_secs(10), std::time::Duration::from_secs(120));
+                tauri::async_runtime::spawn(mail_core::sync::run_loop(svc.clone(), clients, wake, inbox_every, full_every));
             }
             tauri::async_runtime::spawn(events::reminder_loop(handle.clone()));
             // Web accounts stay loaded in the background so counts and notifications stay live.

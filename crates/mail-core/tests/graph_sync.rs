@@ -356,3 +356,27 @@ async fn partial_message_delta_items_keep_details() {
     assert!(!m4.received_at.is_empty());
     assert_eq!(*events.new_mail.lock().unwrap(), vec!["DocuSign completed".to_string()]);
 }
+
+#[tokio::test]
+async fn inbox_pass_fetches_new_mail_with_one_request() {
+    let (server, svc, acc, events) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    // Before the first full sync there is nothing to build on: no requests at all.
+    Syncer::new(&svc, &g, acc.clone()).run_inbox().await.unwrap();
+    assert!(server.received_requests().await.unwrap().is_empty());
+
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    let before = server.received_requests().await.unwrap().len();
+    let acc = svc.get_account(&acc.id).unwrap();
+    let r = Syncer::new(&svc, &g, acc.clone()).run_inbox().await.unwrap();
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(requests.len() - before, 1, "only the inbox delta link");
+    assert!(requests.last().unwrap().url.query().unwrap_or("").contains("deltatoken=t1"));
+
+    assert_eq!(r.messages_changed, 2);
+    let subjects: Vec<String> = svc.list_messages(&ViewScope::unified_inbox(), 50, 0).unwrap().into_iter().map(|m| m.subject).collect();
+    assert!(subjects.contains(&"Brand new".to_string()));
+    assert!(!subjects.contains(&"Invoice".to_string()));
+    assert_eq!(*events.new_mail.lock().unwrap(), vec!["Brand new".to_string()]);
+    assert_eq!(svc.get_account(&acc.id).unwrap().sync_state, SyncState::Idle);
+}

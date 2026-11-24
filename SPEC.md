@@ -144,7 +144,7 @@ Main risk: multi-webview with isolated storage per account on both platforms in 
 ### Sync (Graph accounts)
 
 - Folder list, then message delta queries per folder (`/messages/delta`), storing delta tokens.
-- Poll every 30 to 60 seconds while online; immediate sync on focus and after any action. Change notifications are out of scope for v1 (they need a public endpoint).
+- Poll the inbox delta every 10 seconds and run the full sync every 2 minutes while online; immediate sync on focus and after any action. Change notifications are out of scope for v1 (they need a public endpoint).
 - Offline window per account (default 6 months of full messages; older mail as headers on demand).
 - Calendar via `calendarView/delta` for a rolling window (for example 3 months back, 12 months forward).
 - Local changes (read, flag, move, delete, drafts) queue and replay with retries. Respect `Retry-After` on 429 responses.

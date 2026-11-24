@@ -86,6 +86,36 @@ impl<'a> Syncer<'a> {
         }
     }
 
+    /// Inbox delta only, run between full cycles so new mail shows within seconds. Waits until
+    /// the first full sync (and any one-time re-read) is done; network errors are left for
+    /// the next full cycle to report.
+    pub async fn run_inbox(&self) -> Result<SyncReport> {
+        let mut report = SyncReport::default();
+        let ready = self.db(|db| Ok(db.kv_get("initialSyncDone")?.is_some() && db.kv_get("mailDeltaVersion")?.as_deref() == Some(MAIL_DELTA_VERSION)))?;
+        let inbox = self.db(|db| db.folder_ids())?.into_iter().find(|(_, role)| *role == Some(FolderRole::Inbox));
+        let Some((folder, role)) = inbox.filter(|_| ready) else { return Ok(report) };
+        match self.sync_folder(&folder, role, false, &mut report).await {
+            Ok(()) => {}
+            Err(e) if e.is_network() => {
+                report.offline = true;
+                return Ok(report);
+            }
+            Err(e) => return Err(e),
+        }
+        // Keep "last synced" current, without overwriting an offline or error state.
+        if self.account.sync_state == SyncState::Idle {
+            self.svc.app().set_sync_state(self.acc(), SyncState::Idle, None)?;
+            self.svc.events().sync_status();
+        }
+        if report.messages_changed > 0 {
+            self.svc.events().mail_changed(std::slice::from_ref(&self.account.id));
+        }
+        if !report.new_mail.is_empty() && self.account.notifications {
+            self.svc.events().new_mail(&self.account, &report.new_mail);
+        }
+        Ok(report)
+    }
+
     async fn run_inner(&self, report: &mut SyncReport) -> Result<()> {
         self.replay_ops(report).await?;
         if report.offline {
@@ -936,8 +966,11 @@ pub fn merge_search(svc: &MailService, local: SearchResult, server_ids: &[String
 /// Factory for Graph clients, one per account.
 pub type ClientFactory = Arc<dyn Fn(&Account) -> Result<GraphClient> + Send + Sync>;
 
-/// Run sync for every Graph account, forever: every `interval`, or sooner when woken.
-pub async fn run_loop(svc: Arc<MailService>, clients: ClientFactory, wake: Arc<tokio::sync::Notify>, interval: std::time::Duration) {
+/// Run sync for every Graph account, forever: the inbox every `inbox_every`, and a full
+/// cycle every `full_every` or straight away when woken (focus, after an action).
+pub async fn run_loop(svc: Arc<MailService>, clients: ClientFactory, wake: Arc<tokio::sync::Notify>, inbox_every: std::time::Duration, full_every: std::time::Duration) {
+    let mut full = true;
+    let mut last_full = tokio::time::Instant::now();
     loop {
         let accounts = svc.graph_accounts().unwrap_or_default();
         for a in accounts {
@@ -946,17 +979,22 @@ pub async fn run_loop(svc: Arc<MailService>, clients: ClientFactory, wake: Arc<t
             }
             match clients(&a) {
                 Ok(client) => {
-                    if let Err(e) = Syncer::new(&svc, &client, a.clone()).run().await {
+                    let syncer = Syncer::new(&svc, &client, a.clone());
+                    let result = if full { syncer.run().await } else { syncer.run_inbox().await };
+                    if let Err(e) = result {
                         tracing::warn!("sync {}: {e}", a.email);
                     }
                 }
                 Err(e) => tracing::warn!("no client for {}: {e}", a.email),
             }
         }
-        tokio::select! {
-            _ = wake.notified() => {}
-            _ = tokio::time::sleep(interval) => {}
+        if full {
+            last_full = tokio::time::Instant::now();
         }
+        full = tokio::select! {
+            _ = wake.notified() => true,
+            _ = tokio::time::sleep(inbox_every) => last_full.elapsed() >= full_every,
+        };
     }
 }
 

@@ -59,7 +59,7 @@ docs/                 Security note for client admins, app registration, releasi
 
 1. The interface calls a command.
 2. The core applies the change to the local database immediately and queues a pending operation.
-3. The sync engine replays the queue against Graph (with retries and backoff), then runs folder and message delta and calendar sync. It runs every 45 seconds, on window focus, and straight after any action.
+3. The sync engine replays the queue against Graph (with retries and backoff), then runs folder and message delta and calendar sync. The inbox is checked every 10 seconds; the full cycle runs every 2 minutes, on window focus, and straight after any action.
 4. Change notifications are out of scope for v1 (they need a public endpoint).
 
 Sending is a queued operation like any other, with three rules:
