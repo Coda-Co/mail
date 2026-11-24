@@ -659,6 +659,26 @@ impl AccountDb {
         Ok(rows)
     }
 
+    /// Cached files of messages received since `since`.
+    pub fn cached_attachment_paths_since(&self, since: &str) -> Result<Vec<String>> {
+        let mut st = self.conn.prepare(
+            "SELECT a.local_path FROM attachments a JOIN messages m ON m.id = a.message_id
+             WHERE m.received_at >= ?1 AND a.local_path IS NOT NULL",
+        )?;
+        let rows = st.query_map([since], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
+        Ok(rows)
+    }
+
+    /// Forget cached files that were deleted from disk.
+    pub fn clear_attachment_paths(&self, paths: &[String]) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        for p in paths {
+            tx.execute("UPDATE attachments SET local_path = NULL WHERE local_path = ?1", [p])?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn set_attachment_failed(&self, raw_message_id: &str, attachment_id: &str) -> Result<()> {
         self.conn.execute("UPDATE attachments SET download_failed = 1 WHERE message_id = ?1 AND id = ?2", params![raw_message_id, attachment_id])?;
         Ok(())

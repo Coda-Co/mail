@@ -140,6 +140,7 @@ impl<'a> Syncer<'a> {
         self.sync_attachments(ATTACHMENT_BUDGET_FULL, report).await?;
         self.sync_calendars(report).await?;
         self.prune_bodies()?;
+        self.prune_attachments()?;
         Ok(())
     }
 
@@ -334,6 +335,38 @@ impl<'a> Syncer<'a> {
         })
     }
 
+    /// Delete cached attachment files that no longer belong to mail inside the offline window
+    /// (it slid out, or the message was deleted). Old attachments still open on demand: they're
+    /// downloaded again. Files touched in the last hour are left for a later cycle, so one just
+    /// opened from an old message isn't pulled from under the app showing it, and a file that
+    /// can't be removed (open elsewhere on Windows) is simply tried again next time.
+    fn prune_attachments(&self) -> Result<()> {
+        let start = self.window_start();
+        let keep: HashSet<String> = self.db(|db| db.cached_attachment_paths_since(&start))?.into_iter().collect();
+        let root = self.svc.paths.attachments_dir(self.acc());
+        let Ok(dirs) = std::fs::read_dir(&root) else { return Ok(()) };
+        let recent = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+        let mut removed = vec![];
+        for dir in dirs.flatten().map(|d| d.path()).filter(|p| p.is_dir()) {
+            for file in std::fs::read_dir(&dir).into_iter().flatten().flatten().map(|f| f.path()) {
+                let p = file.to_string_lossy().to_string();
+                let touched = std::fs::metadata(&file).and_then(|m| m.modified()).map(|t| t > recent).unwrap_or(true);
+                if keep.contains(&p) || touched {
+                    continue;
+                }
+                match std::fs::remove_file(&file) {
+                    Ok(()) => removed.push(p),
+                    Err(e) => tracing::debug!("keeping {p} for now: {e}"),
+                }
+            }
+            let _ = std::fs::remove_dir(&dir); // only succeeds once empty
+        }
+        if !removed.is_empty() {
+            self.db(|db| db.clear_attachment_paths(&removed))?;
+        }
+        Ok(())
+    }
+
     /// Fetch the body of a header-only message (opened from outside the offline window).
     pub async fn fetch_message(&self, raw_id: &str) -> Result<()> {
         let v = self.graph.get(&format!("/me/messages/{}?$select={}", quote(raw_id), MESSAGE_SELECT)).await?;
@@ -345,8 +378,23 @@ impl<'a> Syncer<'a> {
     pub async fn ensure_attachments(&self, raw_id: &str) -> Result<bool> {
         let m = self.db(|db| db.get_message(raw_id))?;
         let needs = m.message.summary.has_attachments || m.message.body_html.contains("cid:");
-        if !needs || self.db(|db| Ok(db.attachments_checked(raw_id)? || db.has_attachment_rows(raw_id)?))? {
+        if !needs {
             return Ok(false);
+        }
+        if self.db(|db| Ok(db.attachments_checked(raw_id)? || db.has_attachment_rows(raw_id)?))? {
+            // Known list: bring back inline images pruned from the cache when the message
+            // left the offline window, so the body shows them again.
+            let missing: Vec<String> = self
+                .db(|db| db.list_attachments(raw_id))?
+                .into_iter()
+                .filter(|a| a.content_id.is_some() && a.size <= 2_000_000)
+                .filter(|a| !a.local_path.as_deref().is_some_and(|p| std::path::Path::new(p).exists()))
+                .map(|a| a.id)
+                .collect();
+            for id in &missing {
+                self.download_attachment(raw_id, id).await?;
+            }
+            return Ok(!missing.is_empty());
         }
         let v = self
             .graph
