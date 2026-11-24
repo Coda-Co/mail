@@ -382,7 +382,7 @@ pub async fn sync_now(s: State<'_, AppState>, account_id: Option<String>) -> R<(
 
 #[tauri::command]
 pub async fn sync_status(s: State<'_, AppState>) -> R<SyncStatus> {
-    s.svc.sync_status()
+    s.sync_status()
 }
 
 #[tauri::command]

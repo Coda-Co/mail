@@ -51,7 +51,7 @@ impl EventSink for TauriEvents {
     fn sync_status(&self) {
         self.later(|app| {
             if let Some(s) = app.try_state::<AppState>() {
-                if let Ok(st) = s.svc.sync_status() {
+                if let Ok(st) = s.sync_status() {
                     let _ = app.emit("sync://status", st);
                 }
             }

@@ -544,6 +544,19 @@ h3 {
   text-overflow: ellipsis;
 }
 
+.demo-tag {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text);
+  background: var(--chip-neutral);
+  border: 1px solid var(--tag-border);
+  border-radius: 4px;
+  padding: 0 5px;
+  line-height: 16px;
+}
+
 .status-line {
   font-size: var(--fs-small);
   color: var(--text-muted);

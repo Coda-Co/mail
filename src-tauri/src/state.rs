@@ -53,6 +53,16 @@ impl AppState {
         }
     }
 
+    /// Sync status for the interface, flagged when showing sample data.
+    pub fn sync_status(&self) -> Result<mail_core::model::SyncStatus> {
+        let mut st = self.svc.sync_status()?;
+        if self.demo {
+            st.demo = true;
+            st.label = "Sample data · nothing syncs".into();
+        }
+        Ok(st)
+    }
+
     pub fn tokens_for(&self, account: &Account) -> Arc<Tokens> {
         token_entry(&self.token_cache, &self.http, &self.auth, &self.tokens, account)
     }

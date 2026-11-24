@@ -175,6 +175,11 @@ export function Sidebar() {
       <div className="brand">
         <div className="brand-logo">M</div>
         <span className="brand-name">Mail</span>
+        {sync.demo && (
+          <span className="demo-tag" title="Built-in sample data. Nothing here is real or synced. Run pnpm tauri dev for your accounts.">
+            Demo data
+          </span>
+        )}
       </div>
       <button
         type="button"

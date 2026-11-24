@@ -1135,7 +1135,7 @@ impl MailService {
         } else {
             "Synced · offline ready".to_string()
         };
-        Ok(SyncStatus { online, syncing, label, last_synced_at: last, outbox_held: held })
+        Ok(SyncStatus { online, syncing, label, last_synced_at: last, outbox_held: held, demo: false })
     }
 
     // ================================================================= used by sync

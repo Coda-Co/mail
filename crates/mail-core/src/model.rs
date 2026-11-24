@@ -612,6 +612,9 @@ pub struct SyncStatus {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_synced_at: Option<String>,
     pub outbox_held: i64,
+    /// Showing built-in sample data (set by the host in demo mode).
+    #[serde(default)]
+    pub demo: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
