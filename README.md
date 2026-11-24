@@ -33,6 +33,8 @@ MAIL_APP_DEMO=1 pnpm tauri dev    # sample accounts, in memory, no sign-in
 MAIL_APP_CLIENT_ID=<client id> pnpm tauri dev   # real accounts
 ```
 
+Debug builds (`pnpm tauri dev`) run as **Mail Dev** with the identifier `co.coda.mail.dev`. That gives them their own data folder, credential-store entries, web-view sign-ins and single-instance lock, so they run beside the installed app without touching its mail. Release builds (`pnpm tauri build`) are **Mail**, `co.coda.mail`.
+
 Prerequisites are Node 22, pnpm 10 (`corepack enable` picks the version pinned in `package.json`), Rust (stable), and on Linux the WebKitGTK development packages (see `.github/workflows/ci.yml`). Linux is for development only.
 
 ## Layout

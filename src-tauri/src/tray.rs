@@ -13,7 +13,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let sync = MenuItem::with_id(app, "sync", "Sync now", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &sync, &quit])?;
-    let mut b = TrayIconBuilder::with_id(TRAY_ID).tooltip("Mail").menu(&menu).show_menu_on_left_click(false).on_menu_event(|app, e| match e.id.as_ref() {
+    let mut b = TrayIconBuilder::with_id(TRAY_ID).tooltip(crate::app_name()).menu(&menu).show_menu_on_left_click(false).on_menu_event(|app, e| match e.id.as_ref() {
         "show" => show_main(app),
         "sync" => {
             if let Some(s) = app.try_state::<AppState>() {
@@ -45,7 +45,7 @@ pub fn show_main(app: &AppHandle) {
 
 pub fn set_unread(app: &AppHandle, total: i64) {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
-        let tip = if total > 0 { format!("Mail · {total} unread") } else { "Mail".to_string() };
+        let tip = if total > 0 { format!("{} · {total} unread", crate::app_name()) } else { crate::app_name().to_string() };
         let _ = tray.set_tooltip(Some(&tip));
         #[cfg(target_os = "macos")]
         let _ = tray.set_title(if total > 0 { Some(total.to_string()) } else { None });

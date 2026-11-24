@@ -14,10 +14,33 @@ use tauri::{LogicalPosition, Manager, WebviewBuilder, WebviewUrl};
 
 pub const MAIN: &str = "main";
 
+/// Debug builds (`pnpm tauri dev`) run as a separate app, "Mail Dev": their own identifier,
+/// so their own data folder, credential-store entries, web-view storage and single-instance
+/// lock. They can run beside the installed app without touching its mail or sign-ins.
+pub const IS_DEV: bool = cfg!(debug_assertions);
+
+pub fn app_name() -> &'static str {
+    if IS_DEV {
+        "Mail Dev"
+    } else {
+        "Mail"
+    }
+}
+
+fn context() -> tauri::Context<tauri::Wry> {
+    let mut ctx = tauri::generate_context!();
+    if IS_DEV {
+        let cfg = ctx.config_mut();
+        cfg.identifier = format!("{}.dev", cfg.identifier);
+        cfg.product_name = Some(app_name().to_string());
+    }
+    ctx
+}
+
 /// The main window holds the interface as a child web view, so web-account views can sit
 /// beside it as siblings (one window, several web views) on every platform.
 fn create_main_window(app: &tauri::App) -> tauri::Result<()> {
-    let win = tauri::window::WindowBuilder::new(app, MAIN).title("Mail").inner_size(1440.0, 900.0).min_inner_size(720.0, 520.0).center().build()?;
+    let win = tauri::window::WindowBuilder::new(app, MAIN).title(app_name()).inner_size(1440.0, 900.0).min_inner_size(720.0, 520.0).center().build()?;
     let size = win.inner_size()?.to_logical::<f64>(win.scale_factor()?);
     win.add_child(
         WebviewBuilder::new(MAIN, WebviewUrl::App("index.html".into())).auto_resize().disable_drag_drop_handler(),
@@ -58,7 +81,7 @@ pub fn run() {
             };
             let svc = Arc::new(svc);
             svc.set_events(Arc::new(events::TauriEvents::new(handle.clone())));
-            let state = AppState::new(svc.clone(), demo);
+            let state = AppState::new(svc.clone(), demo, &app.config().identifier);
             let wake = state.wake.clone();
             let clients = state.client_factory();
             app.manage(state);
@@ -151,6 +174,6 @@ pub fn run() {
             webaccounts::web_account_report,
             webaccounts::web_account_notify,
         ])
-        .run(tauri::generate_context!())
+        .run(context())
         .expect("error while running the mail app");
 }

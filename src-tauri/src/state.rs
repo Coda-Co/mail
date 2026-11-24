@@ -7,9 +7,6 @@ use mail_core::{Error, MailService, Result};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-/// Keychain / Credential Manager service name.
-pub const KEYRING_SERVICE: &str = "co.coda.mail";
-
 pub struct AppState {
     pub svc: Arc<MailService>,
     pub wake: Arc<tokio::sync::Notify>,
@@ -27,11 +24,13 @@ pub fn client_id() -> String {
 }
 
 impl AppState {
-    pub fn new(svc: Arc<MailService>, demo: bool) -> Self {
+    /// `identifier` doubles as the Keychain / Credential Manager service name, so dev and
+    /// release builds keep separate sign-ins.
+    pub fn new(svc: Arc<MailService>, demo: bool, identifier: &str) -> Self {
         let tokens: Arc<dyn TokenStore> = if demo {
             Arc::new(mail_core::secrets::MemoryTokenStore::default())
         } else {
-            Arc::new(mail_core::secrets::OsKeyring::new(KEYRING_SERVICE))
+            Arc::new(mail_core::secrets::OsKeyring::new(identifier))
         };
         AppState {
             svc,
