@@ -799,7 +799,9 @@ export const demoApi: MailApi = {
     const syncing = state.accounts.some((a) => a.syncState === 'syncing');
     const held = state.drafts.filter((d) => d.status === 'unknown' || d.status === 'queued').length;
     const label = !online ? 'Offline · changes will sync' : syncing ? 'Syncing…' : 'Synced · offline ready';
-    return { online, syncing, label, lastSyncedAt: now().toISOString(), outboxHeld: held };
+    const times = state.accounts.filter((a) => a.kind === 'graph' && a.lastSyncedAt).map((a) => a.lastSyncedAt!);
+    const lastSyncedAt = times.length ? times.reduce((m, t) => (t < m ? t : m)) : undefined;
+    return { online, syncing, label, lastSyncedAt, outboxHeld: held };
   },
   async diskEncryption() {
     if (hasWindow && new URLSearchParams(window.location.search).get('disk') === 'off') return 'off';

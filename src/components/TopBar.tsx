@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import { Search } from 'lucide-react';
 import { useApp } from '../state/app';
 import { keyLabel } from '../lib/platform';
+import { SyncIndicator } from './SyncIndicator';
 
 /**
  * The element in the top bar where the mail view puts its live search box
@@ -32,6 +33,8 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
           </button>
         )}
       </div>
+      <span className="spacer" />
+      <SyncIndicator />
     </header>
   );
 }

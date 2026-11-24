@@ -3,7 +3,7 @@ import { Calendar, Inbox, Settings as Gear, Users } from 'lucide-react';
 import { api } from '../api';
 import type { Account, CalendarInfo, Folder, FolderRole } from '../api/types';
 import { useApp } from '../state/app';
-import { Avatar, Menu, useToast, type Anchor, type MenuItem } from './ui';
+import { Avatar, Menu, type Anchor, type MenuItem } from './ui';
 import { RemoveAccountDialog, ApprovalDialog } from '../views/AccountDialogs';
 import type { AddAccountResult } from '../api/types';
 
@@ -34,8 +34,7 @@ function sortFolders(folders: Folder[]): { folder: Folder; depth: number }[] {
 
 export function Sidebar() {
   const app = useApp();
-  const { route, scope, accounts, graphAccounts, sync, me, mailVersion } = app;
-  const toast = useToast();
+  const { route, scope, accounts, graphAccounts, me, mailVersion } = app;
   const [folders, setFolders] = useState<Folder[]>([]);
   const [calendars, setCalendars] = useState<CalendarInfo[]>([]);
   const [menu, setMenu] = useState<{ anchor: Anchor; items: MenuItem[] } | null>(null);
@@ -226,17 +225,9 @@ export function Sidebar() {
         <Avatar name={me.name || '?'} small me />
         <div className="footer-text">
           <span className="name">{me.name}</span>
-          <button
-            type="button"
-            className="status-line"
-            style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
-            title="Sync now"
-            onClick={() => api.syncNow().catch((e) => toast(String(e)))}
-          >
-            <span className={`status-dot${sync.online ? (sync.syncing ? ' syncing' : '') : ' offline'}`} />
-            {sync.label}
-            {sync.outboxHeld > 0 && ` · ${sync.outboxHeld} held`}
-          </button>
+          <span className="email" title={me.email}>
+            {me.email}
+          </span>
         </div>
         <button type="button" className="btn btn-ghost btn-icon" aria-label="Settings" onClick={() => app.openSettings()}>
           <Gear size={16} />

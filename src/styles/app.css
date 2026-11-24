@@ -238,6 +238,141 @@ h3 {
   color: var(--placeholder);
 }
 
+.topbar .spacer {
+  flex: 1;
+}
+
+.sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--r-button);
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--fs-meta);
+  white-space: nowrap;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.sync-indicator .text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sync-indicator:hover,
+.sync-indicator[aria-expanded='true'] {
+  background: var(--row-hover);
+  color: var(--text);
+}
+
+.tone-ok > svg,
+.sync-row.tone-ok .icon {
+  color: var(--success);
+}
+
+.tone-busy > svg,
+.sync-row.tone-busy .icon {
+  color: var(--accent);
+}
+
+.sync-indicator.tone-warn {
+  color: var(--danger);
+}
+
+.sync-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 6px 6px;
+}
+
+.sync-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sync-panel-head .title {
+  font-weight: 600;
+}
+
+.sync-panel-head .btn-small {
+  gap: 6px;
+}
+
+.sync-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+}
+
+.sync-row .who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sync-row .name {
+  font-size: var(--fs-meta);
+  font-weight: 500;
+}
+
+.sync-row .status {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-row.tone-warn .status {
+  color: var(--danger);
+}
+
+.sync-row .icon {
+  display: flex;
+  color: var(--text-muted);
+}
+
+.sync-row-empty,
+.sync-note {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  padding: 6px 0 2px;
+  line-height: 1.45;
+}
+
+.sync-note {
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
 .topbar .search-box {
   height: 36px;
 }
@@ -544,36 +679,12 @@ h3 {
   text-overflow: ellipsis;
 }
 
-.status-line {
+.footer-text .email {
   font-size: var(--fs-small);
   color: var(--text-muted);
-  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.status-line .status-dot {
-  display: inline-block;
-  vertical-align: middle;
-  margin: -2px 6px 0 0;
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--success);
-  flex-shrink: 0;
-}
-
-.status-dot.offline {
-  background: var(--text-muted);
-}
-
-.status-dot.syncing {
-  background: var(--accent);
 }
 
 /* ---------- Pane resizers ---------- */
