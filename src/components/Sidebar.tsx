@@ -1,9 +1,8 @@
 import { useEffect, useState, type MouseEvent } from 'react';
-import { Calendar, Inbox, Search, Settings as Gear, Users } from 'lucide-react';
+import { Calendar, Inbox, Settings as Gear, Users } from 'lucide-react';
 import { api } from '../api';
 import type { Account, CalendarInfo, Folder, FolderRole } from '../api/types';
 import { useApp } from '../state/app';
-import { keyLabel } from '../lib/platform';
 import { Avatar, Menu, useToast, type Anchor, type MenuItem } from './ui';
 import { RemoveAccountDialog, ApprovalDialog } from '../views/AccountDialogs';
 import type { AddAccountResult } from '../api/types';
@@ -35,7 +34,7 @@ function sortFolders(folders: Folder[]): { folder: Folder; depth: number }[] {
 
 export function Sidebar() {
   const app = useApp();
-  const { route, scope, accounts, graphAccounts, sync, me, mailVersion } = app;
+  const { route, scope, accounts, graphAccounts, me, mailVersion } = app;
   const toast = useToast();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [calendars, setCalendars] = useState<CalendarInfo[]>([]);
@@ -185,27 +184,6 @@ export function Sidebar() {
 
   return (
     <nav className="sidebar" aria-label="Sidebar">
-      <div className="brand">
-        <div className="brand-logo">M</div>
-        <span className="brand-name">Mail</span>
-        {sync.demo && (
-          <span className="demo-tag" title="Built-in sample data. Nothing here is real or synced. Run pnpm tauri dev for your accounts.">
-            Demo data
-          </span>
-        )}
-      </div>
-      <button
-        type="button"
-        className="sidebar-search"
-        onClick={() => {
-          if (route.view !== 'mail') app.navigate({ view: 'mail' });
-          app.setSearchActive(true);
-        }}
-      >
-        <Search size={15} />
-        <span>Search this view</span>
-        <span className="kbd-hint">{keyLabel('Mod+E')}</span>
-      </button>
       <div className="sidebar-scroll">
         <button type="button" className={`nav-item${inMail && !scope.accountId && isRole('inbox') ? ' selected' : ''}`} onClick={() => openMail(undefined, { role: 'inbox' })}>
           <Inbox size={16} />
@@ -281,17 +259,9 @@ export function Sidebar() {
         <Avatar name={me.name || '?'} small me />
         <div className="footer-text">
           <span className="name">{me.name}</span>
-          <button
-            type="button"
-            className="status-line"
-            style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
-            title="Sync now"
-            onClick={() => api.syncNow().catch((e) => toast(String(e)))}
-          >
-            <span className={`status-dot${sync.online ? (sync.syncing ? ' syncing' : '') : ' offline'}`} />
-            {sync.label}
-            {sync.outboxHeld > 0 && ` · ${sync.outboxHeld} held`}
-          </button>
+          <span className="email" title={me.email}>
+            {me.email}
+          </span>
         </div>
         <button type="button" className="btn btn-ghost btn-icon" aria-label="Settings" onClick={() => app.openSettings()}>
           <Gear size={16} />

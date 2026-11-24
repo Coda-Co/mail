@@ -3,6 +3,8 @@ import { ShieldAlert, WifiOff } from 'lucide-react';
 import { AppProvider, useApp } from './state/app';
 import { ToastProvider } from './components/ui';
 import { Sidebar } from './components/Sidebar';
+import { Resizer } from './components/Resizer';
+import { SearchSlot, TopBar } from './components/TopBar';
 import { MailView } from './views/MailView';
 import { CalendarView } from './views/CalendarView';
 import { PeopleView } from './views/PeopleView';
@@ -28,6 +30,7 @@ function useGlobalShortcuts() {
 function Shell() {
   const app = useApp();
   const [diskDismissed, setDiskDismissed] = useState(false);
+  const [searchSlot, setSearchSlot] = useState<HTMLDivElement | null>(null);
   useGlobalShortcuts();
   useCommand('goMail', () => app.navigate({ view: 'mail' }));
   useCommand('goCalendar', () => app.navigate({ view: 'calendar' }));
@@ -49,7 +52,9 @@ function Shell() {
   return (
     <div className="app">
       <Sidebar />
+      <Resizer variable="--sidebar-w" pane="before" label="Resize sidebar" className="sidebar-resizer" />
       <main className="app-main">
+        <TopBar slotRef={setSearchSlot} />
         {app.disk === 'off' && !diskDismissed && (
           <div className="banner" role="alert">
             <ShieldAlert size={16} />
@@ -66,12 +71,14 @@ function Shell() {
             Offline. Mail and calendar still work; changes and sends will go when you reconnect.
           </div>
         )}
-        <div className="app-body">
-          {route.view === 'mail' && <MailView />}
-          {route.view === 'calendar' && <CalendarView />}
-          {route.view === 'people' && <PeopleView />}
-          {route.view === 'web' && route.param && <WebAccountView key={route.param} accountId={route.param} />}
-        </div>
+        <SearchSlot.Provider value={searchSlot}>
+          <div className="app-body">
+            {route.view === 'mail' && <MailView />}
+            {route.view === 'calendar' && <CalendarView />}
+            {route.view === 'people' && <PeopleView />}
+            {route.view === 'web' && route.param && <WebAccountView key={route.param} accountId={route.param} />}
+          </div>
+        </SearchSlot.Provider>
       </main>
       {app.settingsTab && <SettingsModal />}
     </div>

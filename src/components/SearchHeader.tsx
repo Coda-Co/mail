@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, X } from 'lucide-react';
 import { api } from '../api';
 import type { DateFilter, Person, SearchQuery } from '../api/types';
 import { useApp } from '../state/app';
 import { Menu, Popover, type Anchor } from './ui';
 import { plural } from '../lib/text';
+import { useSearchSlot } from './TopBar';
 
 const DATE_LABELS: Record<DateFilter, string> = { any: 'any time', week: 'past week', month: 'past month', year: 'past year' };
 
@@ -85,6 +87,7 @@ export function SearchHeader({
   const set = (patch: Partial<SearchQuery>, names?: Partial<SearchState>) => onChange({ ...state, ...names, query: { ...q, ...patch } });
   const local = useRef<HTMLInputElement>(null);
   const ref = inputRef ?? local;
+  const slot = useSearchSlot();
 
   useEffect(() => {
     ref.current?.focus();
@@ -93,8 +96,7 @@ export function SearchHeader({
   const chip = (active: boolean) => `chip${active ? ' active' : ''}`;
   const toggle = (kind: NonNullable<typeof open>['kind']) => (e: React.MouseEvent<HTMLButtonElement>) => setOpen(open?.kind === kind ? null : { kind, anchor: e.currentTarget });
 
-  return (
-    <div className="search-header">
+  const box = (
       <div className="search-box">
         <Search size={16} />
         <input
@@ -111,6 +113,11 @@ export function SearchHeader({
           <X size={16} />
         </button>
       </div>
+  );
+
+  return (
+    <div className="search-header">
+      {slot ? createPortal(box, slot) : box}
       <div className="facets" role="group" aria-label="Filters">
         {q.from ? (
           <button type="button" className={chip(true)} onClick={() => set({ from: undefined }, { fromName: undefined })}>

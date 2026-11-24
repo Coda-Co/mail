@@ -84,3 +84,14 @@ export function toLocalInput(d: Date): string {
 export function toDateInput(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+
+/** How long ago something happened: "just now", "4 min ago", "at 09:42", "yesterday at 09:42". */
+export function agoTime(iso: string, ref: Date = now()): string {
+  const d = new Date(iso);
+  const mins = Math.floor((ref.getTime() - d.getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  if (sameDay(d, ref)) return `at ${hhmm(d)}`;
+  if (sameDay(d, addDays(ref, -1))) return `yesterday at ${hhmm(d)}`;
+  return `on ${fullTime(iso, ref)}`;
+}
