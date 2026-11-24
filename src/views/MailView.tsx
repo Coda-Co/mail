@@ -153,7 +153,8 @@ export function MailView() {
     };
   }, [searchActive, search, scope, mailVersion]);
 
-  const list = searchActive ? (result?.messages ?? messages ?? []) : (messages ?? []);
+  // While a search runs the list shows "Searching…", never the folder's mail or the previous query's results.
+  const list = searchActive ? (searchPending || searchError ? [] : (result?.messages ?? [])) : (messages ?? []);
 
   const loadMore = useCallback(() => {
     if (!hasMore || searchActive || !messages) return;
@@ -272,7 +273,7 @@ export function MailView() {
               : searchActive
                 ? searchError
                   ? `Search failed: ${searchError}`
-                  : searchPending && !result
+                  : searchPending || !result
                     ? 'Searching…'
                     : 'No messages match these filters'
                 : scope.tab === 'unread'
@@ -281,13 +282,13 @@ export function MailView() {
                     ? 'No flagged messages'
                     : `Nothing in ${folderName}`
           }
-          header={searchActive && result ? <ContactCard result={result} onEmail={(email, name) => newMessage({ email, name })} /> : undefined}
+          header={searchActive && result && !searchPending ? <ContactCard result={result} onEmail={(email, name) => newMessage({ email, name })} /> : undefined}
           footer={
-            searchActive && result && !result.fromServer ? (
+            searchActive && result && !searchPending && !result.fromServer ? (
               <button type="button" className="btn search-server" onClick={searchServer} disabled={serverBusy}>
                 {serverBusy ? 'Searching the server…' : 'Search the server'}
               </button>
-            ) : searchActive && result?.fromServer ? (
+            ) : searchActive && !searchPending && result?.fromServer ? (
               <div className="list-empty">Includes results from the server</div>
             ) : null
           }
