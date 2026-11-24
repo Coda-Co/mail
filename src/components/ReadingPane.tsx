@@ -201,11 +201,28 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
       return;
     }
     setExpanded((s) => new Set(s).add(selection.id));
-    // Mark as read as soon as it opens.
+    // Mark as read as soon as it opens, but only once the user can actually see it: a message
+    // selected while the app is in the background (e.g. new mail auto-selected) stays unread
+    // until the window is focused, and is left alone if the selection moves on first.
+    let cancelled = false;
+    let stopWaiting: (() => void) | null = null;
     loadThread(selection.id).then((t) => {
+      if (cancelled) return;
       const m = t?.messages.find((x) => x.id === selection.id);
-      if (m && !m.isRead) void api.markRead([m.id], true);
+      if (!m || m.isRead) return;
+      const mark = () => void api.markRead([m.id], true);
+      if (document.hasFocus()) return mark();
+      const onFocus = () => {
+        stopWaiting?.();
+        mark();
+      };
+      window.addEventListener('focus', onFocus);
+      stopWaiting = () => window.removeEventListener('focus', onFocus);
     });
+    return () => {
+      cancelled = true;
+      stopWaiting?.();
+    };
   }, [selection, loadThread]);
 
   // Attachments (and inline images) arrive in the background after the thread opens and are
