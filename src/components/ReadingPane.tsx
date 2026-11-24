@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ExternalLink, FileText, MoreHorizontal } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
 import type { Draft, DraftMode, Folder, Message, Thread } from '../api/types';
@@ -83,7 +83,7 @@ function MessageView({ message, expanded, onExpand, onChanged }: { message: Mess
             ))}
         </div>
       )}
-      <MessageBody html={message.bodyHtml} />
+      <MessageBody html={message.bodyHtml} cacheKey={message.id} />
     </div>
   );
 }
@@ -98,31 +98,54 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
   const [menu, setMenu] = useState<{ anchor: Anchor; items: MenuItem[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedMessage = thread?.messages.find((m) => m.id === selection?.id) ?? thread?.messages[0] ?? null;
+  // While the next message loads, the previous thread stays on screen (no blank flash),
+  // but actions only target a thread that holds the selected message.
+  const current = !!thread && selection?.kind === 'message' && thread.messages.some((m) => m.id === selection.id);
+  const selectedMessage = current ? (thread.messages.find((m) => m.id === selection?.id) ?? null) : null;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const latest = useRef(0);
+  const shownConversation = useRef<string | null>(null);
+  const wanted = useRef<string | null>(null);
 
   const loadThread = useCallback(async (id: string) => {
+    const req = ++latest.current;
     try {
       const t = await api.getThread(id);
+      // A slower reply for an earlier click, or a refresh of a thread the user has since
+      // left, must not replace what they are now looking at.
+      if (req !== latest.current || (wanted.current && !t.messages.some((m) => m.id === wanted.current))) return null;
+      if (shownConversation.current !== t.conversationId) {
+        shownConversation.current = t.conversationId;
+        setExpanded(new Set([id]));
+        scrollRef.current?.scrollTo(0, 0);
+      }
       setThread(t);
       setError(null);
       return t;
     } catch (e) {
+      if (req !== latest.current) return null;
       setError(e instanceof Error ? e.message : String(e));
+      shownConversation.current = null;
       setThread(null);
       return null;
     }
   }, []);
 
   useEffect(() => {
-    setThread(null);
     setDraft(null);
     setFocusDraft(false);
+    wanted.current = selection?.kind === 'message' ? selection.id : null;
+    if (!selection || selection.kind === 'draft') {
+      latest.current++;
+      shownConversation.current = null;
+      setThread(null);
+    }
     if (!selection) return;
     if (selection.kind === 'draft') {
       api.getDraft(selection.id).then(setDraft).catch((e) => setError(String(e)));
       return;
     }
-    setExpanded(new Set([selection.id]));
+    setExpanded((s) => new Set(s).add(selection.id));
     // Mark as read as soon as it opens.
     loadThread(selection.id).then((t) => {
       const m = t?.messages.find((x) => x.id === selection.id);
@@ -255,30 +278,30 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
         <button type="button" className="btn btn-ghost back-button" onClick={onBack} aria-label="Back to list">
           <ArrowLeft size={15} />
         </button>
-        <button type="button" className="btn btn-ghost" onClick={() => startDraft('reply')} disabled={!selectedMessage}>
+        <button type="button" className="btn btn-ghost" onClick={() => startDraft('reply')} disabled={!thread}>
           Reply
         </button>
-        <button type="button" className="btn btn-ghost" onClick={() => startDraft('replyAll')} disabled={!selectedMessage}>
+        <button type="button" className="btn btn-ghost" onClick={() => startDraft('replyAll')} disabled={!thread}>
           Reply all
         </button>
-        <button type="button" className="btn btn-ghost" onClick={() => startDraft('forward')} disabled={!selectedMessage}>
+        <button type="button" className="btn btn-ghost" onClick={() => startDraft('forward')} disabled={!thread}>
           Forward
         </button>
         <span className="spacer" />
-        <button type="button" className="btn btn-ghost" onClick={() => removeWithUndo('archive')} disabled={!selectedMessage}>
+        <button type="button" className="btn btn-ghost" onClick={() => removeWithUndo('archive')} disabled={!thread}>
           Archive
         </button>
-        <button type="button" className="btn btn-ghost" onClick={() => removeWithUndo('delete')} disabled={!selectedMessage}>
+        <button type="button" className="btn btn-ghost" onClick={() => removeWithUndo('delete')} disabled={!thread}>
           Delete
         </button>
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="More actions" onClick={(e) => moreMenu(e.currentTarget)} disabled={!selectedMessage}>
+        <button type="button" className="btn btn-ghost btn-icon" aria-label="More actions" onClick={(e) => moreMenu(e.currentTarget)} disabled={!thread}>
           <MoreHorizontal size={16} />
         </button>
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="Open in new window" onClick={() => selectedMessage && api.popOut('message', selectedMessage.id)} disabled={!selectedMessage}>
+        <button type="button" className="btn btn-ghost btn-icon" aria-label="Open in new window" onClick={() => selectedMessage && api.popOut('message', selectedMessage.id)} disabled={!thread}>
           <ExternalLink size={15} />
         </button>
       </div>
-      <div className="reading-scroll">
+      <div className="reading-scroll" ref={scrollRef}>
         {error && (
           <div className="empty-state">
             <span className="body">This message couldn’t be loaded. {error}</span>

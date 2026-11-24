@@ -29,9 +29,20 @@ hr{border:none;border-top:1px solid #E4E7EB;margin:16px 0}
 </style></head><body>${html}</body></html>`;
 }
 
-export function MessageBody({ html }: { html: string }) {
+// Last measured height per message, so reopening one lays out at its real size at once.
+const heights = new Map<string, number>();
+function remember(key: string, h: number) {
+  heights.delete(key);
+  heights.set(key, h);
+  if (heights.size > 500) heights.delete(heights.keys().next().value!);
+}
+
+export function MessageBody({ html, cacheKey }: { html: string; cacheKey?: string }) {
   const ref = useRef<HTMLIFrameElement>(null);
-  const [height, setHeight] = useState(48);
+  const cached = cacheKey ? heights.get(cacheKey) : undefined;
+  const [height, setHeight] = useState(cached ?? 48);
+  // Hidden until first measured: a frame or two of nothing beats a clipped box that jumps.
+  const [measured, setMeasured] = useState(cached !== undefined);
   const dark = document.documentElement.dataset.theme === 'dark';
   const doc = useMemo(() => srcdoc(html, dark), [html, dark]);
 
@@ -47,7 +58,12 @@ export function MessageBody({ html }: { html: string }) {
       const d = frame.contentDocument;
       if (!d || d === attached || d.URL !== 'about:srcdoc' || !d.body) return false;
       attached = d;
-      const measure = () => setHeight(Math.max(24, d.documentElement.scrollHeight));
+      const measure = () => {
+        const h = Math.max(24, d.documentElement.scrollHeight);
+        setHeight(h);
+        setMeasured(true);
+        if (cacheKey) remember(cacheKey, h);
+      };
       measure();
       observer?.disconnect();
       observer = new ResizeObserver(measure);
@@ -68,14 +84,17 @@ export function MessageBody({ html }: { html: string }) {
       if (!attach()) raf = requestAnimationFrame(poll);
     };
     poll();
-    const onLoad = () => attach();
+    const onLoad = () => {
+      attach();
+      setMeasured(true);
+    };
     frame.addEventListener('load', onLoad);
     return () => {
       cancelAnimationFrame(raf);
       frame.removeEventListener('load', onLoad);
       observer?.disconnect();
     };
-  }, [doc]);
+  }, [doc, cacheKey]);
 
-  return <iframe ref={ref} className="message-body-frame" title="Message" sandbox="allow-same-origin" srcDoc={doc} style={{ height, colorScheme: dark ? 'dark' : 'light' }} />;
+  return <iframe ref={ref} className="message-body-frame" title="Message" sandbox="allow-same-origin" srcDoc={doc} style={{ height, visibility: measured ? undefined : 'hidden', colorScheme: dark ? 'dark' : 'light' }} />;
 }

@@ -19,3 +19,8 @@ rusqlite = { version = "0.32", features = ["bundled", "serde_json"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "io-util", "process"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "http2"] }
 tracing = "0.1"
+
+# Dev builds: optimise dependencies (the HTML sanitiser is ~10x slower unoptimised) but
+# keep the workspace's own crates fast to compile and debuggable.
+[profile.dev.package."*"]
+opt-level = 2
