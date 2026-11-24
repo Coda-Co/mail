@@ -8,6 +8,7 @@ export type ShortcutId =
   | 'ctrlF'
   | 'archive'
   | 'delete'
+  | 'markUnread'
   | 'send'
   | 'search'
   | 'escape'
@@ -31,6 +32,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'ctrlF', combo: 'Mod+F', allowInInput: false },
   { id: 'archive', combo: 'E', allowInInput: false },
   { id: 'delete', combo: 'Delete', allowInInput: false },
+  { id: 'markUnread', combo: 'Mod+U', allowInInput: false },
   { id: 'send', combo: 'Mod+Enter', allowInInput: true },
   { id: 'search', combo: 'Mod+E', allowInInput: true },
   { id: 'escape', combo: 'Escape', allowInInput: true },

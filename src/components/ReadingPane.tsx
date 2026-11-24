@@ -123,13 +123,11 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
       return;
     }
     setExpanded(new Set([selection.id]));
-    // Mark as read after it has been open briefly, so skimming past doesn't.
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Mark as read as soon as it opens.
     loadThread(selection.id).then((t) => {
       const m = t?.messages.find((x) => x.id === selection.id);
-      if (m && !m.isRead) timer = setTimeout(() => api.markRead([m.id], true), 1500);
+      if (m && !m.isRead) void api.markRead([m.id], true);
     });
-    return () => clearTimeout(timer);
   }, [selection, loadThread]);
 
   useEffect(
@@ -167,6 +165,18 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
   useCommand('replyAll', () => void startDraft('replyAll'), hasMessage);
   useCommand('archive', () => void removeWithUndo('archive'), hasMessage);
   useCommand('delete', () => void removeWithUndo('delete'), hasMessage);
+  useCommand(
+    'markUnread',
+    () => {
+      if (!selectedMessage) return;
+      const id = selectedMessage.id;
+      void api.markRead([id], false).then(() => {
+        loadThread(id);
+        toast('Marked as unread');
+      });
+    },
+    hasMessage,
+  );
   useCommand(
     'ctrlF',
     () => {

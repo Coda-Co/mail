@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
-import { Search } from 'lucide-react';
+import { Search, SquarePen } from 'lucide-react';
+import { runCommand } from '../lib/commands';
 import { useApp } from '../state/app';
 import { keyLabel } from '../lib/platform';
 import { SyncIndicator } from './SyncIndicator';
@@ -17,6 +18,15 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   const searching = app.route.view === 'mail' && app.searchActive;
   return (
     <header className="topbar">
+      <button
+        type="button"
+        className="btn btn-primary btn-icon topbar-new"
+        onClick={() => runCommand('newMessage')}
+        title={`New email (${keyLabel('Mod+N')})`}
+        aria-label="New email"
+      >
+        <SquarePen size={16} strokeWidth={2.2} />
+      </button>
       <div className="topbar-search" ref={slotRef}>
         {!searching && (
           <button
