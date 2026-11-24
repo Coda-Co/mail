@@ -27,6 +27,7 @@ export const tauriApi: MailApi = {
   allowRemoteImages: (senderEmail) => call('allow_remote_images', { senderEmail }),
   showRemoteImagesOnce: (messageId) => call('show_remote_images_once', { messageId }),
   openAttachment: (messageId, attachmentId) => call('open_attachment', { messageId, attachmentId }),
+  copyAttachments: (messageId, attachmentIds) => call('copy_attachments', { messageId, attachmentIds }),
 
   createDraft: (req) => call('create_draft', { req }),
   getDraft: (draftId) => call('get_draft', { draftId }),

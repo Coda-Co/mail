@@ -217,6 +217,36 @@ pub async fn open_attachment(app: AppHandle, s: State<'_, AppState>, message_id:
     app.opener().open_path(path, None::<&str>).map_err(|e| Error::Other(e.to_string()))
 }
 
+/// Download on demand (cached), then put the files on the system clipboard so they paste
+/// into Explorer or Finder as files.
+#[tauri::command]
+pub async fn copy_attachments(app: AppHandle, s: State<'_, AppState>, message_id: String, attachment_ids: Vec<String>) -> R<()> {
+    let (acc, raw) = ids::split(&message_id)?;
+    let account = s.svc.get_account(acc)?;
+    let g = s.graph(&account)?;
+    let syncer = Syncer::new(&s.svc, &g, account);
+    let mut paths = Vec::with_capacity(attachment_ids.len());
+    for id in &attachment_ids {
+        let path = syncer.download_attachment(raw, id).await?;
+        // Pruning spares files touched in the last hour, so a paste soon after still finds it.
+        if let Ok(f) = std::fs::File::options().write(true).open(&path) {
+            let _ = f.set_modified(std::time::SystemTime::now());
+        }
+        paths.push(path);
+    }
+    if paths.is_empty() {
+        return Ok(());
+    }
+    // The clipboard lives on the main thread: AppKit wants it there, and on Linux the
+    // context must outlive this call to keep serving the paste.
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(crate::clipboard::set_files(paths));
+    })
+    .map_err(|e| Error::Other(e.to_string()))?;
+    rx.await.map_err(|e| Error::Other(e.to_string()))?
+}
+
 // ---------------------------------------------------------------- drafts
 
 #[tauri::command]

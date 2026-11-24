@@ -531,6 +531,9 @@ export const demoApi: MailApi = {
   async openAttachment() {
     /* The desktop app opens the cached file with the system viewer. */
   },
+  async copyAttachments() {
+    /* The desktop app puts the cached files on the system clipboard. */
+  },
 
   async createDraft(req) {
     const source = req.sourceMessageId ? getMsg(req.sourceMessageId) : undefined;

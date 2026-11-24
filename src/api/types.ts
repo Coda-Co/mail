@@ -308,6 +308,8 @@ export interface MailApi {
   allowRemoteImages(senderEmail: string): Promise<void>;
   showRemoteImagesOnce(messageId: string): Promise<Message>;
   openAttachment(messageId: string, attachmentId: string): Promise<void>;
+  /** Puts the files on the system clipboard, downloading any not cached yet. */
+  copyAttachments(messageId: string, attachmentIds: string[]): Promise<void>;
 
   createDraft(req: { mode: DraftMode; sourceMessageId?: string; accountId?: string }): Promise<Draft>;
   getDraft(draftId: string): Promise<Draft>;
