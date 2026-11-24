@@ -130,13 +130,30 @@ interface Toast {
 
 const ToastCtx = createContext<(text: string, action?: Toast['action']) => void>(() => {});
 
+const UNDO_DEPTH = 20;
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  // Toasts with an "Undo" action also go on this stack so Ctrl/Cmd+Z can
+  // undo them, newest first, after the toast itself has gone.
+  const undoStack = useRef<{ id: number; run: () => void }[]>([]);
+  const dismiss = useCallback((id: number) => setToasts((all) => all.filter((x) => x.id !== id)), []);
   const show = useCallback((text: string, action?: Toast['action']) => {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t.slice(-2), { id, text, action }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
-  }, []);
+    setTimeout(() => dismiss(id), 5000);
+    if (action?.label === 'Undo') undoStack.current = [...undoStack.current.slice(1 - UNDO_DEPTH), { id, run: action.run }];
+  }, [dismiss]);
+  const forgetUndo = (id: number) => {
+    undoStack.current = undoStack.current.filter((u) => u.id !== id);
+  };
+  useCommand('undo', () => {
+    const last = undoStack.current.pop();
+    if (!last) return false;
+    dismiss(last.id);
+    last.run();
+    show('Undone');
+  });
   return (
     <ToastCtx.Provider value={show}>
       {children}
@@ -149,8 +166,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <button
                   type="button"
                   onClick={() => {
+                    forgetUndo(t.id);
                     t.action!.run();
-                    setToasts((all) => all.filter((x) => x.id !== t.id));
+                    dismiss(t.id);
                   }}
                 >
                   {t.action.label}

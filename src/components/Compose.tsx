@@ -6,6 +6,7 @@ import { AccountPicker } from './AccountPicker';
 import { AddressField } from './AddressField';
 import { RichEditor, type RichEditorHandle } from './RichEditor';
 import { useToast } from './ui';
+import { useCommand } from '../lib/commands';
 import { MessageBody } from './MessageBody';
 import { FileIcon } from './FileIcon';
 import { keyLabel, isMac } from '../lib/platform';
@@ -91,8 +92,8 @@ const MODE_TITLE: Record<Draft['mode'], string> = { new: 'New message', reply: '
 interface Props {
   initial: Draft;
   layout: ComposeLayout;
-  /** Called after send or discard. */
-  onDone: (outcome: 'sent' | 'discarded' | 'poppedOut') => void;
+  /** Called after send, discard, pop-out, or close (Escape: saved, kept in Drafts). */
+  onDone: (outcome: 'sent' | 'discarded' | 'poppedOut' | 'closed') => void;
   autoFocus?: boolean;
 }
 
@@ -101,6 +102,7 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
   const toast = useToast();
   const { sync } = useApp();
   const editor = useRef<RichEditorHandle>(null);
+  const root = useRef<HTMLDivElement>(null);
   const [showCc, setShowCc] = useState(initial.cc.length > 0);
   const [showBcc, setShowBcc] = useState(initial.bcc.length > 0);
   const [sending, setSending] = useState(false);
@@ -145,6 +147,14 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
     await api.discardDraft(draft.id);
     onDone('discarded');
   };
+
+  // Escape saves and closes the draft, like closing a compose window in
+  // Outlook. A pop-out window always takes it; an inline draft only while
+  // focus is inside it, so Escape elsewhere in the thread works as before.
+  useCommand('escape', () => {
+    if (layout === 'inline' && !root.current?.contains(document.activeElement)) return false;
+    void save().then(() => onDone('closed'));
+  });
 
   const popOut = async () => {
     await save();
@@ -253,7 +263,7 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
 
   if (layout === 'popout') {
     return (
-      <div className="popout" onKeyDown={onKeyDown}>
+      <div className="popout" ref={root} onKeyDown={onKeyDown}>
         <div className="popout-toolbar">
           <button type="button" className="btn btn-primary" onClick={send} disabled={sending}>
             Send
@@ -295,7 +305,7 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
   }
 
   return (
-    <div className="draft-section" aria-label={`${MODE_TITLE[draft.mode]} draft`} onKeyDown={onKeyDown}>
+    <div className="draft-section" ref={root} aria-label={`${MODE_TITLE[draft.mode]} draft`} onKeyDown={onKeyDown}>
       <div className="draft-section-header">
         <span className="title">{MODE_TITLE[draft.mode]}</span>
         <button type="button" className="btn btn-ghost" onClick={popOut}>
@@ -338,6 +348,20 @@ export function PoppedOutDraft({ draft }: { draft: Draft }) {
         <span style={{ flex: 1 }}>{MODE_TITLE[draft.mode]} is open in its own window.</span>
         <button type="button" className="btn btn-small" onClick={() => api.dockBack(draft.id)}>
           Dock back
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Shown in place of an inline draft closed with Escape; the draft stays saved. */
+export function ClosedDraft({ draft, onOpen }: { draft: Draft; onOpen: () => void }) {
+  return (
+    <div className="draft-section">
+      <div className="draft-popped">
+        <span style={{ flex: 1 }}>{MODE_TITLE[draft.mode]} draft saved.</span>
+        <button type="button" className="btn btn-small" onClick={onOpen}>
+          Continue editing
         </button>
       </div>
     </div>

@@ -44,7 +44,7 @@ function GeneralTab() {
           </select>
         </div>
         <span className="hint">
-          {keyLabel('Mod+N')} new · {keyLabel('Mod+R')} reply · {keyLabel('Mod+Shift+R')} reply all · E archive · Delete delete · {keyLabel('Mod+U')} mark unread · {keyLabel('Mod+Enter')} send · {keyLabel('Mod+E')} search · Esc close ·{' '}
+          {keyLabel('Mod+N')} new · {keyLabel('Mod+R')} reply · {keyLabel('Mod+Shift+R')} reply all · E archive · Delete delete · {keyLabel('Mod+U')} mark unread · {keyLabel('Mod+Z')} undo · {keyLabel('Mod+Enter')} send · {keyLabel('Mod+E')} search · Esc close (saves drafts) ·{' '}
           {keyLabel('Mod+1')}/{keyLabel('Mod+2')}/{keyLabel('Mod+3')} mail, calendar, people · J/K next, previous
         </span>
       </div>

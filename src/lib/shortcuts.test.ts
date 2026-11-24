@@ -44,4 +44,11 @@ describe('shortcut matching', () => {
     expect(resolveShortcut(key('j'), false, false)).toBe('next');
     expect(resolveShortcut(key('ArrowUp'), false, false)).toBe('previous');
   });
+
+  it('maps Mod+Z to undo, but not while typing or with Shift', () => {
+    expect(resolveShortcut(key('z', { ctrl: true }), false, false)).toBe('undo');
+    expect(resolveShortcut(key('z', { meta: true }), false, true)).toBe('undo');
+    expect(resolveShortcut(key('z', { ctrl: true }), true, false)).toBe(null);
+    expect(resolveShortcut(key('Z', { ctrl: true, shift: true }), false, false)).toBe(null);
+  });
 });
