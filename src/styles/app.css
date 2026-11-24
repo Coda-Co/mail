@@ -44,6 +44,8 @@
   --success: #1f883d;
   --success-bg: #eaf6ee;
   --success-text: #1a6e32;
+  --warning: #e16f24;
+  --status-offline: #9aa3ad;
   --warning-bg: #fff8e5;
   --warning-border: #f0d68a;
   --danger: #cf222e;
@@ -100,6 +102,8 @@
   --success: #3fb950;
   --success-bg: #183222;
   --success-text: #56d364;
+  --warning: #f0883e;
+  --status-offline: #6e7681;
   --warning-bg: #2d2610;
   --warning-border: #6b5a1d;
   --danger: #f85149;
@@ -245,9 +249,11 @@ h3 {
 .sync-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
   height: 32px;
-  padding: 0 10px;
+  min-width: 32px;
+  padding: 0 12px;
   border: none;
   border-radius: var(--r-button);
   background: none;
@@ -258,9 +264,20 @@ h3 {
   min-width: 0;
 }
 
-.sync-indicator .text {
-  overflow: hidden;
-  text-overflow: ellipsis;
+.sync-indicator .status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--success);
+}
+
+.sync-indicator.dot-warn .status-dot {
+  background: var(--warning);
+}
+
+.sync-indicator.dot-offline .status-dot {
+  background: var(--status-offline);
 }
 
 .sync-indicator:hover,
@@ -269,18 +286,12 @@ h3 {
   color: var(--text);
 }
 
-.tone-ok > svg,
 .sync-row.tone-ok .icon {
   color: var(--success);
 }
 
-.tone-busy > svg,
 .sync-row.tone-busy .icon {
   color: var(--accent);
-}
-
-.sync-indicator.tone-warn {
-  color: var(--danger);
 }
 
 .sync-panel {

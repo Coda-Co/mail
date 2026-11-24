@@ -55,25 +55,28 @@ export function SyncIndicator() {
   // healthy case say when, which is what people want to know.
   const summary = tone === 'ok' && sync.lastSyncedAt && !sync.demo ? `Synced ${agoTime(sync.lastSyncedAt, ref)}` : sync.label;
 
+  // The top bar shows a single dot: green while syncing normally (including mid-sync, so
+  // the frequent inbox checks don't make it flicker), orange for problems, grey offline.
+  const dot = tone === 'offline' ? 'offline' : tone === 'warn' ? 'warn' : 'ok';
+
   const syncNow = () => api.syncNow().catch((e) => toast(String(e)));
 
   return (
     <>
       <button
         type="button"
-        className={`sync-indicator tone-${tone}`}
+        className={`sync-indicator dot-${dot}`}
         aria-label={`Sync status: ${summary}`}
+        title={summary}
         aria-expanded={!!anchor}
         onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
       >
-        {sync.demo ? (
+        {sync.demo && (
           <span className="demo-tag" title="Built-in sample data. Nothing here is real or synced. Run pnpm tauri dev for your accounts.">
             Demo data
           </span>
-        ) : (
-          <ToneIcon tone={tone} />
         )}
-        <span className="text">{summary}</span>
+        <span className="status-dot" aria-hidden="true" />
       </button>
       {anchor && (
         <Popover anchor={anchor} onClose={() => setAnchor(null)} width={320} align="end">
