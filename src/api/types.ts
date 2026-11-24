@@ -116,6 +116,8 @@ export interface Draft {
   error?: string;
   /** True while the draft is open in its own window. */
   poppedOut: boolean;
+  /** False for a new draft nobody has changed yet; missing counts as edited. */
+  edited?: boolean;
 }
 
 export interface Thread {

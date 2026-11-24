@@ -24,6 +24,8 @@ export function useDraft(initial: Draft) {
   const latest = useRef(initial);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
+  // Changed in this window, saved or not.
+  const touched = useRef(false);
 
   const save = useCallback(async () => {
     if (timer.current) clearTimeout(timer.current);
@@ -52,6 +54,7 @@ export function useDraft(initial: Draft) {
       latest.current = { ...latest.current, ...patch };
       setDraft(latest.current);
       dirty.current = true;
+      touched.current = true;
       setSaveState('dirty');
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(save, 800);
@@ -82,7 +85,7 @@ export function useDraft(initial: Draft) {
     [],
   );
 
-  return { draft, update, replace, save, saveState };
+  return { draft, update, replace, save, saveState, touched };
 }
 
 export type ComposeLayout = 'inline' | 'popout';
@@ -98,7 +101,7 @@ interface Props {
 }
 
 export function Compose({ initial, layout, onDone, autoFocus }: Props) {
-  const { draft, update, replace, save, saveState } = useDraft(initial);
+  const { draft, update, replace, save, saveState, touched } = useDraft(initial);
   const toast = useToast();
   const { sync } = useApp();
   const editor = useRef<RichEditorHandle>(null);
@@ -148,12 +151,15 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
     onDone('discarded');
   };
 
-  // Escape saves and closes the draft, like closing a compose window in
-  // Outlook. A pop-out window always takes it; an inline draft only while
-  // focus is inside it, so Escape elsewhere in the thread works as before.
+  // Escape closes the draft, like closing a compose window in Outlook: a
+  // reply nobody has changed is discarded, anything else is saved. A pop-out
+  // window always takes it; an inline draft only while focus is inside it,
+  // so Escape elsewhere in the thread works as before.
   useCommand('escape', () => {
     if (layout === 'inline' && !root.current?.contains(document.activeElement)) return false;
-    void save().then(() => onDone('closed'));
+    const untouchedReply = (draft.mode === 'reply' || draft.mode === 'replyAll') && draft.edited === false && !touched.current;
+    if (untouchedReply) void discard();
+    else void save().then(() => onDone('closed'));
   });
 
   const popOut = async () => {

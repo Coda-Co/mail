@@ -569,6 +569,7 @@ export const demoApi: MailApi = {
       savedToServer: false,
       status: 'editing',
       poppedOut: false,
+      edited: false,
     };
     if (req.mode === 'forward') {
       draft.bodyHtml = sig ? withSignature('<p><br></p>', sig) + body.replace(/^<p><br><\/p>/, '') : body;
@@ -585,7 +586,7 @@ export const demoApi: MailApi = {
   async updateDraft(draft) {
     const existing = getDraftState(draft.id);
     const { accountId, poppedOut, status } = existing;
-    Object.assign(existing, clone(draft), { accountId, poppedOut, status, updatedAt: now().toISOString(), savedToServer: true });
+    Object.assign(existing, clone(draft), { accountId, poppedOut, status, edited: true, updatedAt: now().toISOString(), savedToServer: true });
     save();
     emit(EVENTS.draftChanged, { draftId: draft.id });
     return clone(existing);
@@ -597,6 +598,7 @@ export const demoApi: MailApi = {
     const sig = signatureFor(accountId, d.mode);
     d.signatureId = sig?.id;
     d.bodyHtml = withSignature(d.bodyHtml, sig);
+    d.edited = true;
     d.updatedAt = now().toISOString();
     changed([accountId]);
     emit(EVENTS.draftChanged, { draftId });
@@ -615,6 +617,7 @@ export const demoApi: MailApi = {
     });
     for (const f of Array.from(files ?? [])) {
       d.attachments.push({ id: `att-${Math.random().toString(36).slice(2, 9)}`, name: f.name, contentType: f.type || 'application/octet-stream', size: f.size, isInline: false });
+      d.edited = true;
     }
     save();
     return clone(d);
@@ -622,6 +625,7 @@ export const demoApi: MailApi = {
   async removeAttachment(draftId, attachmentId) {
     const d = getDraftState(draftId);
     d.attachments = d.attachments.filter((a) => a.id !== attachmentId);
+    d.edited = true;
     save();
     return clone(d);
   },

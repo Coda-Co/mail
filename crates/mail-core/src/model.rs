@@ -352,6 +352,13 @@ pub struct Draft {
     pub error: Option<String>,
     #[serde(default)]
     pub popped_out: bool,
+    /// False for a new draft the user hasn't changed yet (Escape discards those).
+    #[serde(default = "edited_default")]
+    pub edited: bool,
+}
+
+fn edited_default() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

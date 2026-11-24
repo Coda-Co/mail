@@ -348,3 +348,18 @@ fn sent_drafts_leave_the_thread_held_ones_stay() {
     assert_eq!(t.drafts.len(), 1);
     assert_eq!(t.drafts[0].status, DraftStatus::Unknown);
 }
+
+#[test]
+fn new_drafts_are_unedited_until_changed() {
+    let (svc, ids) = setup();
+    let src = format!("{}:m-agenda", ids.harbour);
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src), account_id: None }).unwrap();
+    assert!(!d.edited, "a fresh reply is unedited");
+    assert!(!svc.get_draft(&d.id).unwrap().edited, "stored as unedited");
+    assert!(!svc.set_popped_out(&d.id, true).unwrap().edited, "popping out isn't an edit");
+
+    let mut changed = svc.get_draft(&d.id).unwrap();
+    changed.body_html = "<p>Thanks</p>".into();
+    assert!(svc.update_draft(&changed).unwrap().edited);
+    assert!(svc.get_draft(&d.id).unwrap().edited, "stays edited once saved");
+}

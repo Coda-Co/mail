@@ -117,6 +117,8 @@ CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     "ALTER TABLE messages ADD COLUMN attachments_checked INTEGER NOT NULL DEFAULT 0",
     // The server refused the content (e.g. a cloud link): don't retry it in background sync.
     "ALTER TABLE attachments ADD COLUMN download_failed INTEGER NOT NULL DEFAULT 0",
+    // False until the user changes a new draft; existing drafts count as edited.
+    "ALTER TABLE drafts ADD COLUMN edited INTEGER NOT NULL DEFAULT 1",
 ];
 
 /// A message as stored, with raw IDs. Built by sync from Graph, or by tests and the demo seed.
@@ -715,23 +717,24 @@ impl AccountDb {
                 status: DraftStatus::parse(&r.get::<_, String>(14)?),
                 error: r.get(15)?,
                 popped_out: r.get(16)?,
+                edited: r.get(17)?,
             },
             r.get(1)?,
         ))
     }
 
     const DRAFT_COLS: &'static str =
-        "id, server_id, mode, source_message_id, conversation_id, to_json, cc_json, bcc_json, subject, body_html, signature_id, attachments_json, updated_at, saved_to_server, status, error, popped_out";
+        "id, server_id, mode, source_message_id, conversation_id, to_json, cc_json, bcc_json, subject, body_html, signature_id, attachments_json, updated_at, saved_to_server, status, error, popped_out, edited";
 
     /// Insert or replace a draft. `raw_source` is the raw id of the message replied to.
     pub fn save_draft(&self, raw_id: &str, d: &Draft, raw_source: Option<&str>, created_by: &str) -> Result<()> {
         self.conn.execute(
             &format!(
-                "INSERT INTO drafts ({}, created_by) VALUES (?1, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+                "INSERT INTO drafts ({}, created_by) VALUES (?1, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
                  ON CONFLICT(id) DO UPDATE SET mode = excluded.mode, to_json = excluded.to_json, cc_json = excluded.cc_json, bcc_json = excluded.bcc_json,
                    subject = excluded.subject, body_html = excluded.body_html, signature_id = excluded.signature_id, attachments_json = excluded.attachments_json,
                    updated_at = excluded.updated_at, saved_to_server = excluded.saved_to_server, status = excluded.status, error = excluded.error,
-                   popped_out = excluded.popped_out",
+                   popped_out = excluded.popped_out, edited = excluded.edited",
                 Self::DRAFT_COLS
             ),
             params![
@@ -751,6 +754,7 @@ impl AccountDb {
                 d.status.as_str(),
                 d.error,
                 d.popped_out,
+                d.edited,
                 created_by
             ],
         )?;
