@@ -39,9 +39,14 @@ export function MessageBody({ html }: { html: string }) {
     const frame = ref.current;
     if (!frame) return;
     let observer: ResizeObserver | null = null;
-    const onLoad = () => {
+    let attached: Document | null = null;
+    let raf = 0;
+    // Size the frame as soon as the srcdoc is parsed, not on `load`: `load` waits for
+    // every remote image, which can take seconds on a newsletter.
+    const attach = () => {
       const d = frame.contentDocument;
-      if (!d) return;
+      if (!d || d === attached || d.URL !== 'about:srcdoc' || !d.body) return false;
+      attached = d;
       const measure = () => setHeight(Math.max(24, d.documentElement.scrollHeight));
       measure();
       observer?.disconnect();
@@ -57,9 +62,16 @@ export function MessageBody({ html }: { html: string }) {
       // Re-measure after fonts and images settle.
       setTimeout(measure, 100);
       setTimeout(measure, 600);
+      return true;
     };
+    const poll = () => {
+      if (!attach()) raf = requestAnimationFrame(poll);
+    };
+    poll();
+    const onLoad = () => attach();
     frame.addEventListener('load', onLoad);
     return () => {
+      cancelAnimationFrame(raf);
       frame.removeEventListener('load', onLoad);
       observer?.disconnect();
     };
