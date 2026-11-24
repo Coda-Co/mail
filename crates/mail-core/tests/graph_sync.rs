@@ -276,4 +276,8 @@ async fn expired_sign_in_marks_account() {
     assert!(Syncer::new(&svc, &g, acc.clone()).run().await.is_err());
     assert_eq!(svc.get_account(&acc.id).unwrap().sync_state, SyncState::NeedsAuth);
     assert_eq!(svc.sync_status().unwrap().label, "Sign in needed");
+    // Signing in again clears it.
+    let again = svc.add_graph_account("miles@coda.example", "Coda", None, None).unwrap();
+    assert_eq!(again.id, acc.id);
+    assert_eq!(svc.get_account(&acc.id).unwrap().sync_state, SyncState::Idle);
 }

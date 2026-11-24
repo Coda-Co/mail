@@ -225,12 +225,17 @@ impl MailService {
         Ok(a)
     }
 
-    /// Called after a successful Graph sign-in. Upgrades a matching web account in place.
+    /// Called after a successful Graph sign-in. Upgrades a matching web account in place, and
+    /// clears "sign in needed" on an existing one. Doesn't start sync: the caller stores the
+    /// tokens first, then wakes the sync engine.
     pub fn add_graph_account(&self, email: &str, display_name: &str, tenant_id: Option<String>, home_account_id: Option<String>) -> Result<Account> {
         let existing = self.app().find_account_by_email(email)?;
         let a = match existing {
             Some(a) if a.kind == AccountKind::Web => self.app().convert_to_graph(&a.id, tenant_id, home_account_id)?,
-            Some(a) => a,
+            Some(a) => {
+                self.app().set_sync_state(&a.id, SyncState::Idle, None)?;
+                a
+            }
             None => self.app().insert_account(NewAccount {
                 email: email.into(),
                 display_name: if display_name.trim().is_empty() { default_display_name(email) } else { display_name.into() },
@@ -242,7 +247,6 @@ impl MailService {
         };
         self.account_db(&a.id)?;
         self.events().accounts_changed();
-        self.queued(&a.id);
         Ok(a)
     }
 
@@ -1135,7 +1139,7 @@ impl MailService {
         } else {
             "Synced · offline ready".to_string()
         };
-        Ok(SyncStatus { online, syncing, label, last_synced_at: last, outbox_held: held })
+        Ok(SyncStatus { online, syncing, label, last_synced_at: last, outbox_held: held, demo: false })
     }
 
     // ================================================================= used by sync

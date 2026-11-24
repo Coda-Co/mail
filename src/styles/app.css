@@ -603,6 +603,16 @@ h3 {
   line-height: 16px;
 }
 
+.sign-in-tag {
+  cursor: pointer;
+  color: var(--accent);
+  border-color: currentColor;
+}
+
+.sign-in-tag:hover {
+  background: var(--chip-neutral);
+}
+
 .neutral-dot {
   width: 6px;
   height: 6px;
@@ -677,6 +687,18 @@ h3 {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.demo-tag {
+  flex-shrink: 0;
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text);
+  background: var(--chip-neutral);
+  border: 1px solid var(--tag-border);
+  border-radius: 4px;
+  padding: 0 5px;
+  line-height: 16px;
 }
 
 .footer-text .email {

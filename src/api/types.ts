@@ -245,6 +245,8 @@ export interface SyncStatus {
   label: string;
   lastSyncedAt?: string;
   outboxHeld: number;
+  /** Showing built-in sample data, not real accounts (browser preview or MAIL_APP_DEMO=1). */
+  demo?: boolean;
 }
 
 export type DiskEncryption = 'on' | 'off' | 'unknown';

@@ -798,10 +798,10 @@ export const demoApi: MailApi = {
     const online = !hasWindow || navigator.onLine;
     const syncing = state.accounts.some((a) => a.syncState === 'syncing');
     const held = state.drafts.filter((d) => d.status === 'unknown' || d.status === 'queued').length;
-    const label = !online ? 'Offline · changes will sync' : syncing ? 'Syncing…' : 'Synced · offline ready';
+    const label = !online ? 'Offline · changes will sync' : syncing ? 'Syncing…' : 'Sample data · nothing syncs';
     const times = state.accounts.filter((a) => a.kind === 'graph' && a.lastSyncedAt).map((a) => a.lastSyncedAt!);
     const lastSyncedAt = times.length ? times.reduce((m, t) => (t < m ? t : m)) : undefined;
-    return { online, syncing, label, lastSyncedAt, outboxHeld: held };
+    return { online, syncing, label, lastSyncedAt, outboxHeld: held, demo: true };
   },
   async diskEncryption() {
     if (hasWindow && new URLSearchParams(window.location.search).get('disk') === 'off') return 'off';

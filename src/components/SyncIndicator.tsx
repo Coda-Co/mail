@@ -53,7 +53,7 @@ export function SyncIndicator() {
   const tone: Tone = !sync.online ? 'offline' : sync.syncing ? 'busy' : sync.outboxHeld > 0 || anyWarn ? 'warn' : 'ok';
   // The core's label covers offline, held sends and problems; for the
   // healthy case say when, which is what people want to know.
-  const summary = tone === 'ok' && sync.lastSyncedAt ? `Synced ${agoTime(sync.lastSyncedAt, ref)}` : sync.label;
+  const summary = tone === 'ok' && sync.lastSyncedAt && !sync.demo ? `Synced ${agoTime(sync.lastSyncedAt, ref)}` : sync.label;
 
   const syncNow = () => api.syncNow().catch((e) => toast(String(e)));
 
@@ -66,7 +66,13 @@ export function SyncIndicator() {
         aria-expanded={!!anchor}
         onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
       >
-        <ToneIcon tone={tone} />
+        {sync.demo ? (
+          <span className="demo-tag" title="Built-in sample data. Nothing here is real or synced. Run pnpm tauri dev for your accounts.">
+            Demo data
+          </span>
+        ) : (
+          <ToneIcon tone={tone} />
+        )}
         <span className="text">{summary}</span>
       </button>
       {anchor && (
@@ -115,6 +121,7 @@ export function SyncIndicator() {
                 {sync.outboxHeld === 1 ? '1 message is' : `${sync.outboxHeld} messages are`} held in the outbox. Check Sent before sending again.
               </div>
             )}
+            {sync.demo && <div className="sync-note">This is built-in sample data. Nothing here is real or synced; run pnpm tauri dev to use your accounts.</div>}
             {!sync.online && <div className="sync-note">You’re offline. Mail and calendar still work; changes will sync when you reconnect.</div>}
           </div>
         </Popover>

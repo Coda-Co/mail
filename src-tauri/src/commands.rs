@@ -56,9 +56,16 @@ async fn sign_in_and_add(app: &AppHandle, s: &AppState, email: &str) -> R<AddAcc
                 (Some(o), Some(tid)) => Some(format!("{o}.{tid}")),
                 _ => None,
             };
+            let existed = s.svc.app().find_account_by_email(&addr)?.is_some();
             let account = s.svc.add_graph_account(&addr, &org, tenant, home)?;
+            // Store the sign-in before sync can start. If that fails, don't leave a half-added account.
             if let Some(rt) = &t.refresh_token {
-                s.tokens.set(&account.id, rt)?;
+                if let Err(e) = s.tokens.set(&account.id, rt) {
+                    if !existed {
+                        let _ = s.svc.remove_account(&account.id);
+                    }
+                    return Ok(AddAccountResult::Error { message: format!("Signed in, but the sign-in couldn't be saved to the credential store: {e}") });
+                }
             }
             s.tokens_for(&account).seed(&t).await;
             crate::webaccounts::close(app, &account.id);
@@ -382,7 +389,7 @@ pub async fn sync_now(s: State<'_, AppState>, account_id: Option<String>) -> R<(
 
 #[tauri::command]
 pub async fn sync_status(s: State<'_, AppState>) -> R<SyncStatus> {
-    s.svc.sync_status()
+    s.sync_status()
 }
 
 #[tauri::command]

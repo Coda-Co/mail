@@ -39,7 +39,7 @@ impl AppState {
         let tokens: Arc<dyn TokenStore> = if demo {
             Arc::new(mail_core::secrets::MemoryTokenStore::default())
         } else {
-            Arc::new(mail_core::secrets::OsKeyring::new(identifier))
+            Arc::new(mail_core::secrets::os_token_store(identifier))
         };
         AppState {
             svc,
@@ -51,6 +51,16 @@ impl AppState {
             graph_base: std::env::var("MAIL_APP_GRAPH_BASE").unwrap_or_else(|_| GRAPH_BASE.to_string()),
             demo,
         }
+    }
+
+    /// Sync status for the interface, flagged when showing sample data.
+    pub fn sync_status(&self) -> Result<mail_core::model::SyncStatus> {
+        let mut st = self.svc.sync_status()?;
+        if self.demo {
+            st.demo = true;
+            st.label = "Sample data · nothing syncs".into();
+        }
+        Ok(st)
     }
 
     pub fn tokens_for(&self, account: &Account) -> Arc<Tokens> {

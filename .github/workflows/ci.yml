@@ -1,12 +1,12 @@
 name: CI
 
+# Pull requests only: a push to a branch with an open PR runs CI once, through the PR.
 on:
-  push:
-    branches: [main, "claude/**"]
   pull_request:
 
+# A newer push to the same PR cancels the run in progress.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -42,7 +42,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-latest
             target: aarch64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc

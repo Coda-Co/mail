@@ -86,3 +86,11 @@ describe('demo backend', () => {
     expect((await demoApi.listMessages(inbox, 50, 0)).some((m) => m.id === first.id)).toBe(true);
   });
 });
+
+describe('demo flag', () => {
+  it('marks the demo backend as sample data', async () => {
+    const s = await demoApi.syncStatus();
+    expect(s.demo).toBe(true);
+    expect(s.label).toBe('Sample data · nothing syncs');
+  });
+});
