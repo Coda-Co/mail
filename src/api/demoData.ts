@@ -56,10 +56,10 @@ const id = (prefix: string) => `${prefix}-${(++seq).toString(36)}`;
 export function buildDemoState(now: Date): DemoState {
   seq = 0;
   const accounts: Account[] = [
-    { id: 'acc-coda', email: ME_ADDR.coda.email, displayName: 'Coda & Co', kind: 'graph', color: COLORS.coda, unread: 0, notifications: true, agentsEnabled: true, offlineMonths: 6, syncState: 'idle', lastSyncedAt: now.toISOString(), tenantId: 'coda' },
-    { id: 'acc-harbour', email: ME_ADDR.harbour.email, displayName: 'Harbour Partners', kind: 'graph', color: COLORS.harbour, unread: 0, notifications: true, agentsEnabled: false, offlineMonths: 6, syncState: 'idle', lastSyncedAt: now.toISOString(), tenantId: 'harbour' },
-    { id: 'acc-fenwick', email: ME_ADDR.fenwick.email, displayName: 'Fenwick Group', kind: 'graph', color: COLORS.fenwick, unread: 0, notifications: true, agentsEnabled: false, offlineMonths: 3, syncState: 'idle', lastSyncedAt: now.toISOString(), tenantId: 'fenwick' },
-    { id: 'acc-aldgate', email: 'miles.rowland@aldgatecapital.example', displayName: 'Aldgate Capital', kind: 'web', color: COLORS.aldgate, unread: 2, notifications: true, agentsEnabled: false, offlineMonths: 0, syncState: 'idle', webUrl: 'https://outlook.office.com/mail/' },
+    { id: 'acc-coda', email: ME_ADDR.coda.email, displayName: 'Coda & Co', kind: 'graph', color: COLORS.coda, unread: 0, notifications: true, offlineMonths: 6, syncState: 'idle', lastSyncedAt: now.toISOString(), tenantId: 'coda' },
+    { id: 'acc-harbour', email: ME_ADDR.harbour.email, displayName: 'Harbour Partners', kind: 'graph', color: COLORS.harbour, unread: 0, notifications: true, offlineMonths: 6, syncState: 'idle', lastSyncedAt: now.toISOString(), tenantId: 'harbour' },
+    { id: 'acc-fenwick', email: ME_ADDR.fenwick.email, displayName: 'Fenwick Group', kind: 'graph', color: COLORS.fenwick, unread: 0, notifications: true, offlineMonths: 3, syncState: 'idle', lastSyncedAt: now.toISOString(), tenantId: 'fenwick' },
+    { id: 'acc-aldgate', email: 'miles.rowland@aldgatecapital.example', displayName: 'Aldgate Capital', kind: 'web', color: COLORS.aldgate, unread: 2, notifications: true, offlineMonths: 0, syncState: 'idle', webUrl: 'https://outlook.office.com/mail/' },
   ];
   const accId = (k: AccKey) => `acc-${k}`;
 
@@ -282,7 +282,7 @@ export function buildDemoState(now: Date): DemoState {
     calendars,
     events,
     signatures,
-    settings: { theme: 'light', notifications: true, ctrlF: 'forward', mcpEnabled: false, mcpAllowSend: false, remoteImageSenders: [], remoteImages: 'show' },
+    settings: { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show' },
     serverOnly,
   };
 }

@@ -51,7 +51,6 @@ permissions = [
   "allow-sync-now",
   "allow-sync-status",
   "allow-disk-encryption",
-  "allow-mcp-info",
   "allow-pop-out",
   "allow-dock-back",
   "allow-open-external",

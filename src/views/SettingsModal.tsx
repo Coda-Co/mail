@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bold, ImagePlus, Italic, Link, Palette, Trash2 } from 'lucide-react';
 import { api } from '../api';
-import type { Account, McpInfo, Signature } from '../api/types';
+import type { Account, Signature } from '../api/types';
 import { useApp } from '../state/app';
 import { Modal, Popover, useToast } from '../components/ui';
 import { RichEditor, format, type RichEditorHandle } from '../components/RichEditor';
@@ -9,7 +9,7 @@ import { AddAccountForm, AddWebAccountForm, RemoveAccountDialog } from './Accoun
 import { PALETTE } from '../lib/colors';
 import { keyLabel } from '../lib/platform';
 
-type Tab = 'general' | 'accounts' | 'signatures' | 'agents';
+type Tab = 'general' | 'accounts' | 'signatures';
 
 function GeneralTab() {
   const { settings, updateSettings, disk } = useApp();
@@ -124,9 +124,6 @@ function AccountCard({ account, highlight }: { account: Account; highlight: bool
         </label>
         {account.kind === 'graph' && (
           <>
-            <label className="check">
-              <input type="checkbox" checked={account.agentsEnabled} onChange={(e) => patch({ agentsEnabled: e.target.checked })} /> Agents can access
-            </label>
             <label className="check">
               Keep offline
               <select className="select" value={account.offlineMonths} onChange={(e) => patch({ offlineMonths: Number(e.target.value) })}>
@@ -358,66 +355,6 @@ function SignaturesTab() {
   );
 }
 
-function AgentsTab() {
-  const { settings, updateSettings, graphAccounts, reloadAccounts } = useApp();
-  const [info, setInfo] = useState<McpInfo | null>(null);
-  const toast = useToast();
-  useEffect(() => {
-    api.mcpInfo().then(setInfo);
-  }, [settings.mcpEnabled]);
-  return (
-    <>
-      <div className="settings-group">
-        <h3>Agent access (MCP)</h3>
-        <label className="check">
-          <input type="checkbox" checked={settings.mcpEnabled} onChange={(e) => updateSettings({ mcpEnabled: e.target.checked })} />
-          Let AI agents use a local MCP server
-        </label>
-        <span className="hint">
-          Agents can search mail, read messages and threads, list events, create and update drafts, and create events. <b>Sending is never automatic:</b> agents create drafts; you send them.
-        </span>
-      </div>
-      <div className="settings-group">
-        <h3>Accounts agents can use</h3>
-        {graphAccounts.map((a) => (
-          <label key={a.id} className="check">
-            <input
-              type="checkbox"
-              checked={a.agentsEnabled}
-              onChange={async (e) => {
-                await api.updateAccount(a.id, { agentsEnabled: e.target.checked });
-                reloadAccounts();
-              }}
-            />
-            <span className="acc-dot" style={{ background: a.color }} />
-            {a.displayName}
-          </label>
-        ))}
-        <span className="hint">Web accounts can’t be used by agents.</span>
-      </div>
-      {info && settings.mcpEnabled && (
-        <div className="settings-group">
-          <h3>Connect a client</h3>
-          <span className="hint">Add this to your MCP client’s configuration (for example Claude Desktop or Claude Code):</span>
-          <pre className="code-block">{info.configSnippet}</pre>
-          <div>
-            <button
-              type="button"
-              className="btn"
-              onClick={async () => {
-                await navigator.clipboard.writeText(info.configSnippet).catch(() => {});
-                toast('Configuration copied');
-              }}
-            >
-              Copy
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
 export function SettingsModal() {
   const app = useApp();
   const raw = app.settingsTab ?? 'general';
@@ -427,7 +364,6 @@ export function SettingsModal() {
     ['general', 'General'],
     ['accounts', 'Accounts'],
     ['signatures', 'Signatures'],
-    ['agents', 'Agents'],
   ];
   return (
     <Modal title="Settings" onClose={app.closeSettings} wide>
@@ -443,7 +379,6 @@ export function SettingsModal() {
           {tab === 'general' && <GeneralTab />}
           {tab === 'accounts' && <AccountsTab focus={focus} />}
           {tab === 'signatures' && <SignaturesTab />}
-          {tab === 'agents' && <AgentsTab />}
         </div>
       </div>
     </Modal>

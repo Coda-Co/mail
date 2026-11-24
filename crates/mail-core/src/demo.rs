@@ -1,5 +1,5 @@
 //! Sample data from the mockups (all names made up). Used by `MAIL_APP_DEMO=1`,
-//! the MCP server's tests and screenshots. Times are relative to `now`.
+//! tests and screenshots. Times are relative to `now`.
 
 use crate::db::account::{EventRecord, MessageRecord};
 use crate::error::Result;

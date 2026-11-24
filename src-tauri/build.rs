@@ -49,7 +49,6 @@ const COMMANDS: &[&str] = &[
     "sync_now",
     "sync_status",
     "disk_encryption",
-    "mcp_info",
     "pop_out",
     "dock_back",
     "open_external",

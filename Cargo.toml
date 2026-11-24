@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/mail-core", "crates/mail-mcp", "src-tauri"]
+members = ["crates/mail-core", "src-tauri"]
 
 [workspace.package]
 version = "0.1.0"

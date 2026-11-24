@@ -1,4 +1,4 @@
-//! The local mail service: everything the interface and the MCP server can do,
+//! The local mail service: everything the interface can do,
 //! answered from the local databases. Changes apply locally at once and queue a
 //! pending operation that the sync engine replays against Microsoft Graph.
 

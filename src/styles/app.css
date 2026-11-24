@@ -1978,18 +1978,6 @@ h3 {
   border-color: var(--text);
 }
 
-.code-block {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-  background: var(--panel-muted);
-  border: 1px solid var(--border);
-  border-radius: var(--r-button);
-  padding: 10px 12px;
-  white-space: pre;
-  overflow-x: auto;
-  margin: 0;
-}
-
 .signature-list {
   display: flex;
   flex-direction: column;

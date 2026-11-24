@@ -397,18 +397,6 @@ pub async fn disk_encryption() -> R<DiskEncryption> {
     Ok(tauri::async_runtime::spawn_blocking(mail_core::disk::check).await.unwrap_or(DiskEncryption::Unknown))
 }
 
-/// How to connect an MCP client: the bundled mail-mcp sidecar and this app's data folder.
-#[tauri::command]
-pub async fn mcp_info(app: AppHandle, s: State<'_, AppState>) -> R<McpInfo> {
-    let exe = std::env::current_exe()?;
-    let name = if cfg!(windows) { "mail-mcp.exe" } else { "mail-mcp" };
-    let command = exe.parent().map(|p| p.join(name)).unwrap_or_else(|| name.into()).to_string_lossy().to_string();
-    let data = app.path().app_data_dir().map_err(|e| Error::Other(e.to_string()))?.to_string_lossy().to_string();
-    let args = vec!["--data-dir".to_string(), data];
-    let snippet = serde_json::to_string_pretty(&json!({"mcpServers": {"mail": {"command": command, "args": args}}}))?;
-    Ok(McpInfo { enabled: s.svc.settings()?.mcp_enabled, command, args, config_snippet: snippet })
-}
-
 // ---------------------------------------------------------------- windows
 
 fn window_label(prefix: &str, id: &str) -> String {

@@ -6,21 +6,10 @@ The app is internal only (spec §6). Releases are signed, notarised on macOS, an
 
 ```bash
 pnpm install --frozen-lockfile
-cargo build --release -p mail-mcp
+pnpm tauri build
 ```
 
-Copy the MCP sidecar where Tauri expects it, named with the target triple:
-
-```bash
-mkdir -p src-tauri/binaries
-cp target/release/mail-mcp "src-tauri/binaries/mail-mcp-$(rustc -vV | sed -n 's/host: //p')"
-```
-
-```bash
-pnpm tauri build -c src-tauri/tauri.bundle.conf.json
-```
-
-On Windows the sidecar is `mail-mcp.exe` and the copy is named `mail-mcp-x86_64-pc-windows-msvc.exe`. Installers are written to `target/release/bundle/` (`.app` and `.dmg` on macOS, NSIS `.exe` on Windows).
+Installers are written to `target/release/bundle/` (`.app` and `.dmg` on macOS, NSIS `.exe` on Windows).
 
 The minimum macOS version is 14 (`bundle.macOS.minimumSystemVersion`). That is what per-account WKWebView storage for web accounts needs; confirm it in the milestone-1 spike.
 
@@ -50,9 +39,9 @@ Then:
 3. Release builds use:
 
    ```bash
-   pnpm tauri build --features updater -c src-tauri/tauri.bundle.conf.json -c src-tauri/tauri.updater.conf.json
+   pnpm tauri build --features updater -c src-tauri/tauri.updater.conf.json
    ```
 
 ## Before retiring Outlook
 
-Spec milestone 8: live in the app for two weeks.
+Spec milestone 7: live in the app for two weeks.

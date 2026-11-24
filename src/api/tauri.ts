@@ -60,7 +60,6 @@ export const tauriApi: MailApi = {
   syncNow: (accountId) => call('sync_now', { accountId }),
   syncStatus: () => call('sync_status'),
   diskEncryption: () => call('disk_encryption'),
-  mcpInfo: () => call('mcp_info'),
 
   popOut: (kind, id) => call('pop_out', { kind, id }),
   dockBack: (draftId) => call('dock_back', { draftId }),

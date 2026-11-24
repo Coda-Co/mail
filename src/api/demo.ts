@@ -328,7 +328,6 @@ function newAccount(email: string, kind: 'graph' | 'web', displayName?: string):
     color,
     unread: kind === 'web' ? null : 0,
     notifications: true,
-    agentsEnabled: false,
     offlineMonths: kind === 'web' ? 0 : 6,
     syncState: 'idle',
     lastSyncedAt: kind === 'graph' ? now().toISOString() : undefined,
@@ -782,7 +781,7 @@ export const demoApi: MailApi = {
     return clone(state.settings);
   },
   async updateSettings(patch) {
-    Object.assign(state.settings, patch, { mcpAllowSend: false });
+    Object.assign(state.settings, patch);
     save();
     return clone(state.settings);
   },
@@ -813,16 +812,6 @@ export const demoApi: MailApi = {
     if (hasWindow && new URLSearchParams(window.location.search).get('disk') === 'off') return 'off';
     return 'on';
   },
-  async mcpInfo() {
-    const command = '/Applications/Mail.app/Contents/MacOS/mail-mcp';
-    return {
-      enabled: state.settings.mcpEnabled,
-      command,
-      args: [],
-      configSnippet: JSON.stringify({ mcpServers: { mail: { command, args: [] } } }, null, 2),
-    };
-  },
-
   async popOut(kind, id) {
     if (kind === 'draft') {
       const d = getDraftState(id);

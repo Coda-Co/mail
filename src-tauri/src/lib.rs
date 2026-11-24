@@ -166,7 +166,6 @@ pub fn run() {
             commands::sync_now,
             commands::sync_status,
             commands::disk_encryption,
-            commands::mcp_info,
             commands::pop_out,
             commands::dock_back,
             commands::open_external,

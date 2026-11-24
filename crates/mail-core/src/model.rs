@@ -66,7 +66,6 @@ pub struct Account {
     pub color: String,
     pub unread: Option<i64>,
     pub notifications: bool,
-    pub agents_enabled: bool,
     pub offline_months: i64,
     pub sync_state: SyncState,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -85,7 +84,6 @@ pub struct AccountPatch {
     pub display_name: Option<String>,
     pub color: Option<String>,
     pub notifications: Option<bool>,
-    pub agents_enabled: Option<bool>,
     pub offline_months: Option<i64>,
 }
 
@@ -574,8 +572,6 @@ pub struct Settings {
     pub theme: String,
     pub notifications: bool,
     pub ctrl_f: String,
-    pub mcp_enabled: bool,
-    pub mcp_allow_send: bool,
     pub remote_image_senders: Vec<String>,
     /// "show": load remote images (except in Junk); "ask": block until shown or the
     /// sender is allowed. Defaulted so settings saved before it existed still load.
@@ -593,8 +589,6 @@ impl Default for Settings {
             theme: "light".into(),
             notifications: true,
             ctrl_f: "forward".into(),
-            mcp_enabled: false,
-            mcp_allow_send: false,
             remote_image_senders: vec![],
             remote_images: default_remote_images(),
         }
@@ -607,8 +601,6 @@ pub struct SettingsPatch {
     pub theme: Option<String>,
     pub notifications: Option<bool>,
     pub ctrl_f: Option<String>,
-    pub mcp_enabled: Option<bool>,
-    pub mcp_allow_send: Option<bool>,
     pub remote_image_senders: Option<Vec<String>>,
     pub remote_images: Option<String>,
 }
@@ -654,15 +646,6 @@ pub enum AddAccountResult {
     Error {
         message: String,
     },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct McpInfo {
-    pub enabled: bool,
-    pub command: String,
-    pub args: Vec<String>,
-    pub config_snippet: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

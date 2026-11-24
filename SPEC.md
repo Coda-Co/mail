@@ -15,13 +15,13 @@ A lightweight, fast replacement for Outlook on Windows and macOS, covering only 
 - A fallback for client tenants that block third-party apps: Outlook on the web inside the app.
 - Clean, quiet interface in the style of Outline. Keyboard first.
 - Identical behaviour and shortcuts on Windows and macOS.
-- Read and write access for AI agents over a local MCP server.
 
 ### Non-goals (v1)
 
 - Anything beyond mail, calendar and people: no tasks, notes, RSS, ribbon or add-ins.
 - Non-Microsoft providers (Gmail, IMAP). The design should not rule them out.
 - Mobile apps. I use Outlook mobile on my phone.
+- Agent access over a local MCP server.
 - Shared mailboxes, delegation, public folders, rules editing.
 - Rich compose features beyond signatures (templates, scheduled send). Revisit after v1.
 
@@ -37,7 +37,6 @@ Each account has one of two backends. The interface treats them the same where i
 | Unified inbox, search, agenda, people | Yes | No: own pane only |
 | Unread count | From sync | Read from the page (best effort) |
 | Notifications | From sync | Captured from the page's web notifications |
-| MCP access | Yes | No |
 
 ### Adding an account
 
@@ -109,13 +108,6 @@ Each account has one of two backends. The interface treats them the same where i
 - Native desktop notifications for new mail and reminders, labelled with the account.
 - Per-account on/off. Tray or menu-bar badge with total unread.
 
-### 3.7 Agent access (MCP)
-
-- Local MCP server, off by default, enabled in settings.
-- Tools: search mail, read message or thread, list events, create draft, update draft, create event.
-- **Sending is never automatic**: agents create drafts; I send. (A setting may allow sending later, with confirmation.)
-- Covers Graph accounts only, and only accounts I've enabled for agents.
-
 ## 4. Design
 
 - Style: Outline-like. Light grey sidebar, white content, one blue accent, generous spacing.
@@ -133,7 +125,7 @@ Each account has one of two backends. The interface treats them the same where i
 
 - **Shell: Tauri v2.** Small install, native web views on each platform (WebView2 on Windows, WKWebView on macOS), Rust back end.
 - **Built from scratch.** Not built on MailCraft; it may be read as a reference for Graph behaviour only.
-- **Core: Rust.** Graph client, sync engine, SQLite store, search index, outbox, MCP server.
+- **Core: Rust.** Graph client, sync engine, SQLite store, search index, outbox.
 - **Interface: TypeScript + React** in the main web view, talking to the core through Tauri commands and events.
 - **Web accounts:** additional Tauri web views, one per account, each with its own data store.
 - **Storage:** SQLite with FTS5 for search. One database per account.
@@ -170,8 +162,7 @@ Main risk: multi-webview with isolated storage per account on both platforms in 
 4. **Search and people:** local index, facets, contact cards.
 5. **Calendar:** week view, agenda panel, responding, create and edit.
 6. **Web accounts:** isolated web views, unread count, notifications.
-7. **MCP server.**
-8. **Polish:** dark mode, notifications, shortcuts, signing, updates. Then live in it for two weeks before retiring Outlook.
+7. **Polish:** dark mode, notifications, shortcuts, signing, updates. Then live in it for two weeks before retiring Outlook.
 
 ## 8. Decisions made
 
