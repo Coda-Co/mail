@@ -490,6 +490,41 @@ impl AccountDb {
         })
     }
 
+    /// The stored row as a record, for merging partial delta items onto it.
+    pub fn get_message_record(&self, raw_id: &str) -> Result<Option<MessageRecord>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT id, folder_id, conversation_id, internet_message_id, from_name, from_email, to_json, cc_json, bcc_json, reply_to_json,
+                        subject, snippet, body_html, received_at, is_read, is_flagged, has_attachments, is_draft, web_link
+                 FROM messages WHERE id = ?1",
+                [raw_id],
+                |r| {
+                    Ok(MessageRecord {
+                        id: r.get(0)?,
+                        folder_id: r.get(1)?,
+                        conversation_id: r.get(2)?,
+                        internet_message_id: r.get(3)?,
+                        from: Address { name: r.get(4)?, email: r.get(5)? },
+                        to: from_json(r.get(6)?),
+                        cc: from_json(r.get(7)?),
+                        bcc: from_json(r.get(8)?),
+                        reply_to: from_json(r.get(9)?),
+                        subject: r.get(10)?,
+                        snippet: r.get(11)?,
+                        body_html: r.get(12)?,
+                        received_at: r.get(13)?,
+                        is_read: r.get(14)?,
+                        is_flagged: r.get(15)?,
+                        has_attachments: r.get(16)?,
+                        is_draft: r.get(17)?,
+                        web_link: r.get(18)?,
+                    })
+                },
+            )
+            .optional()?)
+    }
+
     pub fn message_exists(&self, raw_id: &str) -> Result<bool> {
         Ok(self.conn.query_row("SELECT 1 FROM messages WHERE id = ?1", [raw_id], |_| Ok(())).optional()?.is_some())
     }

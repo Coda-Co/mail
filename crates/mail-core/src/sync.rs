@@ -19,6 +19,8 @@ pub const CAL_BACK_DAYS: i64 = 92;
 pub const CAL_FORWARD_DAYS: i64 = 366;
 /// Bumped to force one full calendar re-read after a change in how delta items are stored.
 const CAL_DELTA_VERSION: &str = "2";
+/// Same for messages: bumped to re-read every folder's window once.
+const MAIL_DELTA_VERSION: &str = "2";
 /// Graph accepts simple attachments up to 3 MB; larger ones use an upload session.
 const SMALL_ATTACHMENT: u64 = 3 * 1024 * 1024;
 const CHUNK: usize = 5 * 320 * 1024;
@@ -159,6 +161,16 @@ impl<'a> Syncer<'a> {
     }
 
     pub async fn sync_messages(&self, report: &mut SyncReport) -> Result<()> {
+        // Rows written before partial delta items were merged may be blank: drop the saved
+        // delta links once so this round re-reads every folder's window in full.
+        if self.db(|db| db.kv_get("mailDeltaVersion"))?.as_deref() != Some(MAIL_DELTA_VERSION) {
+            self.db(|db| {
+                for (f, _) in db.folder_ids()? {
+                    db.set_folder_delta(&f, None)?;
+                }
+                db.kv_set("mailDeltaVersion", MAIL_DELTA_VERSION)
+            })?;
+        }
         let folders = self.db(|db| db.folder_ids())?;
         let first_sync = self.db(|db| db.kv_get("initialSyncDone"))?.is_none();
         for (folder, role) in folders {
@@ -213,7 +225,7 @@ impl<'a> Syncer<'a> {
                     report.messages_changed += 1;
                     continue;
                 }
-                let mut rec = graph::message_record(v, true);
+                let Some(mut rec) = self.delta_message(v).await? else { continue };
                 if rec.folder_id.is_empty() {
                     rec.folder_id = folder.to_string();
                 }
@@ -249,6 +261,25 @@ impl<'a> Syncer<'a> {
             break;
         }
         Ok(())
+    }
+
+    /// A message delta item as a full record. Graph may send only the id and the changed
+    /// properties: merge those onto the stored row, or fetch the message when there is no
+    /// complete row to merge onto (new mail can arrive like this). None if it is gone.
+    async fn delta_message(&self, v: &Value) -> Result<Option<crate::db::account::MessageRecord>> {
+        if graph::is_full_message(v) {
+            return Ok(Some(graph::message_record(v, true)));
+        }
+        let id = v["id"].as_str().unwrap_or("").to_string();
+        let stored = self.db(|db| db.get_message_record(&id))?.filter(|r| !r.received_at.is_empty());
+        if let Some(base) = stored {
+            return Ok(Some(graph::message_record_over(v, true, &base)));
+        }
+        match self.graph.get(&format!("/me/messages/{}?$select={}", quote(&id), MESSAGE_SELECT)).await {
+            Ok(full) => Ok(Some(graph::message_record(&full, true))),
+            Err(Error::Graph { status: 404, .. }) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
     /// Keep headers but drop bodies that have slid out of the offline window.

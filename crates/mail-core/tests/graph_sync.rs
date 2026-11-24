@@ -321,3 +321,38 @@ async fn bare_calendar_occurrences_keep_their_titles() {
     assert_eq!(occ.subject, "Pacifica daily sync", "title from the series master");
     assert_eq!(occ.location, "Teams");
 }
+
+#[tokio::test]
+async fn partial_message_delta_items_keep_details() {
+    let (server, svc, acc, events) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+
+    // The next round sends M1 (stored) with only its new read state, and M4 (new mail)
+    // with nothing but its id: the details have to be fetched.
+    Mock::given(method("GET"))
+        .and(path("/me/mailFolders/F-INBOX/messages/delta"))
+        .and(query_param("$deltatoken", "t1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "value": [{"id": "M1", "isRead": true}, {"id": "M4"}],
+            "@odata.deltaLink": format!("{}/me/mailFolders/F-INBOX/messages/delta?$deltatoken=t2", server.uri())
+        })))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET")).and(path("/me/messages/M4")).respond_with(ResponseTemplate::new(200).set_body_json(msg("M4", "F-INBOX", "DocuSign completed", false))).expect(1).mount(&server).await;
+    Mock::given(method("GET")).and(path("/me/messages/M1")).respond_with(ResponseTemplate::new(500)).expect(0).mount(&server).await;
+    let acc = svc.get_account(&acc.id).unwrap();
+    Syncer::new(&svc, &g, acc).run().await.unwrap();
+
+    let inbox = svc.list_messages(&ViewScope::unified_inbox(), 50, 0).unwrap();
+    let m1 = inbox.iter().find(|m| m.id.ends_with("M1")).unwrap();
+    assert_eq!(m1.subject, "Steering agenda", "stored subject kept");
+    assert_eq!(m1.from.email, "sarah@harbour.example", "stored sender kept");
+    assert!(!m1.received_at.is_empty(), "stored date kept");
+    assert!(m1.is_read, "new read state applied");
+    let m4 = inbox.iter().find(|m| m.id.ends_with("M4")).expect("new mail stored");
+    assert_eq!(m4.subject, "DocuSign completed");
+    assert!(!m4.received_at.is_empty());
+    assert_eq!(*events.new_mail.lock().unwrap(), vec!["DocuSign completed".to_string()]);
+}

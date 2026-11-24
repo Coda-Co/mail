@@ -223,6 +223,40 @@ pub fn message_record(v: &Value, with_body: bool) -> MessageRecord {
     }
 }
 
+/// True when a message delta item carries the full selected properties. Graph's message
+/// delta sometimes sends only the id and the properties that changed (for new mail too).
+pub fn is_full_message(v: &Value) -> bool {
+    v.get("receivedDateTime").and_then(|x| x.as_str()).is_some_and(|s| !s.is_empty())
+}
+
+/// Builds a record from a (possibly partial) Graph message, keeping `base`'s value for
+/// every property the item leaves out, so a change to one flag can't blank the rest.
+pub fn message_record_over(v: &Value, with_body: bool, base: &MessageRecord) -> MessageRecord {
+    let has = |k: &str| v.get(k).is_some();
+    let n = message_record(v, with_body);
+    let b = base.clone();
+    MessageRecord {
+        id: if n.id.is_empty() { b.id } else { n.id },
+        folder_id: if n.folder_id.is_empty() { b.folder_id } else { n.folder_id },
+        conversation_id: if has("conversationId") { n.conversation_id } else { b.conversation_id },
+        internet_message_id: if has("internetMessageId") { n.internet_message_id } else { b.internet_message_id },
+        from: if has("from") { n.from } else { b.from },
+        to: if has("toRecipients") { n.to } else { b.to },
+        cc: if has("ccRecipients") { n.cc } else { b.cc },
+        bcc: if has("bccRecipients") { n.bcc } else { b.bcc },
+        reply_to: if has("replyTo") { n.reply_to } else { b.reply_to },
+        subject: if has("subject") { n.subject } else { b.subject },
+        snippet: if has("bodyPreview") { n.snippet } else { b.snippet },
+        body_html: n.body_html.or(b.body_html),
+        received_at: if has("receivedDateTime") { n.received_at } else { b.received_at },
+        is_read: if has("isRead") { n.is_read } else { b.is_read },
+        is_flagged: if has("flag") { n.is_flagged } else { b.is_flagged },
+        has_attachments: if has("hasAttachments") { n.has_attachments } else { b.has_attachments },
+        is_draft: if has("isDraft") { n.is_draft } else { b.is_draft },
+        web_link: if has("webLink") { n.web_link } else { b.web_link },
+    }
+}
+
 pub fn event_record(v: &Value, calendar_id: &str) -> EventRecord {
     event_record_over(v, calendar_id, None)
 }
