@@ -289,6 +289,7 @@ impl<'a> Syncer<'a> {
                         is_flagged: rec.is_flagged,
                         has_attachments: rec.has_attachments,
                         is_draft: rec.is_draft,
+                        has_draft: false,
                     });
                 }
                 records.push(rec);
@@ -964,6 +965,8 @@ impl<'a> Syncer<'a> {
             Err(e) => {
                 self.db(|db| db.set_draft_status(raw_id, DraftStatus::Failed, Some(&friendly_send_error(&e))))?;
                 self.svc.events().draft_changed(&ids::join(self.acc(), raw_id));
+                // Back to a draft to finish, so its conversation's row shows it again.
+                self.svc.events().mail_changed(&[self.acc().to_string()]);
                 Err(e)
             }
         }

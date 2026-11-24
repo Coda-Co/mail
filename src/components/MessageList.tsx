@@ -34,7 +34,14 @@ export function MessageRow({ m, selected, onSelect }: { m: MessageSummary; selec
         <span className="time">{listTime(m.receivedAt)}</span>
       </span>
       <span className="subject">{m.subject || '(no subject)'}</span>
-      <span className="snippet">{m.snippet}</span>
+      <span className="snippet">
+        {m.hasDraft && (
+          <span className="draft-label" title="You started a reply in this conversation">
+            Draft
+          </span>
+        )}
+        {m.snippet}
+      </span>
     </button>
   );
 }

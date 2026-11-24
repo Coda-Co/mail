@@ -68,6 +68,8 @@ export interface MessageSummary {
   isFlagged: boolean;
   hasAttachments: boolean;
   isDraft: boolean;
+  /** The conversation has a reply or forward the user started and hasn't sent. */
+  hasDraft?: boolean;
 }
 
 export interface Attachment {

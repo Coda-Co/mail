@@ -90,6 +90,31 @@ fn reply_draft_defaults_and_from_swap() {
 }
 
 #[test]
+fn inbox_rows_show_an_unfinished_draft() {
+    let (svc, ids) = setup();
+    let src = format!("{}:m-agenda", ids.harbour);
+    let has_draft = || svc.list_messages(&ViewScope::unified_inbox(), 50, 0).unwrap().into_iter().find(|m| m.id == src).unwrap().has_draft;
+    assert!(!has_draft());
+
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src.clone()), account_id: None }).unwrap();
+    assert!(!has_draft(), "opening Reply without typing doesn't count");
+
+    let mut edit = d.clone();
+    edit.body_html = format!("<p>Happy to</p>{}", d.body_html);
+    let d = svc.update_draft(&edit).unwrap();
+    assert!(has_draft());
+
+    svc.send_draft(&d.id).unwrap();
+    assert!(!has_draft(), "a queued send is no longer a draft to finish");
+
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Forward, source_message_id: Some(src.clone()), account_id: None }).unwrap();
+    let d = svc.update_draft(&d).unwrap();
+    assert!(has_draft());
+    svc.discard_draft(&d.id).unwrap();
+    assert!(!has_draft());
+}
+
+#[test]
 fn outbox_rules() {
     let (svc, ids) = setup();
     let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()) }).unwrap();
