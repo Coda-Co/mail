@@ -40,7 +40,6 @@ jobs:
           cp "target/${{ matrix.target }}/release/mail-mcp$ext" "src-tauri/binaries/mail-mcp-${{ matrix.target }}$ext"
       - uses: tauri-apps/tauri-action@v0
         env:
-          MAIL_APP_CLIENT_ID: ${{ vars.MAIL_APP_CLIENT_ID }}
           MAIL_APP_SECURITY_NOTE_URL: ${{ vars.MAIL_APP_SECURITY_NOTE_URL }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}

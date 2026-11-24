@@ -17,17 +17,17 @@ Then:
 - Under **Branding & properties**, add the publisher domain and links. Then complete **publisher verification** through Partner Center: unverified multi-tenant apps get stricter consent prompts in client tenants.
 - Under **Branding**, link to a public copy of [SECURITY.md](SECURITY.md).
 
-## 2. Build with the client id
+## 2. The client id in the app
 
-The client id is not a secret.
+The registration's client id, `190e0115-8a14-44c2-9bbc-af0704d1ded6`, is built into the app (`CLIENT_ID` in `src-tauri/src/state.rs`). It is not a secret, so no setup is needed to sign in.
+
+To try a different registration, set `MAIL_APP_CLIENT_ID` when launching or building; it overrides the built-in id.
+
+The link to the security note in the "Ask my admin" message is set at build time:
 
 ```bash
-export MAIL_APP_CLIENT_ID=<application (client) id>
-export MAIL_APP_SECURITY_NOTE_URL=<public URL of SECURITY.md>
-pnpm tauri build
+MAIL_APP_SECURITY_NOTE_URL=<public URL of SECURITY.md> pnpm tauri build
 ```
-
-Both values are read at build time. `MAIL_APP_CLIENT_ID` can also be set when launching, which is useful during development.
 
 ## 3. Admin approval in client tenants
 

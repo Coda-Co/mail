@@ -38,7 +38,7 @@ It does **not** request:
 Open the admin consent link the user sent you, or go to:
 
 ```
-https://login.microsoftonline.com/<your-tenant>/v2.0/adminconsent?client_id=<client-id>&redirect_uri=http://localhost&scope=https://graph.microsoft.com/User.Read https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Calendars.ReadWrite
+https://login.microsoftonline.com/<your-tenant>/v2.0/adminconsent?client_id=190e0115-8a14-44c2-9bbc-af0704d1ded6&redirect_uri=http://localhost&scope=https://graph.microsoft.com/User.Read https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Calendars.ReadWrite
 ```
 
 You can also approve it for specific users only, through user assignment on the enterprise application.

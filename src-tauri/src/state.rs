@@ -18,9 +18,18 @@ pub struct AppState {
     pub demo: bool,
 }
 
-/// The app registration's client id: build-time `MAIL_APP_CLIENT_ID`, overridable at run time.
+/// Coda & Co's multi-tenant app registration (docs/APP_REGISTRATION.md). Not a secret:
+/// public clients have no secret, and the id appears in every sign-in URL.
+pub const CLIENT_ID: &str = "190e0115-8a14-44c2-9bbc-af0704d1ded6";
+
+/// The client id to sign in with: `MAIL_APP_CLIENT_ID` (at run time, then at build time)
+/// overrides the built-in registration, e.g. to try a test registration.
 pub fn client_id() -> String {
-    std::env::var("MAIL_APP_CLIENT_ID").ok().or_else(|| option_env!("MAIL_APP_CLIENT_ID").map(String::from)).unwrap_or_default()
+    std::env::var("MAIL_APP_CLIENT_ID")
+        .ok()
+        .or_else(|| option_env!("MAIL_APP_CLIENT_ID").map(String::from))
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| CLIENT_ID.to_string())
 }
 
 impl AppState {
@@ -77,4 +86,17 @@ fn token_entry(cache: &Mutex<HashMap<String, Arc<Tokens>>>, http: &reqwest::Clie
         .entry(a.id.clone())
         .or_insert_with(|| Arc::new(Tokens::refreshing(http.clone(), auth.clone(), a.tenant_id.clone(), &a.id, store.clone())))
         .clone()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn built_in_client_id_is_a_guid() {
+        let parts: Vec<&str> = CLIENT_ID.split('-').collect();
+        assert_eq!(parts.iter().map(|p| p.len()).collect::<Vec<_>>(), vec![8, 4, 4, 4, 12]);
+        assert!(CLIENT_ID.chars().all(|c| c == '-' || c.is_ascii_hexdigit()));
+        assert!(AuthConfig::new(CLIENT_ID).is_configured());
+    }
 }

@@ -291,7 +291,7 @@ pub enum SignIn {
 /// Full interactive sign-in. `open_browser` opens the URL in the system browser.
 pub async fn sign_in(http: &reqwest::Client, cfg: &AuthConfig, email: &str, open_browser: impl FnOnce(&str) -> Result<()>) -> Result<SignIn> {
     if !cfg.is_configured() {
-        return Err(Error::Auth("No app registration configured. Set MAIL_APP_CLIENT_ID when building.".into()));
+        return Err(Error::Auth("No app registration configured (MAIL_APP_CLIENT_ID is empty).".into()));
     }
     let lb = Loopback::bind().await?;
     let redirect = lb.redirect_uri();

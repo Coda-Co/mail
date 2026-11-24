@@ -17,7 +17,7 @@ cp target/release/mail-mcp "src-tauri/binaries/mail-mcp-$(rustc -vV | sed -n 's/
 ```
 
 ```bash
-MAIL_APP_CLIENT_ID=<client id> pnpm tauri build -c src-tauri/tauri.bundle.conf.json
+pnpm tauri build -c src-tauri/tauri.bundle.conf.json
 ```
 
 On Windows the sidecar is `mail-mcp.exe` and the copy is named `mail-mcp-x86_64-pc-windows-msvc.exe`. Installers are written to `target/release/bundle/` (`.app` and `.dmg` on macOS, NSIS `.exe` on Windows).

@@ -30,7 +30,7 @@ That runs the React interface against an in-browser demo backend. For the real d
 
 ```bash
 MAIL_APP_DEMO=1 pnpm tauri dev    # sample accounts, in memory, no sign-in
-MAIL_APP_CLIENT_ID=<client id> pnpm tauri dev   # real accounts
+pnpm tauri dev                    # real accounts (Coda & Co app registration built in)
 ```
 
 Debug builds (`pnpm tauri dev`) run as **Mail Dev** with the identifier `co.coda.mail.dev`. That gives them their own data folder, credential-store entries, web-view sign-ins and single-instance lock, so they run beside the installed app without touching its mail. Release builds (`pnpm tauri build`) are **Mail**, `co.coda.mail`.
