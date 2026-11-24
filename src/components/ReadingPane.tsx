@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ExternalLink, FileText, MoreHorizontal } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
 import type { Draft, DraftMode, Folder, Message, Thread } from '../api/types';
@@ -91,6 +91,7 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
   const app = useApp();
   const toast = useToast();
   const [thread, setThread] = useState<Thread | null>(null);
+  const readTimer = useRef<ReturnType<typeof setTimeout>>();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [focusDraft, setFocusDraft] = useState(false);
@@ -123,12 +124,11 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
     }
     setExpanded(new Set([selection.id]));
     // Mark as read after it has been open briefly, so skimming past doesn't.
-    let timer: ReturnType<typeof setTimeout> | undefined;
     loadThread(selection.id).then((t) => {
       const m = t?.messages.find((x) => x.id === selection.id);
-      if (m && !m.isRead) timer = setTimeout(() => api.markRead([m.id], true), 1500);
+      if (m && !m.isRead) readTimer.current = setTimeout(() => api.markRead([m.id], true), 1500);
     });
-    return () => clearTimeout(timer);
+    return () => clearTimeout(readTimer.current);
   }, [selection, loadThread]);
 
   useEffect(
@@ -166,6 +166,20 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
   useCommand('replyAll', () => void startDraft('replyAll'), hasMessage);
   useCommand('archive', () => void removeWithUndo('archive'), hasMessage);
   useCommand('delete', () => void removeWithUndo('delete'), hasMessage);
+  useCommand(
+    'markUnread',
+    () => {
+      if (!selectedMessage) return;
+      const id = selectedMessage.id;
+      // Stop the pending auto-mark-read from undoing this.
+      clearTimeout(readTimer.current);
+      void api.markRead([id], false).then(() => {
+        loadThread(id);
+        toast('Marked as unread');
+      });
+    },
+    hasMessage,
+  );
   useCommand(
     'ctrlF',
     () => {
