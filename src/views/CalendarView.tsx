@@ -69,6 +69,7 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
   ];
   return (
     <Modal
+      className="event-modal"
       title={eventTitle(event)}
       onClose={onClose}
       footer={
@@ -200,7 +201,10 @@ export function CalendarView() {
 
   const style = (e: CalendarEvent, isSelected: boolean) => ({
     background: isSelected ? eventSelectedFill(e.color, dark) : eventFill(e.color, dark),
-    border: isSelected ? `2px solid ${e.color}` : `1px solid ${eventBorder(e.color, dark)}`,
+    border: `1px solid ${eventBorder(e.color, dark)}`,
+    borderLeft: `4px solid ${e.color}`,
+    outline: isSelected ? '2px solid var(--text)' : undefined,
+    outlineOffset: -1,
   });
 
   const dayEvents = (d: Date) => events.filter((e) => new Date(e.start) < addDays(d, 1) && new Date(e.end) > d);
@@ -390,7 +394,6 @@ export function CalendarView() {
           onClose={() => setForm(null)}
           onSaved={(e) => {
             setForm(null);
-            setSelectedId(e.id);
             setAnchor(new Date(e.start));
             setVersion((v) => v + 1);
           }}

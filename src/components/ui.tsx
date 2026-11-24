@@ -94,7 +94,7 @@ export function Menu({ anchor, items, onClose, align }: { anchor: Anchor; items:
 
 // ---------- Modal ----------
 
-export function Modal({ title, onClose, children, footer, wide }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+export function Modal({ title, onClose, children, footer, wide, className }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; className?: string }) {
   useCommand('escape', () => {
     onClose();
   });
@@ -105,7 +105,7 @@ export function Modal({ title, onClose, children, footer, wide }: { title: strin
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className={`modal${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`modal${wide ? ' wide' : ''}${className ? ` ${className}` : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal-header">
           <h2>{title}</h2>
           <button type="button" className="btn btn-ghost btn-icon" aria-label="Close" onClick={onClose}>

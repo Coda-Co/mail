@@ -3,9 +3,6 @@
 export const PALETTE = ['#1F883D', '#8250DF', '#D4600F', '#0B5CC4', '#BF3989', '#1A7F8E'];
 export const WEB_ONLY = '#6E7781';
 
-const FILL: Record<string, string> = { '#1F883D': '#EAF6EE', '#8250DF': '#F1ECFC', '#D4600F': '#FCEFE5' };
-const BORDER: Record<string, string> = { '#1F883D': '#B7DFC3', '#8250DF': '#D3C4F5', '#D4600F': '#F2CBAE' };
-
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
   const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
@@ -24,15 +21,13 @@ export function mix(color: string, amount: number, base = '#FFFFFF'): string {
 }
 
 export function eventFill(color: string, dark: boolean): string {
-  if (dark) return mix(color, 0.22, '#16191D');
-  return FILL[color.toUpperCase()] ?? mix(color, 0.1);
+  return dark ? mix(color, 0.4, '#16191D') : mix(color, 0.32);
 }
 
 export function eventBorder(color: string, dark: boolean): string {
-  if (dark) return mix(color, 0.5, '#16191D');
-  return BORDER[color.toUpperCase()] ?? mix(color, 0.35);
+  return dark ? mix(color, 0.62, '#16191D') : mix(color, 0.55);
 }
 
 export function eventSelectedFill(color: string, dark: boolean): string {
-  return dark ? mix(color, 0.36, '#16191D') : mix(color, 0.22);
+  return dark ? mix(color, 0.55, '#16191D') : mix(color, 0.48);
 }
