@@ -152,7 +152,7 @@ Main risk: multi-webview with isolated storage per account on both platforms in 
 
 ### Data on disk
 
-- Client mail stored locally is sensitive. v1 relies on full-disk encryption (BitLocker, FileVault) and checks it at start-up with a warning if off.
+- Client mail stored locally is sensitive. v1 relies on full-disk encryption (BitLocker, FileVault) and shows whether it is on in Settings (no warning).
 - Option to encrypt the database (SQLCipher): decide before v1.
 - "Remove account" deletes that account's database, cache and tokens.
 

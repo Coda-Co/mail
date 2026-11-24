@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bold, ImagePlus, Italic, Link, Palette, ShieldAlert, Trash2 } from 'lucide-react';
+import { Bold, ImagePlus, Italic, Link, Palette, Trash2 } from 'lucide-react';
 import { api } from '../api';
 import type { Account, McpInfo, Signature } from '../api/types';
 import { useApp } from '../state/app';
@@ -412,12 +412,6 @@ export function SettingsModal() {
   ];
   return (
     <Modal title="Settings" onClose={app.closeSettings} wide>
-      {app.disk === 'off' && (
-        <div className="banner" style={{ margin: '0 20px 12px', borderRadius: 8, border: '1px solid var(--warning-border)' }}>
-          <ShieldAlert size={16} />
-          Full-disk encryption is off. Client mail stored on this device isn’t encrypted. Turn on BitLocker (Windows) or FileVault (macOS).
-        </div>
-      )}
       <div className="settings">
         <div className="settings-nav">
           {tabs.map(([t, label]) => (

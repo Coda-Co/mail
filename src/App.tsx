@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ShieldAlert, WifiOff } from 'lucide-react';
+import { WifiOff } from 'lucide-react';
 import { AppProvider, useApp } from './state/app';
 import { ToastProvider } from './components/ui';
 import { Sidebar } from './components/Sidebar';
@@ -29,7 +29,6 @@ function useGlobalShortcuts() {
 
 function Shell() {
   const app = useApp();
-  const [diskDismissed, setDiskDismissed] = useState(false);
   const [searchSlot, setSearchSlot] = useState<HTMLDivElement | null>(null);
   useGlobalShortcuts();
   useCommand('goMail', () => app.navigate({ view: 'mail' }));
@@ -55,16 +54,6 @@ function Shell() {
       <Resizer variable="--sidebar-w" pane="before" label="Resize sidebar" className="sidebar-resizer" />
       <main className="app-main">
         <TopBar slotRef={setSearchSlot} />
-        {app.disk === 'off' && !diskDismissed && (
-          <div className="banner" role="alert">
-            <ShieldAlert size={16} />
-            Full-disk encryption is off, so client mail stored on this device isn’t encrypted. Turn on BitLocker or FileVault.
-            <span className="spacer" />
-            <button type="button" className="link-button" onClick={() => setDiskDismissed(true)}>
-              Dismiss
-            </button>
-          </div>
-        )}
         {!app.sync.online && (
           <div className="banner" style={{ background: 'var(--panel-muted)', borderColor: 'var(--border)' }}>
             <WifiOff size={15} />

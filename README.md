@@ -89,7 +89,7 @@ Agents can search and read mail, list events, create and update drafts, and crea
 | Decision | Current state |
 |---|---|
 | Name | Still "Mail"; the identifier is `co.coda.mail`. |
-| Database encryption | Full-disk only, with a start-up check and warning. SQLCipher would be a `rusqlite` feature switch. |
+| Database encryption | Full-disk only; Settings shows whether it is on. SQLCipher would be a `rusqlite` feature switch. |
 | Client permission to store mail locally | Check each client's terms before adding them as a Graph account. |
 | Ctrl+F | A setting (forward or find); defaults to forward. |
 | Who else uses it | Not decided. |

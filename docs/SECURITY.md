@@ -27,7 +27,7 @@ It does **not** request:
 ## Where data lives
 
 - **On the user's device only.** Mail and calendar are stored in a local SQLite database per account under the user's app data folder. By default this holds 6 months of full messages and a rolling calendar window of 3 months back and 12 months forward.
-- **Disk encryption.** The app relies on full-disk encryption (BitLocker or FileVault) and warns at start-up if it is off.
+- **Disk encryption.** The app relies on full-disk encryption (BitLocker or FileVault) and shows whether it is on in Settings; it does not warn when it is off.
 - **Tokens.** Sign-in tokens are kept in the operating system's credential store (Windows Credential Manager or macOS Keychain), never in files.
 - **No Coda & Co servers in the path.** The app talks directly to `login.microsoftonline.com` and `graph.microsoft.com`; no mail, calendar data or tokens are sent to Coda & Co or anyone else.
 - **AI agents.** An optional local agent bridge (MCP) is off by default. When the user turns it on, it is enabled per account and runs only on the device. Agents can read mail and create drafts, but cannot send.
