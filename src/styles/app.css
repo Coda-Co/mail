@@ -49,6 +49,12 @@
   --warning-bg: #fff8e5;
   --warning-border: #f0d68a;
   --danger: #cf222e;
+  --file-pdf: #c4261d;
+  --file-slides: #c4501b;
+  --file-sheet: #1d7a45;
+  --file-doc: #1f5fbf;
+  --file-image: #8250df;
+  --file-media: #a1468a;
   --draft-border: #c9d6e8;
   --draft-header: #f6f9fd;
   --draft-header-border: #e4e9f1;
@@ -82,6 +88,12 @@
   --text: #e6e8eb;
   --text-secondary: #c5cad1;
   --text-muted: #9aa3ae;
+  --file-pdf: #f26d63;
+  --file-slides: #f0884f;
+  --file-sheet: #4cc27a;
+  --file-doc: #6aa5f0;
+  --file-image: #b392f0;
+  --file-media: #e07fc4;
   --placeholder: #8b949e;
   --bg: #16191d;
   --sidebar: #1d2126;
@@ -1133,6 +1145,18 @@ h3 {
   color: var(--text);
   max-width: 320px;
 }
+
+.attachment-chip .file-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.attachment-chip .file-pdf { color: var(--file-pdf); }
+.attachment-chip .file-slides { color: var(--file-slides); }
+.attachment-chip .file-sheet { color: var(--file-sheet); }
+.attachment-chip .file-doc { color: var(--file-doc); }
+.attachment-chip .file-image { color: var(--file-image); }
+.attachment-chip .file-audio,
+.attachment-chip .file-video { color: var(--file-media); }
 
 .attachment-chip .name {
   overflow: hidden;

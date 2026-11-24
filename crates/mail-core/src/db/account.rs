@@ -113,6 +113,10 @@ CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 "#,
     // Quoted original for replies and forwards, kept out of the editable body.
     "ALTER TABLE drafts ADD COLUMN quote_html TEXT",
+    // Attachment list fetched from the server (it can be empty even when hasAttachments is set).
+    "ALTER TABLE messages ADD COLUMN attachments_checked INTEGER NOT NULL DEFAULT 0",
+    // The server refused the content (e.g. a cloud link): don't retry it in background sync.
+    "ALTER TABLE attachments ADD COLUMN download_failed INTEGER NOT NULL DEFAULT 0",
 ];
 
 /// A message as stored, with raw IDs. Built by sync from Graph, or by tests and the demo seed.
@@ -620,6 +624,44 @@ impl AccountDb {
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
+    }
+
+    pub fn attachments_checked(&self, raw_message_id: &str) -> Result<bool> {
+        Ok(self.conn.query_row("SELECT attachments_checked FROM messages WHERE id = ?1", [raw_message_id], |r| r.get::<_, bool>(0)).optional()?.unwrap_or(false))
+    }
+
+    pub fn set_attachments_checked(&self, raw_message_id: &str) -> Result<()> {
+        self.conn.execute("UPDATE messages SET attachments_checked = 1 WHERE id = ?1", [raw_message_id])?;
+        Ok(())
+    }
+
+    /// Messages received since `since` whose attachment list hasn't been fetched yet, newest first.
+    pub fn messages_needing_attachment_list(&self, since: &str, limit: i64) -> Result<Vec<String>> {
+        let mut st = self.conn.prepare(
+            "SELECT id FROM messages
+             WHERE received_at >= ?1 AND attachments_checked = 0 AND is_draft = 0
+               AND (has_attachments = 1 OR body_html LIKE '%cid:%')
+             ORDER BY received_at DESC LIMIT ?2",
+        )?;
+        let rows = st.query_map(params![since, limit], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
+        Ok(rows)
+    }
+
+    /// Attachments of messages received since `since` that aren't cached yet, newest first:
+    /// (message id, attachment id, size).
+    pub fn attachments_to_download(&self, since: &str, limit: i64) -> Result<Vec<(String, String, i64)>> {
+        let mut st = self.conn.prepare(
+            "SELECT a.message_id, a.id, a.size FROM attachments a JOIN messages m ON m.id = a.message_id
+             WHERE m.received_at >= ?1 AND a.local_path IS NULL AND a.download_failed = 0
+             ORDER BY m.received_at DESC LIMIT ?2",
+        )?;
+        let rows = st.query_map(params![since, limit], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<_>>()?;
+        Ok(rows)
+    }
+
+    pub fn set_attachment_failed(&self, raw_message_id: &str, attachment_id: &str) -> Result<()> {
+        self.conn.execute("UPDATE attachments SET download_failed = 1 WHERE message_id = ?1 AND id = ?2", params![raw_message_id, attachment_id])?;
+        Ok(())
     }
 
     pub fn has_attachment_rows(&self, raw_message_id: &str) -> Result<bool> {
