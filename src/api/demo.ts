@@ -310,7 +310,17 @@ function eventFromInput(input: EventInput, existing?: CalendarEvent): CalendarEv
     reminderMinutes: input.reminderMinutes,
     isCancelled: false,
     color: acc.color,
+    readOnly: false,
   };
+}
+
+const READ_ONLY = 'This event is read-only. Change it in Outlook on the web.';
+
+function editableEvent(eventId: string): CalendarEvent {
+  const e = state.events.find((x) => x.id === eventId);
+  if (!e) throw new Error('Unknown event');
+  if (e.readOnly) throw new Error(READ_ONLY);
+  return e;
 }
 
 // ---- Accounts -------------------------------------------------------------
@@ -332,13 +342,14 @@ function newAccount(email: string, kind: 'graph' | 'web', displayName?: string):
     syncState: 'idle',
     lastSyncedAt: kind === 'graph' ? now().toISOString() : undefined,
     webUrl: kind === 'web' ? 'https://outlook.office.com/mail/' : undefined,
+    webCalendar: false,
   };
   state.accounts.push(a);
   if (kind === 'graph') {
     for (const [role, n] of [['inbox', 'Inbox'], ['drafts', 'Drafts'], ['sent', 'Sent'], ['archive', 'Archive'], ['deleted', 'Deleted']] as const) {
       state.folders.push({ id: `${a.id}-${role}`, accountId: a.id, name: n, role, unread: 0, total: 0 });
     }
-    state.calendars.push({ id: `cal-${a.id}`, accountId: a.id, name: 'Calendar', color, visible: true, isDefault: true });
+    state.calendars.push({ id: `cal-${a.id}`, accountId: a.id, name: 'Calendar', color, visible: true, isDefault: true, readOnly: false });
   }
   return a;
 }
@@ -414,12 +425,29 @@ export const demoApi: MailApi = {
   },
   async updateAccount(accountId, patch) {
     const a = account(accountId);
+    if (patch.webCalendar !== undefined && patch.webCalendar !== a.webCalendar) {
+      if (a.kind !== 'web') throw new Error('Only web accounts read their calendar from Outlook on the web');
+      if (patch.webCalendar) {
+        // The demo has no Outlook page to read: bring back the sample events.
+        const seed = buildDemoState(demoNow());
+        state.calendars.push(...seed.calendars.filter((c) => c.accountId === accountId));
+        state.events.push(...seed.events.filter((e) => e.accountId === accountId));
+        a.webCalendarSyncedAt = now().toISOString();
+      } else {
+        // Turning it off deletes everything read from Outlook on the web straight away.
+        state.calendars = state.calendars.filter((c) => c.accountId !== accountId);
+        state.events = state.events.filter((e) => e.accountId !== accountId);
+        a.webCalendarSyncedAt = undefined;
+        a.webCalendarError = undefined;
+      }
+    }
     Object.assign(a, patch);
     if (patch.color) {
       state.calendars.filter((c) => c.accountId === accountId).forEach((c) => (c.color = patch.color!));
       state.events.filter((e) => e.accountId === accountId).forEach((e) => (e.color = patch.color!));
     }
     save();
+    if (patch.webCalendar !== undefined) emit(EVENTS.mailChanged, { accountIds: [accountId] });
     emit(EVENTS.accountsChanged, state.accounts);
     return clone(a);
   },
@@ -709,6 +737,9 @@ export const demoApi: MailApi = {
   async listCalendars() {
     return clone(state.calendars);
   },
+  async refreshWebCalendars() {
+    /* The demo has no Outlook page to read. */
+  },
   async setCalendarVisible(calendarId, visible) {
     const c = state.calendars.find((x) => x.id === calendarId);
     if (c) c.visible = visible;
@@ -735,6 +766,8 @@ export const demoApi: MailApi = {
     return out;
   },
   async createEvent(input) {
+    if (account(input.accountId).kind !== 'graph') throw new Error('Web accounts manage their calendar in Outlook on the web');
+    if (state.calendars.find((c) => c.id === input.calendarId)?.readOnly) throw new Error('You can’t add events to that calendar');
     const e = eventFromInput(input);
     state.events.push(e);
     save();
@@ -742,16 +775,15 @@ export const demoApi: MailApi = {
     return clone(e);
   },
   async updateEvent(eventId, input) {
+    editableEvent(eventId);
     const idx = state.events.findIndex((e) => e.id === eventId);
-    if (idx < 0) throw new Error('Unknown event');
     state.events[idx] = eventFromInput(input, state.events[idx]);
     save();
     emit(EVENTS.mailChanged, { accountIds: [input.accountId] });
     return clone(state.events[idx]);
   },
   async respondEvent(eventId, response) {
-    const e = state.events.find((x) => x.id === eventId);
-    if (!e) throw new Error('Unknown event');
+    const e = editableEvent(eventId);
     e.myResponse = response;
     const me = myAddress(e.accountId);
     const att = e.attendees.find((a) => a.address.email === me.email);
@@ -760,6 +792,7 @@ export const demoApi: MailApi = {
     return clone(e);
   },
   async deleteEvent(eventId) {
+    editableEvent(eventId);
     state.events = state.events.filter((e) => e.id !== eventId);
     save();
   },

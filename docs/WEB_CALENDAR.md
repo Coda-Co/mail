@@ -1,6 +1,6 @@
 # Web account calendars: spec
 
-Status: **proposed, not built.** Pick-up notes for whoever implements it.
+Status: **built and working against a real web account on Windows (24 Nov 2026).** The calendar call is the one Outlook's own Calendar makes, sent with Outlook's own access token read inside the page (§4.2, §8). Still to do: the macOS check, and the rest of the manual check in §6.
 
 ## 1. Goal
 
@@ -21,6 +21,7 @@ These tenants block third-party apps on purpose. Copying their calendar data int
 - Turning it on shows a confirmation that says, in plain words: this reads your calendar from Outlook on the web and stores the next few weeks on this device; this tenant blocks third-party apps, so check the client is fine with it.
 - Turning it off deletes every stored web event and calendar row for that account straight away.
 - Data never leaves the device. The page fetches from its own Outlook origin and hands the result to the core; nothing else.
+- **It uses the page's own sign-in.** Outlook on the web only answers the calendar call with its bearer token, so the injected script reads Outlook's access token from the page's sign-in cache, inside the page, at the time of each call (§8). The token is never sent to the app, logged or stored anywhere else; only normalised event data crosses the bridge. Refresh and id tokens are never read. The confirmation says that the calendar is read using the user's Outlook on the web sign-in.
 
 ## 3. Behaviour
 
@@ -62,7 +63,7 @@ Rules for the fetch:
 - Use what the page already uses (its cookies and whatever request headers it sets). If a bearer token is needed, read it the same way the page does, at the time of the call, and **never pass a token, cookie or header value to the app**. Only normalised event data crosses the bridge.
 - Request only the fields in §4.3. Ask for no bodies.
 - Page through results until the range is complete, capped at 2,000 events. Report `error: "too_many"` above that.
-- 30-second timeout. On any failure, report `{ error: "<short code>", events: [] }` (`signed_out`, `http_<status>`, `parse`, `timeout`, `too_many`, `unsupported`).
+- 30-second timeout. On any failure, report `{ error: "<short code>", events: [] }` (`signed_out`, `no_token`, `http_<status>`, `network`, `parse`, `timeout`, `too_many`, `unsupported`).
 - Keep it tolerant: Outlook's internals are not an API and will change. A failure must only mark the calendar stale, never break mail, the unread count or notifications.
 
 ### 4.3 Payload
@@ -178,4 +179,31 @@ Interface: `demo.test.ts` covers the read-only flag; the event modal hides the a
 
 ## 8. Findings from the real Outlook on the web session
 
-_Fill in during implementation: endpoint, required headers, the response fields used, how paging works, and the date it was checked._
+Checked 24 Nov 2026 on Windows (WebView2), against a signed-in web account, by watching the Calendar's own requests (including its web workers) while moving between weeks.
+
+- **Host:** Outlook on the web now runs at `https://outlook.cloud.microsoft` (it used to be `outlook.office.com`). The injected script, the `web-accounts` capability and the page-load check now accept it. Before this, the script stopped at its host check on this host, so the unread count and notifications were silently off too.
+- **Endpoint:** `POST /owa/service.svc?action=GetCalendarView&app=Calendar` on the page's origin, made from one of Outlook's web workers.
+- **Request:** no body. The JSON request is URL-encoded in the `x-owa-urlpostdata` header: `GetCalendarViewJsonRequest:#Exchange`, `RequestServerVersion: V2018_01_08`, `TimeZoneContext` with the user's Windows time zone (for example `GMT Standard Time`), `CalendarId` as a `FolderId` (Outlook uses the calendar's folder id; the script uses the distinguished folder `calendar`), `RangeStart`, `RangeEnd`, `ClientSupportsIrm`, `OptimizeExtendedPropertyLoading`.
+- **Headers Outlook sends:** `Action`, `x-req-source`, `x-owa-urlpostdata`, `content-type`, `prefer`, `x-anchormailbox`, `x-owa-sessionid`, `x-owa-correlationid`, `x-owa-actionsource`, `x-owa-hosted-ux`, `x-client-version`, `ms-cv`, `traceparent`, and **`authorization: Bearer <token>`**. No `X-OWA-CANARY` cookie exists any more.
+- **Authentication:** with the page's cookies alone the call returns **401** (tested from the page, both with a JSON body and with the header form). The access tokens are in MSAL's encrypted local storage cache (`msal.3|…|accesstoken|…`, `{ id, nonce, data }`), and the page exposes no token API (`window.msal` holds only client ids; `nestedAppAuthBridge` is the add-in auth bridge).
+- **Response:** `Body.Items[]` of `CalendarItem:#Exchange` with `ItemId.Id`, `Subject`, `Start`, `End`, `IsAllDayEvent`, `FreeBusyType`, `IsCancelled`, `IsOrganizer`, **`ResponseType`** (the user's own response; the script reads it), `Organizer.Mailbox.{Name,EmailAddress}`, `Location.DisplayName`, `Locations[]`, `IsRecurring`, `CalendarItemType`, `SeriesMasterItemId`, `ReminderIsSet`, `ReminderMinutesBeforeStart`, `Preview`, `Sensitivity`. Recurring meetings come back as separate occurrences. **No attendees and no join link** in the calendar view, so those stay empty for web events; `Location` shows "Microsoft Teams Meeting" for Teams calls.
+- **Paging:** one request per week shown; the script asks in 7-day slices and deduplicates by id.
+- **Errors:** a redirect or 440 is `signed_out`; a 401 (token refused) is `http_401`; no Outlook token in the cache (for example, still signing in) is `no_token`.
+- **Checked end to end:** turning the toggle on in Settings asked the page within a second; the page's report reached the core through `web_account_calendar_report`; 83 events for the window were stored (15 all-day, 2 cancelled and hidden, no bodies or reminders, the user's response on every event) and shown read-only in Calendar with the "web" tag, the source line and only "Open in Outlook on the web". All-day events landed on the right days. A report with a made-up request id was dropped (nothing stored), and the page was refused `list_events`.
+
+### The bearer token (decided: reuse the page's token)
+
+The call only works with Outlook's own access token; with cookies alone it returns 401. Outlook's main thread rarely makes `service.svc` calls (its data calls run in web workers, under a service worker), so noting the header from the page's own requests isn't reliable. Instead `outlookToken()` in `web_account.js` reads the token the way MSAL does:
+
+- **Where:** local storage entries whose key contains `|accesstoken|` and `https://outlook.office.com/` (key format `msal.3|<homeAccountId>|<environment>|accesstoken|<clientId>|<realm>|<scopes>|`), preferring one whose scopes include calendar access.
+- **Decryption (MSAL 4):** entries are `{ id, nonce, data, lastUpdatedAt }`. The key is in the session cookie `msal.cache.encryption` (`{ id, key }`, base64url). Derive AES-GCM-256 with HKDF-SHA-256 (salt = the entry's `nonce`, info = the client id from the key), then decrypt `data` with a zero 12-byte IV. The result is MSAL's credential (`credentialType: "AccessToken"`, `secret`, `expiresOn`, `target`, ...). Unencrypted entries (older MSAL) are read as they are.
+- **Use:** an unexpired token (at least 2 minutes left) goes in `Authorization: Bearer` on the calendar call only, through the page's original `fetch` taken before Outlook's code runs.
+- **After a start:** the encryption cookie lasts for the browser session, so after the app restarts the cache can't be decrypted until Outlook re-fetches its tokens. The script waits up to 20 seconds for a token, then reports `no_token`; the 10-minute schedule (or opening Calendar) tries again.
+
+If MSAL changes its cache format, this fails with `no_token` and only the web calendar goes stale.
+
+Decisions taken where the spec left room:
+- `showAs` is accepted in the payload but not stored or shown yet (open question in §7).
+- The core re-sends the account list after a good refresh if the last one it sent is over 30 minutes old, so "updated N min ago" and the one-hour stale note stay true without emitting on every refresh.
+- Opening Calendar calls a new main-window command, `refresh_web_calendars` (in `app-windows`, not in `web-account-reporting`).
+- A page load counts once the Outlook page itself finishes loading (`on_page_load`, Outlook hosts only), and the first request waits 15 seconds for the app to start.

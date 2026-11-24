@@ -2580,6 +2580,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

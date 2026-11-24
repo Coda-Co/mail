@@ -87,6 +87,41 @@ describe('demo backend', () => {
   });
 });
 
+describe('web account calendar', () => {
+  beforeEach(() => resetDemo());
+
+  it('shows the web account’s events read-only', async () => {
+    const cals = await demoApi.listCalendars();
+    const web = cals.find((c) => c.accountId === 'acc-aldgate');
+    expect(web?.readOnly).toBe(true);
+    expect(cals.filter((c) => c.accountId !== 'acc-aldgate').every((c) => !c.readOnly)).toBe(true);
+    const events = await demoApi.listEvents('2026-11-23T00:00:00.000Z', '2026-12-07T00:00:00.000Z');
+    const fromWeb = events.filter((e) => e.accountId === 'acc-aldgate');
+    expect(fromWeb.map((e) => e.subject)).toEqual(['Investment committee', 'Quarterly portfolio review', 'Aldgate offsite']);
+    expect(fromWeb.every((e) => e.readOnly && e.reminderMinutes === undefined)).toBe(true);
+    expect(events.filter((e) => e.accountId !== 'acc-aldgate').every((e) => !e.readOnly)).toBe(true);
+  });
+
+  it('refuses changes to read-only events', async () => {
+    const [e] = (await demoApi.listEvents('2026-11-23T00:00:00.000Z', '2026-12-07T00:00:00.000Z')).filter((x) => x.readOnly);
+    await expect(demoApi.respondEvent(e.id, 'accepted')).rejects.toThrow(/read-only/);
+    await expect(demoApi.deleteEvent(e.id)).rejects.toThrow(/read-only/);
+    await expect(demoApi.updateEvent(e.id, { ...e, attendees: [] })).rejects.toThrow(/read-only/);
+  });
+
+  it('turning it off deletes the events, on brings them back', async () => {
+    await demoApi.updateAccount('acc-aldgate', { webCalendar: false });
+    expect((await demoApi.listCalendars()).some((c) => c.accountId === 'acc-aldgate')).toBe(false);
+    expect((await demoApi.listEvents('2026-11-23T00:00:00.000Z', '2026-12-07T00:00:00.000Z')).some((e) => e.accountId === 'acc-aldgate')).toBe(false);
+    const a = (await demoApi.listAccounts()).find((x) => x.id === 'acc-aldgate');
+    expect(a?.webCalendar).toBe(false);
+    expect(a?.webCalendarSyncedAt).toBeUndefined();
+    await demoApi.updateAccount('acc-aldgate', { webCalendar: true });
+    expect((await demoApi.listEvents('2026-11-23T00:00:00.000Z', '2026-12-07T00:00:00.000Z')).filter((e) => e.accountId === 'acc-aldgate')).toHaveLength(3);
+    await expect(demoApi.updateAccount('acc-coda', { webCalendar: true })).rejects.toThrow(/web accounts/);
+  });
+});
+
 describe('demo flag', () => {
   it('marks the demo backend as sample data', async () => {
     const s = await demoApi.syncStatus();

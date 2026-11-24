@@ -19,7 +19,7 @@ export interface DemoState {
   serverOnly: Message[];
 }
 
-export const DEMO_VERSION = 3;
+export const DEMO_VERSION = 4;
 
 const COLORS = { coda: '#1F883D', harbour: '#8250DF', fenwick: '#D4600F', aldgate: '#6E7781' };
 
@@ -56,10 +56,10 @@ const id = (prefix: string) => `${prefix}-${(++seq).toString(36)}`;
 export function buildDemoState(now: Date): DemoState {
   seq = 0;
   const accounts: Account[] = [
-    { id: 'acc-coda', email: ME_ADDR.coda.email, displayName: 'Coda & Co', kind: 'graph', color: COLORS.coda, unread: 0, notifications: true, offlineMonths: 6, syncState: 'idle', lastSyncedAt: now.toISOString(), tenantId: 'coda' },
-    { id: 'acc-harbour', email: ME_ADDR.harbour.email, displayName: 'Harbour Partners', kind: 'graph', color: COLORS.harbour, unread: 0, notifications: true, offlineMonths: 6, syncState: 'idle', lastSyncedAt: now.toISOString(), tenantId: 'harbour' },
-    { id: 'acc-fenwick', email: ME_ADDR.fenwick.email, displayName: 'Fenwick Group', kind: 'graph', color: COLORS.fenwick, unread: 0, notifications: true, offlineMonths: 3, syncState: 'idle', lastSyncedAt: now.toISOString(), tenantId: 'fenwick' },
-    { id: 'acc-aldgate', email: 'miles.rowland@aldgatecapital.example', displayName: 'Aldgate Capital', kind: 'web', color: COLORS.aldgate, unread: 2, notifications: true, offlineMonths: 0, syncState: 'idle', webUrl: 'https://outlook.office.com/mail/' },
+    { id: 'acc-coda', email: ME_ADDR.coda.email, displayName: 'Coda & Co', kind: 'graph', color: COLORS.coda, unread: 0, notifications: true, offlineMonths: 6, syncState: 'idle', lastSyncedAt: now.toISOString(), tenantId: 'coda', webCalendar: false },
+    { id: 'acc-harbour', email: ME_ADDR.harbour.email, displayName: 'Harbour Partners', kind: 'graph', color: COLORS.harbour, unread: 0, notifications: true, offlineMonths: 6, syncState: 'idle', lastSyncedAt: now.toISOString(), tenantId: 'harbour', webCalendar: false },
+    { id: 'acc-fenwick', email: ME_ADDR.fenwick.email, displayName: 'Fenwick Group', kind: 'graph', color: COLORS.fenwick, unread: 0, notifications: true, offlineMonths: 3, syncState: 'idle', lastSyncedAt: now.toISOString(), tenantId: 'fenwick', webCalendar: false },
+    { id: 'acc-aldgate', email: 'miles.rowland@aldgatecapital.example', displayName: 'Aldgate Capital', kind: 'web', color: COLORS.aldgate, unread: 2, notifications: true, offlineMonths: 0, syncState: 'idle', webUrl: 'https://outlook.office.com/mail/', webCalendar: true, webCalendarSyncedAt: new Date(now.getTime() - 4 * 60000).toISOString() },
   ];
   const accId = (k: AccKey) => `acc-${k}`;
 
@@ -210,9 +210,11 @@ export function buildDemoState(now: Date): DemoState {
 
   // Calendar: the week in the Calendar mockup.
   const calendars: CalendarInfo[] = [
-    { id: 'cal-coda', accountId: 'acc-coda', name: 'Calendar', color: COLORS.coda, visible: true, isDefault: true },
-    { id: 'cal-harbour', accountId: 'acc-harbour', name: 'Calendar', color: COLORS.harbour, visible: true, isDefault: true },
-    { id: 'cal-fenwick', accountId: 'acc-fenwick', name: 'Calendar', color: COLORS.fenwick, visible: true, isDefault: true },
+    { id: 'cal-coda', accountId: 'acc-coda', name: 'Calendar', color: COLORS.coda, visible: true, isDefault: true, readOnly: false },
+    { id: 'cal-harbour', accountId: 'acc-harbour', name: 'Calendar', color: COLORS.harbour, visible: true, isDefault: true, readOnly: false },
+    { id: 'cal-fenwick', accountId: 'acc-fenwick', name: 'Calendar', color: COLORS.fenwick, visible: true, isDefault: true, readOnly: false },
+    // Read from Outlook on the web: read-only.
+    { id: 'cal-aldgate', accountId: 'acc-aldgate', name: 'Calendar', color: COLORS.aldgate, visible: true, isDefault: true, readOnly: true },
   ];
   const monday = new Date(2026, 10, 23);
   const ev = (
@@ -252,6 +254,35 @@ export function buildDemoState(now: Date): DemoState {
       reminderMinutes: 15,
       isCancelled: false,
       color: COLORS[acc],
+      readOnly: false,
+    };
+  };
+  const ALDGATE_ME: Address = { name: 'Miles Rowland', email: 'miles.rowland@aldgatecapital.example' };
+  const ana: Address = { name: 'Ana Silva', email: 'ana.silva@aldgatecapital.example' };
+  // Web account events, as read from Outlook on the web: no body, no reminder, read-only.
+  const webEv = (day: number, start: number, end: number, subject: string, location: string, response: CalendarEvent['myResponse'], allDay = false): CalendarEvent => {
+    const d = (h: number) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + day, Math.floor(h), Math.round((h % 1) * 60));
+    return {
+      id: id('web'),
+      accountId: 'acc-aldgate',
+      calendarId: 'cal-aldgate',
+      subject,
+      start: (allDay ? d(0) : d(start)).toISOString(),
+      end: (allDay ? new Date(d(0).getTime() + 86400000) : d(end)).toISOString(),
+      isAllDay: allDay,
+      location,
+      bodyHtml: '',
+      organizer: ana,
+      attendees: [
+        { address: ana, type: 'required', response: 'organizer' },
+        { address: ALDGATE_ME, type: 'required', response },
+      ],
+      myResponse: response,
+      isOnlineMeeting: location === '',
+      onlineMeetingUrl: location === '' ? 'https://teams.example/meet/aldgate' : undefined,
+      isCancelled: false,
+      color: COLORS.aldgate,
+      readOnly: true,
     };
   };
   const events: CalendarEvent[] = [
@@ -270,6 +301,9 @@ export function buildDemoState(now: Date): DemoState {
     ev('harbour', 8, 14, 15, 'AI policy review', '', { online: true, organizer: PEOPLE.sarah, attendees: [PEOPLE.sarah, ME_ADDR.harbour], response: 'none' }),
     ev('fenwick', 9, 10, 11, 'Warehouse build kick-off', 'Fenwick HQ, room 2', { organizer: PEOPLE.ravi, attendees: [PEOPLE.ravi, ME_ADDR.fenwick], response: 'none' }),
     ev('coda', -7, 9, 9.5, 'Weekly delivery', '', { online: true, attendees: [ME_ADDR.coda, PEOPLE.tom] }),
+    webEv(1, 13, 14, 'Investment committee', 'Aldgate boardroom', 'accepted'),
+    webEv(7, 14, 15, 'Quarterly portfolio review', '', 'none'),
+    webEv(9, 0, 0, 'Aldgate offsite', 'Cambridge', 'accepted', true),
   ];
 
   return {

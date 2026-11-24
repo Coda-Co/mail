@@ -86,6 +86,7 @@ pub fn run() {
             let wake = state.wake.clone();
             let clients = state.client_factory();
             app.manage(state);
+            app.manage(webaccounts::WebCalendars::default());
 
             create_main_window(app)?;
             tray::create(&handle)?;
@@ -95,6 +96,7 @@ pub fn run() {
                 tauri::async_runtime::spawn(mail_core::sync::run_loop(svc.clone(), clients, wake, inbox_every, full_every));
             }
             tauri::async_runtime::spawn(events::reminder_loop(handle.clone()));
+            tauri::async_runtime::spawn(webaccounts::calendar_loop(handle.clone()));
             // Web accounts stay loaded in the background so counts and notifications stay live.
             let h = handle.clone();
             tauri::async_runtime::spawn(async move {
@@ -176,6 +178,8 @@ pub fn run() {
             webaccounts::reload_web_account,
             webaccounts::web_account_report,
             webaccounts::web_account_notify,
+            webaccounts::web_account_calendar_report,
+            webaccounts::refresh_web_calendars,
         ])
         .run(context())
         .expect("error while running the mail app");

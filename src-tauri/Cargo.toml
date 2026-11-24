@@ -33,4 +33,5 @@ reqwest.workspace = true
 chrono.workspace = true
 tracing.workspace = true
 sha2 = "0.10"
+uuid.workspace = true
 clipboard-rs = { version = "0.3", default-features = false }

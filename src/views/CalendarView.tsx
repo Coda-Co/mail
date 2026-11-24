@@ -10,6 +10,7 @@ import { EventForm } from './EventForm';
 import { eventWhere } from '../components/Agenda';
 import { Modal, useToast } from '../components/ui';
 import { eventTitle } from '../lib/text';
+import { eventActions, webEventSource } from '../lib/webCalendar';
 
 type Mode = 'day' | 'week' | 'month';
 const HOUR = 56;
@@ -45,14 +46,17 @@ function layoutDay(events: CalendarEvent[]): Placed[] {
   return placed;
 }
 
+const RESPONSE_TEXT: Partial<Record<ResponseStatus, string>> = { accepted: 'You’re going', tentative: 'You said maybe', declined: 'You declined' };
+
 function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: CalendarEvent; onClose: () => void; onChanged: (e: CalendarEvent) => void; onEdit: () => void; onDeleted: () => void }) {
-  const { accountById } = useApp();
+  const { accountById, navigate } = useApp();
   const toast = useToast();
   const [showAll, setShowAll] = useState(false);
   const acc = accountById(event.accountId);
+  const fromWeb = acc?.kind === 'web';
   const start = new Date(event.start);
   const end = new Date(event.end);
-  const isOrganizer = event.myResponse === 'organizer';
+  const actions = eventActions(event);
   const attendees = [...event.attendees].sort((a, b) => (a.response === 'organizer' ? -1 : b.response === 'organizer' ? 1 : 0));
   const shown = showAll ? attendees : attendees.slice(0, 3);
   const respond = async (r: 'accepted' | 'tentative' | 'declined') => {
@@ -73,7 +77,18 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
       title={eventTitle(event)}
       onClose={onClose}
       footer={
-        isOrganizer ? (
+        fromWeb ? (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              onClose();
+              navigate({ view: 'web', param: event.accountId });
+            }}
+          >
+            Open in Outlook on the web
+          </button>
+        ) : actions.edit || actions.delete ? (
           <>
             <button
               type="button"
@@ -98,18 +113,21 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
         <span className="acc">
           <span className="acc-dot" style={{ background: acc?.color ?? event.color }} />
           {acc?.displayName}
+          {fromWeb && <span className="web-tag">web</span>}
         </span>
+        {fromWeb && <span className="event-source">{webEventSource(acc, now())}</span>}
         <div className="facts">
           <span>{longDate(start)}</span>
           <span>{event.isAllDay ? 'All day' : `${hhmm(start)} – ${hhmm(end)}`}</span>
           {event.location && <span>{event.location}</span>}
+          {!actions.respond && event.readOnly && RESPONSE_TEXT[event.myResponse] && <span>{RESPONSE_TEXT[event.myResponse]}</span>}
           {event.isOnlineMeeting && event.onlineMeetingUrl && (
             <button type="button" className="link-button" style={{ alignSelf: 'flex-start', display: 'inline-flex', gap: 6, alignItems: 'center' }} onClick={() => api.openExternal(event.onlineMeetingUrl!)}>
               Join Teams meeting <ExternalLink size={13} />
             </button>
           )}
         </div>
-        {!isOrganizer && (
+        {actions.respond && (
           <div className="rsvp">
             {rsvp.map(([r, label]) => (
               <button key={r} type="button" className={event.myResponse === r ? 'on' : ''} aria-pressed={event.myResponse === r} onClick={() => respond(r)}>
@@ -187,6 +205,11 @@ export function CalendarView() {
     if (mode !== 'month' && scroller.current) scroller.current.scrollTop = 8 * HOUR;
   }, [mode]);
 
+  // Web calendars refresh when Calendar opens (the core limits it to once a minute).
+  useEffect(() => {
+    api.refreshWebCalendars().catch(() => {});
+  }, []);
+
   const selected = events.find((e) => e.id === selectedId) ?? null;
   const today = now();
 
@@ -208,6 +231,13 @@ export function CalendarView() {
   });
 
   const dayEvents = (d: Date) => events.filter((e) => new Date(e.start) < addDays(d, 1) && new Date(e.end) > d);
+  const webTag = (e: CalendarEvent) =>
+    app.accountById(e.accountId)?.kind === 'web' ? (
+      <>
+        {' '}
+        <span className="web-tag">web</span>
+      </>
+    ) : null;
 
   const timeGrid = (
     <>
@@ -235,6 +265,7 @@ export function CalendarView() {
                 .map((e) => (
                   <button key={e.id} type="button" className="all-day-event" style={style(e, e.id === selectedId)} onClick={() => setSelectedId(e.id)}>
                     {eventTitle(e)}
+                    {webTag(e)}
                   </button>
                 ))}
             </div>
@@ -287,10 +318,13 @@ export function CalendarView() {
                         padding: short ? '3px 8px' : undefined,
                       }}
                       onClick={() => setSelectedId(e.id)}
-                      onDoubleClick={() => e.myResponse === 'organizer' && setForm({ event: e })}
+                      onDoubleClick={() => eventActions(e).edit && setForm({ event: e })}
                       title={`${eventTitle(e)} · ${hhmm(s)} – ${hhmm(en)}${eventWhere(e) ? ' · ' + eventWhere(e) : ''}`}
                     >
-                      <span className="title">{eventTitle(e)}</span>
+                      <span className="title">
+                        {eventTitle(e)}
+                        {webTag(e)}
+                      </span>
                       {!short && (
                         <span className="time">
                           {hhmm(s)} – {hhmm(en)}
@@ -334,6 +368,7 @@ export function CalendarView() {
                   <span className="acc-dot" style={{ background: e.color }} />
                   {!e.isAllDay && <span className="t">{hhmm(new Date(e.start))}</span>}
                   <span className="s">{eventTitle(e)}</span>
+                  {webTag(e)}
                 </button>
               ))}
               {list.length > 3 && <span className="month-more">{list.length - 3} more</span>}

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "web-accounts",
-  "description": "Outlook on the web inside web-account views: may only report unread counts and notifications.",
+  "description": "Outlook on the web inside web-account views: may only report unread counts, notifications and answers to the app's calendar requests.",
   "webviews": [
     "web-*"
   ],
@@ -11,6 +11,7 @@
   ],
   "remote": {
     "urls": [
+      "https://outlook.cloud.microsoft/*",
       "https://outlook.office.com/*",
       "https://outlook.office365.com/*",
       "https://outlook.live.com/*"

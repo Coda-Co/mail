@@ -154,7 +154,7 @@ pub struct StoredMessage {
     pub internet_message_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct EventRecord {
     pub id: String,
     pub calendar_id: String,
@@ -924,11 +924,49 @@ impl AccountDb {
         Ok(())
     }
 
-    /// (raw id, name, is_default)
-    pub fn list_calendars(&self) -> Result<Vec<(String, String, bool)>> {
-        let mut st = self.conn.prepare("SELECT id, name, is_default FROM calendars ORDER BY is_default DESC, name")?;
-        let rows = st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<Vec<_>>>()?;
+    /// (raw id, name, is_default, can_edit)
+    pub fn list_calendars(&self) -> Result<Vec<(String, String, bool, bool)>> {
+        let mut st = self.conn.prepare("SELECT id, name, is_default, can_edit FROM calendars ORDER BY is_default DESC, name")?;
+        let rows = st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
+    }
+
+    /// Whether events in this calendar may be changed here (unknown calendars: yes).
+    pub fn calendar_can_edit(&self, raw_id: &str) -> Result<bool> {
+        Ok(self.conn.query_row("SELECT can_edit FROM calendars WHERE id = ?1", [raw_id], |r| r.get(0)).optional()?.unwrap_or(true))
+    }
+
+    /// Delete a calendar and all its events.
+    pub fn delete_calendar(&self, raw_id: &str) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute("DELETE FROM events WHERE calendar_id = ?1", [raw_id])?;
+        tx.execute("DELETE FROM calendars WHERE id = ?1", [raw_id])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Replace a calendar's events in [start, end) with `events`, in one transaction, and prune
+    /// events that end at or before `start`. Events after `end` are kept. Returns whether the
+    /// stored events changed.
+    pub fn replace_events_in_range(&self, raw_calendar_id: &str, start: &str, end: &str, events: &[EventRecord]) -> Result<bool> {
+        // Overlaps [start, end); a zero-length event counts when it sits inside the range.
+        const IN_RANGE: &str = "calendar_id = ?1 AND start_at < ?3 AND (end_at > ?2 OR start_at >= ?2)";
+        let tx = self.conn.unchecked_transaction()?;
+        let old_ids: Vec<String> = tx.prepare(&format!("SELECT id FROM events WHERE {IN_RANGE} ORDER BY id"))?.query_map(params![raw_calendar_id, start, end], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?;
+        let mut old = vec![];
+        for id in &old_ids {
+            old.extend(self.get_event_record(id)?);
+        }
+        let mut new: Vec<&EventRecord> = events.iter().collect();
+        new.sort_by(|a, b| a.id.cmp(&b.id));
+        let mut changed = old.len() != new.len() || old.iter().zip(&new).any(|(a, b)| a != *b);
+        tx.execute(&format!("DELETE FROM events WHERE {IN_RANGE}"), params![raw_calendar_id, start, end])?;
+        for e in events {
+            self.upsert_event(e)?;
+        }
+        changed |= tx.execute("DELETE FROM events WHERE calendar_id = ?1 AND end_at <= ?2 AND start_at < ?2", params![raw_calendar_id, start])? > 0;
+        tx.commit()?;
+        Ok(changed)
     }
 
     pub fn default_calendar(&self) -> Result<Option<String>> {
@@ -1033,22 +1071,27 @@ impl AccountDb {
             reminder_minutes: r.get(13)?,
             is_cancelled: r.get(14)?,
             color: color.to_string(),
+            read_only: !r.get::<_, bool>(15)?,
         })
     }
 
     const EVENT_COLS: &'static str =
         "id, calendar_id, subject, start_at, end_at, is_all_day, location, body_html, organizer_json, attendees_json, my_response, is_online_meeting, online_meeting_url, reminder_minutes, is_cancelled";
 
+    /// EVENT_COLS plus whether the event's calendar can be edited, for `row_event`.
+    const EVENT_VIEW_COLS: &'static str = "id, calendar_id, subject, start_at, end_at, is_all_day, location, body_html, organizer_json, attendees_json, my_response, is_online_meeting, online_meeting_url, reminder_minutes, is_cancelled,
+         COALESCE((SELECT c.can_edit FROM calendars c WHERE c.id = events.calendar_id), 1)";
+
     /// Events overlapping [start, end).
     pub fn list_events(&self, start: &str, end: &str, color: &str) -> Result<Vec<CalendarEvent>> {
-        let mut st = self.conn.prepare(&format!("SELECT {} FROM events WHERE end_at > ?1 AND start_at < ?2 ORDER BY start_at", Self::EVENT_COLS))?;
+        let mut st = self.conn.prepare(&format!("SELECT {} FROM events WHERE end_at > ?1 AND start_at < ?2 ORDER BY start_at", Self::EVENT_VIEW_COLS))?;
         let rows = st.query_map([start, end], |r| self.row_event(r, color))?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
 
     pub fn get_event(&self, raw_id: &str, color: &str) -> Result<CalendarEvent> {
         self.conn
-            .query_row(&format!("SELECT {} FROM events WHERE id = ?1", Self::EVENT_COLS), [raw_id], |r| self.row_event(r, color))
+            .query_row(&format!("SELECT {} FROM events WHERE id = ?1", Self::EVENT_VIEW_COLS), [raw_id], |r| self.row_event(r, color))
             .optional()?
             .ok_or_else(|| Error::NotFound(format!("event {raw_id}")))
     }

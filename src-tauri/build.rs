@@ -1,6 +1,6 @@
 // Every command the interface may call is listed here so Tauri generates a permission for
 // it; capabilities/ then decide which windows get which. Web accounts (remote Outlook pages)
-// may only call the two reporting commands.
+// may only call the three reporting commands.
 const COMMANDS: &[&str] = &[
     "me",
     "list_accounts",
@@ -57,6 +57,8 @@ const COMMANDS: &[&str] = &[
     "reload_web_account",
     "web_account_report",
     "web_account_notify",
+    "web_account_calendar_report",
+    "refresh_web_calendars",
 ];
 
 fn main() {
