@@ -3,6 +3,7 @@ import { api, EVENTS, onEvent } from '../api';
 import type { Draft, Message } from '../api/types';
 import { Compose } from '../components/Compose';
 import { MessageBody } from '../components/MessageBody';
+import { AttachmentList } from '../components/ReadingPane';
 import { Avatar, useToast } from '../components/ui';
 import { useApp } from '../state/app';
 import { fullTime } from '../lib/dates';
@@ -60,16 +61,20 @@ export function ComposeWindow({ draftId }: { draftId: string }) {
 
 /** A message in its own window (#/message/<id>). */
 export function MessageWindow({ messageId }: { messageId: string }) {
-  const { accountById } = useApp();
+  const { accountById, mailVersion } = useApp();
   const toast = useToast();
   const [message, setMessage] = useState<Message | null>(null);
   useCommand('escape', () => void closeWindow());
+  // Reload when mail changes too: attachments can arrive after the window opens.
   useEffect(() => {
-    api.getMessage(messageId).then((m) => {
-      setMessage(m);
-      document.title = m.subject;
-    });
-  }, [messageId]);
+    api
+      .getMessage(messageId)
+      .then((m) => {
+        setMessage(m);
+        document.title = m.subject;
+      })
+      .catch(() => {});
+  }, [messageId, mailVersion]);
   if (!message) return null;
   const acc = accountById(message.accountId);
   const reply = async (mode: 'reply' | 'replyAll' | 'forward') => {
@@ -122,6 +127,7 @@ export function MessageWindow({ messageId }: { messageId: string }) {
                 </span>
               )}
             </div>
+            <AttachmentList message={message} />
             <MessageBody html={message.bodyHtml} />
           </div>
         </div>

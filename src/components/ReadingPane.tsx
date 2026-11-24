@@ -22,7 +22,7 @@ function recipients(m: Message, meName: string, myEmails: string[]): string {
 }
 
 /** Click selects (Ctrl/Cmd+click adds), Ctrl/Cmd+C copies the files, double-click or Enter opens. */
-function AttachmentList({ message }: { message: Message }) {
+export function AttachmentList({ message }: { message: Message }) {
   const toast = useToast();
   const files = message.attachments.filter((a) => !a.isInline);
   const [selected, setSelected] = useState<string[]>([]);
