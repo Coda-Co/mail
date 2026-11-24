@@ -294,8 +294,8 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
   }
 
   return (
-    <div className="draft-card" aria-label={`${MODE_TITLE[draft.mode]} draft`} onKeyDown={onKeyDown}>
-      <div className="draft-card-header">
+    <div className="draft-section" aria-label={`${MODE_TITLE[draft.mode]} draft`} onKeyDown={onKeyDown}>
+      <div className="draft-section-header">
         <span className="title">{MODE_TITLE[draft.mode]}</span>
         <button type="button" className="btn btn-ghost" onClick={popOut}>
           <ExternalLink size={14} />
@@ -331,7 +331,7 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
 /** Shown in place of a draft that's open in its own window. */
 export function PoppedOutDraft({ draft }: { draft: Draft }) {
   return (
-    <div className="draft-card">
+    <div className="draft-section">
       <div className="draft-popped">
         <ExternalLink size={14} />
         <span style={{ flex: 1 }}>{MODE_TITLE[draft.mode]} is open in its own window.</span>

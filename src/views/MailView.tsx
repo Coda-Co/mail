@@ -7,6 +7,7 @@ import { useCommand } from '../lib/commands';
 import { MessageList } from '../components/MessageList';
 import { ReadingPane, type Selection } from '../components/ReadingPane';
 import { Agenda } from '../components/Agenda';
+import { Resizer } from '../components/Resizer';
 import { SearchHeader, type SearchState } from '../components/SearchHeader';
 import { Avatar, useToast } from '../components/ui';
 import { plural } from '../lib/text';
@@ -240,6 +241,7 @@ export function MailView() {
           }
         />
       </section>
+      <Resizer variable="--list-w" pane="before" label="Resize message list" className="list-resizer" />
       <ReadingPane selection={selection} onBack={() => setSelection(null)} onRemoved={afterRemoved} />
     </div>
   );
@@ -258,6 +260,7 @@ export function MailView() {
   return (
     <div className="mail-view">
       <div className="mail-center">{panes}</div>
+      <Resizer variable="--agenda-w" pane="after" label="Resize agenda" className="agenda-resizer" />
       <Agenda />
     </div>
   );

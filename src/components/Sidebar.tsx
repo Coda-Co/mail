@@ -1,9 +1,8 @@
 import { useEffect, useState, type MouseEvent } from 'react';
-import { Calendar, Inbox, Search, Settings as Gear, Users } from 'lucide-react';
+import { Calendar, Inbox, Settings as Gear, Users } from 'lucide-react';
 import { api } from '../api';
 import type { Account, CalendarInfo, Folder, FolderRole } from '../api/types';
 import { useApp } from '../state/app';
-import { keyLabel } from '../lib/platform';
 import { Avatar, Menu, useToast, type Anchor, type MenuItem } from './ui';
 import { RemoveAccountDialog, ApprovalDialog } from '../views/AccountDialogs';
 import type { AddAccountResult } from '../api/types';
@@ -172,22 +171,6 @@ export function Sidebar() {
 
   return (
     <nav className="sidebar" aria-label="Sidebar">
-      <div className="brand">
-        <div className="brand-logo">M</div>
-        <span className="brand-name">Mail</span>
-      </div>
-      <button
-        type="button"
-        className="sidebar-search"
-        onClick={() => {
-          if (route.view !== 'mail') app.navigate({ view: 'mail' });
-          app.setSearchActive(true);
-        }}
-      >
-        <Search size={15} />
-        <span>Search this view</span>
-        <span className="kbd-hint">{keyLabel('Mod+E')}</span>
-      </button>
       <div className="sidebar-scroll">
         <button type="button" className={`nav-item${inMail && !scope.accountId && isRole('inbox') ? ' selected' : ''}`} onClick={() => openMail(undefined, { role: 'inbox' })}>
           <Inbox size={16} />
