@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
 import { api } from '../api';
 import type { Folder, ListTab, MessageSummary, SearchResult } from '../api/types';
 import { useApp } from '../state/app';
@@ -191,13 +190,6 @@ export function MailView() {
       <section className="list-pane" aria-label={searchActive ? 'Results' : 'Message list'}>
         {!searchActive && (
           <div className="list-header">
-            <div className="list-title-row">
-              <h1 className="view-title">{folderName}</h1>
-              <button type="button" className="btn btn-primary" onClick={() => newMessage()}>
-                <Plus size={14} strokeWidth={2.4} />
-                New
-              </button>
-            </div>
             {account && (
               <div className="view-subtitle">
                 <span className="acc-dot" style={{ background: account.color }} />

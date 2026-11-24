@@ -238,6 +238,13 @@ h3 {
   color: var(--placeholder);
 }
 
+.topbar-new {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-card);
+}
+
 .topbar .spacer {
   flex: 1;
 }
@@ -791,6 +798,18 @@ h3 {
   padding: 28px 20px 0;
 }
 
+.mail-panes .list-header {
+  padding-top: 14px;
+}
+
+.mail-panes .list-header .tabs {
+  margin-top: 10px;
+}
+
+.mail-panes .list-header .view-subtitle {
+  margin-top: 0;
+}
+
 .list-title-row {
   display: flex;
   align-items: center;
@@ -848,17 +867,20 @@ h3 {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  padding: 8px 10px;
 }
 
+/* Full-width rows divided by hairlines, as in Outlook. */
 .message-row {
+  position: relative;
+  flex-shrink: 0;
   text-align: left;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 12px;
+  padding: 12px 20px;
   border: none;
-  border-radius: var(--r-row);
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
   background: transparent;
   cursor: pointer;
   color: var(--text);
@@ -898,8 +920,24 @@ h3 {
   color: var(--text-muted);
 }
 
-.message-row.unread .from,
-.message-row.unread .subject {
+/* Unread: accent strip down the left edge, subject and time in the accent colour. */
+.message-row.unread::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+}
+
+.message-row.unread .from {
+  font-weight: 600;
+}
+
+.message-row.unread .subject,
+.message-row.unread .time {
+  color: var(--accent);
   font-weight: 600;
 }
 
