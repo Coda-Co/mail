@@ -29,8 +29,10 @@ pub fn sanitize_mail(html: &str, allow_remote: bool, inline: &HashMap<String, St
     b.add_url_schemes(["data", "cid"]);
     b.link_rel(Some("noopener noreferrer"));
     b.attribute_filter(move |el, attr, value| {
+        let fixed = if attr == "style" { word_auto_spacing(value) } else { None };
+        let value = fixed.as_deref().unwrap_or(value);
         if allow_remote {
-            return Some(value.into());
+            return Some(value.to_string().into());
         }
         let lower = value.trim_start().to_ascii_lowercase();
         let remote = lower.starts_with("http:") || lower.starts_with("https:") || lower.starts_with("//");
@@ -47,7 +49,7 @@ pub fn sanitize_mail(html: &str, allow_remote: bool, inline: &HashMap<String, St
                 flag.store(true, Ordering::Relaxed);
                 Some(strip_css_urls(value).into())
             }
-            _ => Some(value.into()),
+            _ => Some(value.to_string().into()),
         }
     });
     b.add_generic_attributes(["background"]);
@@ -91,6 +93,25 @@ fn extract_styles(html: &str, allow_remote: bool) -> (String, bool) {
         i = end;
     }
     (css.trim().to_string(), blocked)
+}
+
+/// Word and Outlook write a paragraph with "auto" spacing as
+/// `<p class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto'>`.
+/// Outlook gives it one line of space above and below, but browsers ignore `mso-*`,
+/// so the sender's `p.MsoNormal{margin:0}` wins and the blank lines disappear
+/// (typical in signatures). Add the real margins Outlook would use.
+fn word_auto_spacing(style: &str) -> Option<String> {
+    let compact: String = style.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_ascii_lowercase();
+    let mut extra = String::new();
+    for side in ["top", "bottom"] {
+        if compact.contains(&format!("mso-margin-{side}-alt:auto")) {
+            extra.push_str(&format!(";margin-{side}:14pt"));
+        }
+    }
+    if extra.is_empty() {
+        return None;
+    }
+    Some(format!("{}{extra}", style.trim_end().trim_end_matches(';')))
 }
 
 fn strip_css_imports(css: &str) -> String {
@@ -290,6 +311,14 @@ mod tests {
         assert_eq!(evil.html.matches('<').count(), 2, "{}", evil.html);
         // Quotes in replies stay free of sender CSS.
         assert!(!sanitize_mail(html, false, &HashMap::new()).html.contains("<style"));
+    }
+
+    #[test]
+    fn word_auto_spacing_becomes_margins() {
+        let html = "<p class=\"MsoNormal\" style=\"mso-margin-top-alt:auto; mso-margin-bottom-alt: auto\">Best Regards</p><p class=\"MsoNormal\" style=\"color:red\">x</p>";
+        let s = sanitize_mail_for_display(html, false, &HashMap::new()).html;
+        assert!(s.contains("mso-margin-bottom-alt: auto;margin-top:14pt;margin-bottom:14pt\""), "{s}");
+        assert!(s.contains("style=\"color:red\""), "{s}");
     }
 
     #[test]
