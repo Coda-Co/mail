@@ -132,6 +132,9 @@ ALTER TABLE messages_fts_new RENAME TO messages_fts;
 "#,
     // The From filter, newest first, straight from the index.
     "CREATE INDEX messages_from_date ON messages(from_email, received_at DESC); DROP INDEX messages_from",
+    // Meeting messages: Graph's type for the message (NULL = not known yet, '' = plain mail),
+    // and the event details read for it when it was opened.
+    "ALTER TABLE messages ADD COLUMN meeting_type TEXT; ALTER TABLE messages ADD COLUMN meeting_json TEXT",
 ];
 
 /// A message as stored, with raw IDs. Built by sync from Graph, or by tests and the demo seed.
@@ -156,6 +159,9 @@ pub struct MessageRecord {
     pub has_attachments: bool,
     pub is_draft: bool,
     pub web_link: Option<String>,
+    /// Graph's derived type, e.g. "eventMessageRequest"; Some("") for plain mail; None when the
+    /// item didn't say (kept as it was, and checked when the message is opened).
+    pub meeting_type: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -349,14 +355,15 @@ impl AccountDb {
         let body = m.body_html.clone().or(existing_body.flatten());
         tx.execute(
             "INSERT INTO messages (id, folder_id, conversation_id, internet_message_id, from_name, from_email, to_json, cc_json, bcc_json, reply_to_json,
-                                   subject, snippet, body_html, received_at, is_read, is_flagged, has_attachments, is_draft, web_link)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
+                                   subject, snippet, body_html, received_at, is_read, is_flagged, has_attachments, is_draft, web_link, meeting_type)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
              ON CONFLICT(id) DO UPDATE SET folder_id = excluded.folder_id, conversation_id = excluded.conversation_id,
                internet_message_id = excluded.internet_message_id, from_name = excluded.from_name, from_email = excluded.from_email,
                to_json = excluded.to_json, cc_json = excluded.cc_json, bcc_json = excluded.bcc_json, reply_to_json = excluded.reply_to_json,
                subject = excluded.subject, snippet = excluded.snippet, body_html = excluded.body_html, received_at = excluded.received_at,
                is_read = excluded.is_read, is_flagged = excluded.is_flagged, has_attachments = excluded.has_attachments,
-               is_draft = excluded.is_draft, web_link = excluded.web_link",
+               is_draft = excluded.is_draft, web_link = excluded.web_link,
+               meeting_type = coalesce(excluded.meeting_type, messages.meeting_type)",
             params![
                 m.id,
                 m.folder_id,
@@ -376,7 +383,8 @@ impl AccountDb {
                 m.is_flagged,
                 m.has_attachments,
                 m.is_draft,
-                m.web_link
+                m.web_link,
+                m.meeting_type
             ],
         )?;
         let pk: i64 = tx.query_row("SELECT pk FROM messages WHERE id = ?1", [&m.id], |r| r.get(0))?;
@@ -527,17 +535,21 @@ impl AccountDb {
         let row = self
             .conn
             .query_row(
-                &format!("SELECT {MSG_COLS}, m.cc_json, m.bcc_json, m.reply_to_json, m.body_html, m.internet_message_id FROM messages m WHERE m.id = ?1"),
+                &format!("SELECT {MSG_COLS}, m.cc_json, m.bcc_json, m.reply_to_json, m.body_html, m.internet_message_id, m.meeting_json FROM messages m WHERE m.id = ?1"),
                 [raw_id],
                 |r| {
                     let s = self.row_summary(r)?;
                     let body: Option<String> = r.get(16)?;
-                    Ok((s, r.get::<_, String>(13)?, r.get::<_, String>(14)?, r.get::<_, String>(15)?, body, r.get::<_, Option<String>>(17)?))
+                    Ok((s, r.get::<_, String>(13)?, r.get::<_, String>(14)?, r.get::<_, String>(15)?, body, r.get::<_, Option<String>>(17)?, r.get::<_, Option<String>>(18)?))
                 },
             )
             .optional()?
             .ok_or_else(|| Error::NotFound(format!("message {raw_id}")))?;
-        let (summary, cc, bcc, reply_to, body, imid) = row;
+        let (summary, cc, bcc, reply_to, body, imid, meeting_json) = row;
+        let meeting = meeting_json.and_then(|j| serde_json::from_str::<MeetingInfo>(&j).ok()).map(|mut m| {
+            m.event_id = m.event_id.map(|e| ids::join(&self.account_id, &e));
+            m
+        });
         let raw_folder_id = ids::split(&summary.folder_id)?.1.to_string();
         let attachments = self.list_attachments(raw_id)?;
         Ok(StoredMessage {
@@ -553,6 +565,7 @@ impl AccountDb {
                 remote_images_blocked: false,
                 attachments,
                 summary,
+                meeting,
             },
         })
     }
@@ -563,7 +576,7 @@ impl AccountDb {
             .conn
             .query_row(
                 "SELECT id, folder_id, conversation_id, internet_message_id, from_name, from_email, to_json, cc_json, bcc_json, reply_to_json,
-                        subject, snippet, body_html, received_at, is_read, is_flagged, has_attachments, is_draft, web_link
+                        subject, snippet, body_html, received_at, is_read, is_flagged, has_attachments, is_draft, web_link, meeting_type
                  FROM messages WHERE id = ?1",
                 [raw_id],
                 |r| {
@@ -586,10 +599,35 @@ impl AccountDb {
                         has_attachments: r.get(16)?,
                         is_draft: r.get(17)?,
                         web_link: r.get(18)?,
+                        meeting_type: r.get(19)?,
                     })
                 },
             )
             .optional()?)
+    }
+
+    /// Graph's type for the message (None = not known yet) and whether its meeting details are stored.
+    pub fn meeting_state(&self, raw_id: &str) -> Result<(Option<String>, bool)> {
+        Ok(self
+            .conn
+            .query_row("SELECT meeting_type, meeting_json IS NOT NULL FROM messages WHERE id = ?1", [raw_id], |r| Ok((r.get(0)?, r.get(1)?)))
+            .optional()?
+            .unwrap_or((Some(String::new()), false)))
+    }
+
+    pub fn set_meeting_type(&self, raw_id: &str, meeting_type: &str) -> Result<()> {
+        self.conn.execute("UPDATE messages SET meeting_type = ?2 WHERE id = ?1", params![raw_id, meeting_type])?;
+        Ok(())
+    }
+
+    /// Store a meeting message's details (`event_id` raw).
+    pub fn set_meeting(&self, raw_id: &str, meeting: &MeetingInfo) -> Result<()> {
+        self.conn.execute("UPDATE messages SET meeting_json = ?2 WHERE id = ?1", params![raw_id, to_json(meeting)])?;
+        Ok(())
+    }
+
+    pub fn has_event(&self, raw_id: &str) -> Result<bool> {
+        Ok(self.conn.query_row("SELECT 1 FROM events WHERE id = ?1", [raw_id], |_| Ok(())).optional()?.is_some())
     }
 
     pub fn message_exists(&self, raw_id: &str) -> Result<bool> {
@@ -1263,6 +1301,36 @@ mod tests {
             received_at: at.into(),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn meeting_details_round_trip() {
+        let db = db();
+        db.upsert_folder("inbox1", "Inbox", Some(FolderRole::Inbox), None, 1).unwrap();
+        let mut m = msg("m1", "inbox1", "Project Clarity", "Maurice", "2026-11-25T16:44:00Z");
+        db.upsert_message(&m).unwrap();
+        assert_eq!(db.meeting_state("m1").unwrap(), (None, false), "older rows are unknown");
+        m.meeting_type = Some("eventMessageRequest".into());
+        db.upsert_message(&m).unwrap();
+        // An update that doesn't say keeps the type.
+        m.meeting_type = None;
+        db.upsert_message(&m).unwrap();
+        assert_eq!(db.meeting_state("m1").unwrap(), (Some("eventMessageRequest".into()), false));
+
+        let info = MeetingInfo {
+            kind: MeetingKind::Request,
+            start: "2026-11-26T13:00:00Z".into(),
+            end: "2026-11-26T13:30:00Z".into(),
+            is_all_day: false,
+            location: "Microsoft Teams Meeting".into(),
+            event_id: Some("ev1".into()),
+            event: None,
+        };
+        db.set_meeting("m1", &info).unwrap();
+        assert!(db.meeting_state("m1").unwrap().1);
+        let got = db.get_message("m1").unwrap().message.meeting.unwrap();
+        assert_eq!(got.event_id.as_deref(), Some("acc1:ev1"), "public event ID");
+        assert_eq!(got.start, info.start);
     }
 
     #[test]

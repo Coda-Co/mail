@@ -14,6 +14,9 @@ pub const GRAPH_BASE: &str = "https://graph.microsoft.com/v1.0";
 
 pub const MESSAGE_SELECT: &str =
     "id,conversationId,internetMessageId,subject,bodyPreview,body,from,toRecipients,ccRecipients,bccRecipients,replyTo,receivedDateTime,isRead,flag,hasAttachments,isDraft,webLink,parentFolderId";
+/// An event as the reading pane needs it, for a meeting message's expanded event.
+pub const EVENT_SELECT: &str =
+    "id,subject,start,end,isAllDay,location,body,organizer,attendees,responseStatus,isOnlineMeeting,onlineMeeting,isReminderOn,reminderMinutesBeforeStart,isCancelled";
 pub const HEADER_SELECT: &str =
     "id,conversationId,internetMessageId,subject,bodyPreview,from,toRecipients,ccRecipients,bccRecipients,replyTo,receivedDateTime,isRead,flag,hasAttachments,isDraft,webLink,parentFolderId";
 
@@ -220,6 +223,37 @@ pub fn message_record(v: &Value, with_body: bool) -> MessageRecord {
         has_attachments: v.get("hasAttachments").and_then(|x| x.as_bool()).unwrap_or(false),
         is_draft: v.get("isDraft").and_then(|x| x.as_bool()).unwrap_or(false),
         web_link: v.get("webLink").and_then(|x| x.as_str()).map(String::from),
+        meeting_type: meeting_type(v),
+    }
+}
+
+/// Graph's derived type for a message, e.g. "eventMessageRequest" for a meeting request;
+/// Some("") for plain mail, None when the item doesn't say.
+pub fn meeting_type(v: &Value) -> Option<String> {
+    let t = v.get("@odata.type")?.as_str()?;
+    let t = t.trim_start_matches('#').trim_start_matches("microsoft.graph.");
+    Some(if t.starts_with("eventMessage") { t.to_string() } else { String::new() })
+}
+
+/// The event details of an eventMessage read with its event expanded. The event ID is raw.
+pub fn meeting_info(v: &Value) -> MeetingInfo {
+    let event = v.get("event").filter(|e| e.is_object());
+    let pick = |msg_key: &str, ev_key: &str| {
+        let m = s(v, &format!("/{msg_key}/dateTime"));
+        graph_time(&if m.is_empty() { event.map(|e| s(e, &format!("/{ev_key}/dateTime"))).unwrap_or_default() } else { m })
+    };
+    let location = {
+        let l = s(v, "/location/displayName");
+        if l.is_empty() { event.map(|e| s(e, "/location/displayName")).unwrap_or_default() } else { l }
+    };
+    MeetingInfo {
+        kind: MeetingKind::from_graph(&s(v, "/meetingMessageType"), &s(v, "/responseType")),
+        start: pick("startDateTime", "start"),
+        end: pick("endDateTime", "end"),
+        is_all_day: v.get("isAllDay").or_else(|| event.and_then(|e| e.get("isAllDay"))).and_then(|x| x.as_bool()).unwrap_or(false),
+        location,
+        event_id: event.map(|e| s(e, "/id")).filter(|id| !id.is_empty()),
+        event: None,
     }
 }
 
@@ -254,6 +288,7 @@ pub fn message_record_over(v: &Value, with_body: bool, base: &MessageRecord) -> 
         has_attachments: if has("hasAttachments") { n.has_attachments } else { b.has_attachments },
         is_draft: if has("isDraft") { n.is_draft } else { b.is_draft },
         web_link: if has("webLink") { n.web_link } else { b.web_link },
+        meeting_type: n.meeting_type.or(b.meeting_type),
     }
 }
 
@@ -440,5 +475,43 @@ mod tests {
         assert_eq!(merged.location, "Teams");
         assert_eq!(merged.reminder_minutes, Some(10));
         assert_eq!(merged.start, "2026-11-23T16:30:00Z", "new times win");
+    }
+
+    #[test]
+    fn recognises_meeting_messages() {
+        assert_eq!(meeting_type(&json!({"@odata.type": "#microsoft.graph.eventMessageRequest", "id": "m"})).as_deref(), Some("eventMessageRequest"));
+        assert_eq!(meeting_type(&json!({"@odata.type": "#microsoft.graph.message", "id": "m"})).as_deref(), Some(""));
+        assert_eq!(meeting_type(&json!({"id": "m"})), None, "unknown until checked");
+        let rec = message_record(&json!({"@odata.type": "#microsoft.graph.eventMessage", "id": "m", "receivedDateTime": "2026-11-25T16:44:00Z"}), true);
+        assert_eq!(rec.meeting_type.as_deref(), Some("eventMessage"));
+        // A partial delta item without the type keeps what was stored.
+        let merged = message_record_over(&json!({"id": "m", "isRead": true}), true, &rec);
+        assert_eq!(merged.meeting_type.as_deref(), Some("eventMessage"));
+    }
+
+    #[test]
+    fn reads_meeting_details() {
+        let v = json!({
+            "@odata.type": "#microsoft.graph.eventMessageRequest",
+            "id": "m1",
+            "meetingMessageType": "meetingRequest",
+            "startDateTime": {"dateTime": "2026-11-26T13:00:00.0000000", "timeZone": "UTC"},
+            "endDateTime": {"dateTime": "2026-11-26T13:30:00.0000000", "timeZone": "UTC"},
+            "isAllDay": false,
+            "location": {"displayName": "Microsoft Teams Meeting"},
+            "event": {"id": "ev1", "subject": "Project Clarity & InfoSec"}
+        });
+        let m = meeting_info(&v);
+        assert_eq!(m.kind, MeetingKind::Request);
+        assert_eq!((m.start.as_str(), m.end.as_str()), ("2026-11-26T13:00:00Z", "2026-11-26T13:30:00Z"));
+        assert_eq!(m.location, "Microsoft Teams Meeting");
+        assert_eq!(m.event_id.as_deref(), Some("ev1"));
+
+        // Cancellation with the event gone; a response falls back to the event's own times.
+        let c = meeting_info(&json!({"meetingMessageType": "meetingCancelled", "startDateTime": {"dateTime": "2026-11-26T13:00:00"}, "event": null}));
+        assert_eq!((c.kind, c.event_id), (MeetingKind::Cancelled, None));
+        let r = meeting_info(&json!({"responseType": "tentativelyAccepted", "event": {"id": "ev1", "start": {"dateTime": "2026-11-26T13:00:00"}, "end": {"dateTime": "2026-11-26T13:30:00"}}}));
+        assert_eq!(r.kind, MeetingKind::Tentative);
+        assert_eq!(r.start, "2026-11-26T13:00:00Z");
     }
 }

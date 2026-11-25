@@ -11,6 +11,7 @@ import { Avatar, Menu, useToast, type Anchor, type MenuItem } from './ui';
 import { MessageBody } from './MessageBody';
 import { splitQuoted } from '../lib/quoted';
 import { FileIcon } from './FileIcon';
+import { MeetingCard } from './MeetingCard';
 import { ClosedDraft, Compose, PoppedOutDraft } from './Compose';
 
 export type Selection = { kind: 'message' | 'draft'; id: string };
@@ -176,6 +177,7 @@ function MessageView({
           </button>
         </div>
       )}
+      {message.meeting && <MeetingCard message={message} onChanged={onChanged} />}
       <AttachmentList message={message} />
       <MessageBody html={showQuoted ? message.bodyHtml : split.main} cacheKey={showQuoted || !split.hasQuote ? message.id : `${message.id}:new`} />
       {split.hasQuote && (

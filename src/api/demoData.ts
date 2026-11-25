@@ -19,7 +19,7 @@ export interface DemoState {
   serverOnly: Message[];
 }
 
-export const DEMO_VERSION = 4;
+export const DEMO_VERSION = 5;
 
 const COLORS = { coda: '#1F883D', harbour: '#8250DF', fenwick: '#D4600F', aldgate: '#6E7781' };
 
@@ -304,7 +304,21 @@ export function buildDemoState(now: Date): DemoState {
     webEv(1, 13, 14, 'Investment committee', 'Aldgate boardroom', 'accepted'),
     webEv(7, 14, 15, 'Quarterly portfolio review', '', 'none'),
     webEv(9, 0, 0, 'Aldgate offsite', 'Cambridge', 'accepted', true),
+    ev('coda', 9, 9.5, 10.5, 'Proposal review', '', { online: true, attendees: [ME_ADDR.coda, PEOPLE.tom] }),
   ];
+
+  // A meeting request: the reading pane shows when it is, beside the rest of that day.
+  const kickoff = events.find((e) => e.subject === 'Warehouse build kick-off')!;
+  const invite = add(
+    'fenwick',
+    'inbox',
+    PEOPLE.ravi,
+    at(now, -6, 15, 10),
+    'Warehouse build kick-off',
+    'Hi all,\n\nKicking off the warehouse build. We’ll walk through the plan, owners and the first two sprints.\n\nRavi',
+    { cc: [PEOPLE.priya] },
+  );
+  invite.meeting = { kind: 'request', start: kickoff.start, end: kickoff.end, isAllDay: false, location: kickoff.location, eventId: kickoff.id };
 
   return {
     version: DEMO_VERSION,
