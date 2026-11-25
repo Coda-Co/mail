@@ -182,6 +182,7 @@ pub fn run() {
             webaccounts::web_account_calendar_report,
             webaccounts::web_account_event_attendees_report,
             webaccounts::fetch_web_event_attendees,
+            webaccounts::open_web_event,
             webaccounts::refresh_web_calendars,
         ])
         .build(context())
