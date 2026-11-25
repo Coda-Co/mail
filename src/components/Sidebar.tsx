@@ -7,6 +7,7 @@ import { Avatar, Menu, useToast, type Anchor, type MenuItem } from './ui';
 import { RemoveAccountDialog, ApprovalDialog } from '../views/AccountDialogs';
 import type { AddAccountResult } from '../api/types';
 import { webCalendarNote } from '../lib/webCalendar';
+import { graphCalendarNote } from '../lib/calendarNote';
 import { now } from '../lib/clock';
 import { useTick } from '../lib/useTick';
 
@@ -110,10 +111,10 @@ export function Sidebar() {
         );
       const cals = calendars.filter((c) => c.accountId === a.id);
       const visible = cals.some((c) => c.visible);
-      const note = webCalendarNote(a, now());
+      const note = webCalendarNote(a, now()) ?? graphCalendarNote(a, cals.length);
       return (
         <div key={a.id}>
-          <label className={`cal-check${cals.length === 0 ? ' disabled' : ''}`}>
+          <label className={`cal-check${cals.length === 0 ? ' disabled' : ''}`} title={a.kind === 'graph' && a.syncState === 'error' && cals.length === 0 ? a.syncError : undefined}>
             <input
               type="checkbox"
               checked={visible}
