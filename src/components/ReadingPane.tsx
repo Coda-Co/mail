@@ -27,7 +27,8 @@ function AddressName({ address, label, onActive, className }: { address: Address
       tabIndex={0}
       title={address.email}
       onMouseEnter={() => onActive(address)}
-      onMouseLeave={() => onActive(null)}
+      // A clicked (focused) name stays ready to copy after the pointer moves away.
+      onMouseLeave={(e) => onActive(document.activeElement === e.currentTarget ? address : null)}
       onFocus={() => onActive(address)}
       onBlur={() => onActive(null)}
     >
@@ -216,9 +217,26 @@ function MessageView({
           {fullTime(message.receivedAt)}
         </time>
         <div className="message-block collapsed">
-          <button type="button" className="collapsed-message" onClick={onExpand}>
-            <b style={{ color: 'var(--text)', fontWeight: 600 }}>{message.from.name || message.from.email}</b> · {message.snippet}
-          </button>
+          {/* Not a <button>: the sender's name inside is focusable for copying, and clicking
+              it focuses the name rather than expanding. */}
+          <div
+            className="collapsed-message"
+            role="button"
+            tabIndex={0}
+            aria-expanded={false}
+            onClick={(e) => {
+              if (!window.getSelection()?.isCollapsed) return;
+              if ((e.target as Element).closest('.addr')) return;
+              onExpand();
+            }}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+              e.preventDefault();
+              onExpand();
+            }}
+          >
+            <AddressName className="collapsed-sender" address={message.from} label={message.from.name || message.from.email} onActive={setActiveAddress} /> · {message.snippet}
+          </div>
         </div>
       </div>
     );
@@ -239,7 +257,7 @@ function MessageView({
             onClick: (e: React.MouseEvent) => {
               // Leave selecting text in the header alone.
               if (!window.getSelection()?.isCollapsed) return;
-              if ((e.target as Element).closest('a, button')) return;
+              if ((e.target as Element).closest('a, button, .addr')) return;
               onCollapse();
             },
             onKeyDown: (e: React.KeyboardEvent) => {

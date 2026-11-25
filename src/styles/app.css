@@ -1186,18 +1186,31 @@ h3 {
 }
 
 /* Names in the header show their address on hover; Ctrl/Cmd+C copies it. */
-.message-head .addr {
+.message-block .addr {
   border-radius: 3px;
   cursor: default;
 }
 
-.message-head .addr:hover {
+.message-block .addr:hover {
   color: var(--text);
   text-decoration: underline dotted;
   text-underline-offset: 3px;
 }
 
-.message-head .addr:focus-visible {
+/* Clicking a name focuses it (rather than expanding or collapsing the card),
+   ready for Ctrl/Cmd+C. */
+.message-block .addr:focus {
+  outline: none;
+  background: var(--row-selected);
+  color: var(--text);
+}
+
+.message-block .collapsed-sender {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.message-block .addr:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
