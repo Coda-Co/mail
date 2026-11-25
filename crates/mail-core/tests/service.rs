@@ -440,3 +440,43 @@ fn dropped_files_are_kept_and_attached() {
     assert_eq!(std::fs::read(path).unwrap(), b"%PDF-1.4 hello");
     assert!(ops(&svc, &ids.coda).iter().any(|k| k == "saveDraft"));
 }
+
+fn new_draft(svc: &MailService, acc: &str) -> Draft {
+    svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(acc.to_string()) }).unwrap()
+}
+
+fn dropped_path(d: &Draft, i: usize) -> std::path::PathBuf {
+    std::path::PathBuf::from(d.attachments[i].local_path.clone().unwrap())
+}
+
+#[test]
+fn discarding_a_draft_deletes_its_dropped_copies_only() {
+    let (svc, ids) = setup();
+    // A file picked with Attach is the person's own: never deleted.
+    let own = std::env::temp_dir().join(format!("mail-own-{}.txt", std::process::id()));
+    std::fs::write(&own, b"mine").unwrap();
+    let d = new_draft(&svc, &ids.coda);
+    svc.add_attachment(&d.id, &own).unwrap();
+    let d = svc.add_attachment_bytes(&d.id, "dropped.txt", b"copy").unwrap();
+    let copy = dropped_path(&d, 1);
+    assert!(copy.exists());
+
+    svc.discard_draft(&d.id).unwrap();
+    assert!(!copy.exists(), "copy deleted");
+    assert!(!copy.parent().unwrap().exists(), "its folder too");
+    assert!(own.exists(), "picked file left alone");
+    std::fs::remove_file(own).unwrap();
+}
+
+#[test]
+fn removing_a_dropped_attachment_deletes_its_copy() {
+    let (svc, ids) = setup();
+    let d = new_draft(&svc, &ids.coda);
+    svc.add_attachment_bytes(&d.id, "a.txt", b"a").unwrap();
+    let d = svc.add_attachment_bytes(&d.id, "b.txt", b"b").unwrap();
+    let (a, b) = (dropped_path(&d, 0), dropped_path(&d, 1));
+    let d = svc.remove_attachment(&d.id, &d.attachments[0].id.clone()).unwrap();
+    assert!(!a.exists());
+    assert!(b.exists(), "the other copy stays");
+    assert_eq!(d.attachments.len(), 1);
+}

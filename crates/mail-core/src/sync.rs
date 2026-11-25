@@ -990,6 +990,7 @@ impl<'a> Syncer<'a> {
     }
 
     fn finish_sent(&self, raw_id: &str, server_id: &str) -> Result<()> {
+        let attachments = self.db(|db| db.get_draft(raw_id)).map(|(d, _)| d.attachments).unwrap_or_default();
         self.db(|db| {
             db.delete_draft(raw_id)?;
             db.delete_message(server_id)?;
@@ -998,6 +999,8 @@ impl<'a> Syncer<'a> {
             }
             Ok(())
         })?;
+        // Sent: the server has its own copy now.
+        self.svc.delete_dropped_copies(&attachments);
         self.svc.events().draft_changed(&ids::join(self.acc(), raw_id));
         self.svc.events().sync_status();
         Ok(())
