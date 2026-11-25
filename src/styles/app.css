@@ -227,12 +227,12 @@ h3 {
 }
 
 :root {
-  /* Width of the search scope dropdown, which sits outside the search box on its left. */
-  --search-scope-w: 168px;
+  /* Width of the search field picker (From, Subject…), which sits outside the search box on its left. */
+  --search-scope-w: 148px;
 }
 
-/* Offset by the scope dropdown's width, so opening search grows the box leftwards
-   (scope first, like Outlook) while the text field stays where it was. */
+/* Offset by the field picker's width, so opening search grows the box leftwards
+   (picker first, like Outlook) while the text field stays where it was. */
 .topbar-search {
   flex: 0 1 640px;
   min-width: 0;
@@ -289,6 +289,17 @@ h3 {
   min-width: 0;
   border-left: none;
   border-radius: 0 var(--r-card) var(--r-card) 0;
+}
+
+/* Always-there search (Calendar): quiet until focused, like its box. */
+.search-row.quiet .search-scope {
+  border: 1px solid var(--input-border);
+}
+
+.search-row.quiet:focus-within .search-scope {
+  border-color: var(--accent);
+  border-right-color: var(--input-border);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .search-trigger {
@@ -1899,21 +1910,6 @@ h3 {
   color: var(--text);
 }
 
-.scope-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  border: none;
-  border-radius: var(--r-nav);
-  background: var(--sidebar);
-  color: var(--text);
-  font-size: var(--fs-meta);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
 .clear-search {
   width: 28px;
   height: 28px;
@@ -2972,7 +2968,7 @@ h3 {
   }
 
   :root {
-    --search-scope-w: 132px;
+    --search-scope-w: 128px;
   }
 
   .mail-panes {
