@@ -1,7 +1,7 @@
 import { LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
-import type { Folder, MessageSummary, SearchField, SearchResult } from '../api/types';
+import type { Folder, MessageSummary, ViewScope, SearchField, SearchResult } from '../api/types';
 import { useApp } from '../state/app';
 import { useCommand } from '../lib/commands';
 import { MessageList } from '../components/MessageList';
@@ -14,6 +14,13 @@ import { Avatar, useToast } from '../components/ui';
 import { plural } from '../lib/text';
 
 const PAGE = 100;
+
+/**
+ * The open message for each mailbox and folder, kept while the app runs, so
+ * going to Calendar or People (or another mailbox) and back reopens it.
+ */
+const openByScope = new Map<string, Selection>();
+const scopeKey = (s: ViewScope) => `${s.accountId ?? ''}|${'role' in s.folder ? `role:${s.folder.role}` : `id:${s.folder.id}`}|${s.tab}`;
 
 const FIELD_KEY = 'mail.searchField';
 const FIELDS: SearchField[] = ['from', 'to', 'subject', 'content', 'all'];
@@ -74,7 +81,15 @@ export function MailView() {
   const { scope, mailVersion, searchActive, setSearchActive, accountById } = app;
   const [messages, setMessages] = useState<MessageSummary[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  const [selection, setSelection] = useState<Selection | null>(null);
+  const [selection, setSelectionState] = useState<Selection | null>(() => openByScope.get(scopeKey(scope)) ?? null);
+  // Set when a remembered message is reopened, until the list confirms it's still there.
+  const restored = useRef<string | null>(selection?.kind === 'message' ? selection.id : null);
+  const setSelection = (sel: Selection | null) => {
+    restored.current = null;
+    setSelectionState(sel);
+    if (sel) openByScope.set(scopeKey(scope), sel);
+    else openByScope.delete(scopeKey(scope));
+  };
   const [folders, setFolders] = useState<Folder[]>([]);
   const [search, setSearch] = useState<SearchState>(() => ({ query: { text: '', field: lastSearchField(), scope, allFolders: false } }));
   const [result, setResult] = useState<SearchResult | null>(null);
@@ -103,15 +118,23 @@ export function MailView() {
       if (cancelled) return;
       setMessages(list);
       setHasMore(list.length === PAGE);
+      // A reopened message that has since moved or been deleted: don't reopen it.
+      if (restored.current && !list.some((m) => m.id === restored.current)) {
+        openByScope.delete(scopeKey(scope));
+        setSelectionState(null);
+      }
+      restored.current = null;
     });
     return () => {
       cancelled = true;
     };
   }, [scope, mailVersion]);
 
-  // Reset selection when the scope changes.
+  // A new scope reopens what was last open there, if anything.
   useEffect(() => {
-    setSelection(null);
+    const sel = openByScope.get(scopeKey(scope)) ?? null;
+    restored.current = sel?.kind === 'message' ? sel.id : null;
+    setSelectionState(sel);
     setSearch((s) => ({ query: { text: '', field: s.query.field, scope, allFolders: false } }));
     setResult(null);
   }, [scope]);
