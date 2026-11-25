@@ -10,6 +10,7 @@ import type {
   DraftMode,
   EventInput,
   Folder,
+  FolderRole,
   MailApi,
   Message,
   MessageSummary,
@@ -19,6 +20,7 @@ import type {
   SearchResult,
   Signature,
   SyncStatus,
+  UpdateStatus,
   ViewScope,
 } from './types';
 import { EVENTS } from './types';
@@ -30,6 +32,8 @@ import { escapeHtml, htmlToText } from '../lib/text';
 import { PALETTE, WEB_ONLY } from '../lib/colors';
 
 const STORAGE_KEY = 'mail-demo-state';
+// FolderRole::order in mail-core.
+const ROLE_ORDER: FolderRole[] = ['inbox', 'drafts', 'sent', 'archive', 'deleted', 'junk'];
 const hasWindow = typeof window !== 'undefined';
 
 let state: DemoState = load();
@@ -475,7 +479,23 @@ export const demoApi: MailApi = {
   },
 
   async listFolders(accountId) {
-    return clone(state.folders.filter((f) => (accountId ? f.accountId === accountId : graphIds().includes(f.accountId))));
+    if (accountId) return clone(state.folders.filter((f) => f.accountId === accountId));
+    // Same shape as mail-core's list_folders: one summed folder per role across
+    // graph accounts, user folders left out, in sidebar role order.
+    const sums: Folder[] = [];
+    for (const id of graphIds()) {
+      for (const f of state.folders) {
+        if (f.accountId !== id || !f.role) continue;
+        const s = sums.find((x) => x.role === f.role);
+        if (s) {
+          s.unread += f.unread;
+          s.total += f.total;
+        } else {
+          sums.push({ id: `all:${f.role}`, accountId: '', name: f.name, role: f.role, unread: f.unread, total: f.total });
+        }
+      }
+    }
+    return sums.sort((a, b) => ROLE_ORDER.indexOf(a.role!) - ROLE_ORDER.indexOf(b.role!));
   },
   async listMessages(scope, limit, offset) {
     const isDrafts = !('id' in scope.folder) && scope.folder.role === 'drafts';
@@ -647,6 +667,21 @@ export const demoApi: MailApi = {
     emit(EVENTS.draftChanged, { draftId });
     return clone(d);
   },
+  async setDraftSignature(draftId, signatureId) {
+    const d = getDraftState(draftId);
+    const sig = signatureId ? state.signatures.find((s) => s.id === signatureId) : undefined;
+    if (signatureId && !sig) throw new Error('That signature no longer exists.');
+    if (sig && sig.accountId !== d.accountId) throw new Error('That signature belongs to another account.');
+    const firstEdit = d.edited === false;
+    d.signatureId = sig?.id;
+    d.bodyHtml = withSignature(d.bodyHtml, sig);
+    d.edited = true;
+    d.updatedAt = now().toISOString();
+    save();
+    emit(EVENTS.draftChanged, { draftId });
+    if (firstEdit) changed([d.accountId]);
+    return clone(d);
+  },
   async addAttachment(draftId) {
     const d = getDraftState(draftId);
     if (!hasWindow) return clone(d);
@@ -662,6 +697,13 @@ export const demoApi: MailApi = {
       d.attachments.push({ id: `att-${Math.random().toString(36).slice(2, 9)}`, name: f.name, contentType: f.type || 'application/octet-stream', size: f.size, isInline: false });
       d.edited = true;
     }
+    save();
+    return clone(d);
+  },
+  async addAttachmentFile(draftId, file) {
+    const d = getDraftState(draftId);
+    d.attachments.push({ id: `att-${Math.random().toString(36).slice(2, 9)}`, name: file.name, contentType: file.type || 'application/octet-stream', size: file.size, isInline: false });
+    d.edited = true;
     save();
     return clone(d);
   },
@@ -916,4 +958,19 @@ export const demoApi: MailApi = {
   async openExternal(url) {
     if (hasWindow) window.open(url, '_blank', 'noopener');
   },
+
+  // The preview can't update itself. `?update=ready` shows the top-bar button and settings as
+  // they look once a new version has downloaded.
+  async updateStatus() {
+    return demoUpdate();
+  },
+  async checkForUpdate() {
+    return demoUpdate();
+  },
+  async installUpdate() {},
 };
+
+function demoUpdate(): UpdateStatus {
+  const ready = hasWindow && new URLSearchParams(window.location.search).get('update') === 'ready';
+  return ready ? { state: 'ready', currentVersion: '0.1.0', version: '0.2.0', checkedAt: now().toISOString() } : { state: 'unavailable', currentVersion: '0.1.0' };
+}

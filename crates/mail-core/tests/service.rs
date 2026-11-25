@@ -90,6 +90,32 @@ fn reply_draft_defaults_and_from_swap() {
 }
 
 #[test]
+fn signature_added_swapped_and_removed_on_an_existing_draft() {
+    let (svc, ids) = setup();
+    let sigs = svc.list_signatures(Some(&ids.coda)).unwrap();
+    let sig = sigs.first().expect("demo Coda account has a signature").clone();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()) }).unwrap();
+    let cleared = svc.set_draft_signature(&d.id, None).unwrap();
+    assert!(!cleared.body_html.contains("data-signature"), "signature removed");
+    assert_eq!(cleared.signature_id, None);
+    assert_eq!(cleared.id, d.id, "the draft stays put");
+
+    let added = svc.set_draft_signature(&d.id, Some(&sig.id)).unwrap();
+    assert_eq!(added.body_html.matches("data-signature").count(), 1, "signature added once");
+    assert_eq!(added.signature_id.as_deref(), Some(sig.id.as_str()));
+    let again = svc.set_draft_signature(&d.id, Some(&sig.id)).unwrap();
+    assert_eq!(again.body_html.matches("data-signature").count(), 1, "picking it again doesn't duplicate it");
+    assert_eq!(svc.get_draft(&d.id).unwrap().signature_id.as_deref(), Some(sig.id.as_str()));
+    assert!(ops(&svc, &ids.coda).contains(&"saveDraft".to_string()));
+
+    let other = svc.list_signatures(Some(&ids.harbour)).unwrap();
+    if let Some(foreign) = other.first() {
+        assert!(svc.set_draft_signature(&d.id, Some(&foreign.id)).is_err(), "another account's signature is refused");
+    }
+    assert!(svc.set_draft_signature(&d.id, Some("nope")).is_err());
+}
+
+#[test]
 fn inbox_rows_show_an_unfinished_draft() {
     let (svc, ids) = setup();
     let src = format!("{}:m-agenda", ids.harbour);
@@ -424,4 +450,59 @@ fn new_drafts_are_unedited_until_changed() {
     changed.body_html = "<p>Thanks</p>".into();
     assert!(svc.update_draft(&changed).unwrap().edited);
     assert!(svc.get_draft(&d.id).unwrap().edited, "stays edited once saved");
+}
+
+#[test]
+fn dropped_files_are_kept_and_attached() {
+    let (svc, ids) = setup();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()) }).unwrap();
+    let d = svc.add_attachment_bytes(&d.id, "Q4 plan: draft?.pdf", b"%PDF-1.4 hello").unwrap();
+    let a = &d.attachments[0];
+    assert_eq!(a.name, "Q4 plan_ draft_.pdf", "unsafe characters are replaced");
+    assert_eq!(a.size, 14);
+    assert_eq!(a.content_type, "application/pdf");
+    let path = a.local_path.as_deref().unwrap();
+    assert!(path.contains("outgoing"), "kept outside the pruned download cache: {path}");
+    assert_eq!(std::fs::read(path).unwrap(), b"%PDF-1.4 hello");
+    assert!(ops(&svc, &ids.coda).iter().any(|k| k == "saveDraft"));
+}
+
+fn new_draft(svc: &MailService, acc: &str) -> Draft {
+    svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(acc.to_string()) }).unwrap()
+}
+
+fn dropped_path(d: &Draft, i: usize) -> std::path::PathBuf {
+    std::path::PathBuf::from(d.attachments[i].local_path.clone().unwrap())
+}
+
+#[test]
+fn discarding_a_draft_deletes_its_dropped_copies_only() {
+    let (svc, ids) = setup();
+    // A file picked with Attach is the person's own: never deleted.
+    let own = std::env::temp_dir().join(format!("mail-own-{}.txt", std::process::id()));
+    std::fs::write(&own, b"mine").unwrap();
+    let d = new_draft(&svc, &ids.coda);
+    svc.add_attachment(&d.id, &own).unwrap();
+    let d = svc.add_attachment_bytes(&d.id, "dropped.txt", b"copy").unwrap();
+    let copy = dropped_path(&d, 1);
+    assert!(copy.exists());
+
+    svc.discard_draft(&d.id).unwrap();
+    assert!(!copy.exists(), "copy deleted");
+    assert!(!copy.parent().unwrap().exists(), "its folder too");
+    assert!(own.exists(), "picked file left alone");
+    std::fs::remove_file(own).unwrap();
+}
+
+#[test]
+fn removing_a_dropped_attachment_deletes_its_copy() {
+    let (svc, ids) = setup();
+    let d = new_draft(&svc, &ids.coda);
+    svc.add_attachment_bytes(&d.id, "a.txt", b"a").unwrap();
+    let d = svc.add_attachment_bytes(&d.id, "b.txt", b"b").unwrap();
+    let (a, b) = (dropped_path(&d, 0), dropped_path(&d, 1));
+    let d = svc.remove_attachment(&d.id, &d.attachments[0].id.clone()).unwrap();
+    assert!(!a.exists());
+    assert!(b.exists(), "the other copy stays");
+    assert_eq!(d.attachments.len(), 1);
 }

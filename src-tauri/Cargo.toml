@@ -33,6 +33,7 @@ reqwest.workspace = true
 chrono.workspace = true
 tracing.workspace = true
 sha2 = "0.10"
+urlencoding = "2"
 uuid.workspace = true
 clipboard-rs = { version = "0.3", default-features = false }
 # Re-exported by tauri for Webview::set_cookie; named directly so we can rewrite the sign-in

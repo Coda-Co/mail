@@ -4,7 +4,7 @@ import type { Draft, Message } from '../api/types';
 import { Compose } from '../components/Compose';
 import { MessageBody } from '../components/MessageBody';
 import { AttachmentList } from '../components/ReadingPane';
-import { Avatar, useToast } from '../components/ui';
+import { useToast } from '../components/ui';
 import { useApp } from '../state/app';
 import { fullTime } from '../lib/dates';
 import { useCommand } from '../lib/commands';
@@ -115,7 +115,6 @@ export function MessageWindow({ messageId }: { messageId: string }) {
           <h2 className="thread-subject">{message.subject}</h2>
           <div className="message-block">
             <div className="message-head">
-              <Avatar name={message.from.name || message.from.email} />
               <div className="who">
                 <span className="name">{message.from.name || message.from.email}</span>
                 <span className="meta">To {message.to.map((a) => a.name || a.email).join(', ')} · {fullTime(message.receivedAt)}</span>

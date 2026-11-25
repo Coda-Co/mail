@@ -1,8 +1,9 @@
 import { createContext, useContext } from 'react';
-import { Search, SquarePen } from 'lucide-react';
+import { ArrowDownToLine, Search, SquarePen } from 'lucide-react';
+import { api } from '../api';
 import { runCommand } from '../lib/commands';
 import { useApp } from '../state/app';
-import { keyLabel } from '../lib/platform';
+import { isMac, keyLabel } from '../lib/platform';
 import { SyncIndicator } from './SyncIndicator';
 
 /**
@@ -41,6 +42,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
         )}
       </div>
       <span className="spacer" />
+      <UpdateButton />
       <SyncIndicator />
       <button
         type="button"
@@ -52,5 +54,24 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
         <SquarePen size={18} />
       </button>
     </header>
+  );
+}
+
+/** Shown once a new version has downloaded; installs it and relaunches. */
+function UpdateButton() {
+  const { update } = useApp();
+  if (update.state !== 'ready' && update.state !== 'installing') return null;
+  const installing = update.state === 'installing';
+  return (
+    <button
+      type="button"
+      className="btn btn-ghost btn-small"
+      disabled={installing}
+      onClick={() => api.installUpdate()}
+      title={installing ? undefined : `Mail ${update.version} is ready${isMac ? '. It also installs the next time you quit.' : ''}`}
+    >
+      <ArrowDownToLine size={14} />
+      {installing ? 'Updating…' : 'Restart to update'}
+    </button>
   );
 }

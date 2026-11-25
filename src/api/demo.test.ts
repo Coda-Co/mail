@@ -16,6 +16,27 @@ describe('demo backend', () => {
     expect(list.map((m) => m.from.name)).toEqual(['Sarah Okafor', 'Tom Reid', 'Priya Nair', 'Linear', 'James Hart', 'Elena Marsh']);
   });
 
+  it('lists one summed folder per role when no account is given, like mail-core', async () => {
+    const accounts = await demoApi.listAccounts();
+    const graph = accounts.filter((a) => a.kind === 'graph');
+    const perAccount = (await Promise.all(graph.map((a) => demoApi.listFolders(a.id)))).flat();
+    const folders = await demoApi.listFolders();
+    const order = ['inbox', 'drafts', 'sent', 'archive', 'deleted', 'junk'];
+    const roles = order.filter((r) => perAccount.some((f) => f.role === r));
+    expect(folders.map((f) => f.role)).toEqual(roles);
+    for (const f of folders) {
+      expect(f.id).toBe(`all:${f.role}`);
+      expect(f.accountId).toBe('');
+      const same = perAccount.filter((x) => x.role === f.role);
+      expect(f.unread).toBe(same.reduce((n, x) => n + x.unread, 0));
+      expect(f.total).toBe(same.reduce((n, x) => n + x.total, 0));
+    }
+    // User folders exist per account but are left out of the unified list.
+    expect(perAccount.some((f) => f.role === null)).toBe(true);
+    // The unified inbox count matches the graph accounts' badges.
+    expect(folders.find((f) => f.role === 'inbox')?.unread).toBe(graph.reduce((n, a) => n + (a.unread ?? 0), 0));
+  });
+
   it('search filters the inbox and widens to all folders', async () => {
     const inInbox = await demoApi.search(q({ text: 'steering' }));
     expect(inInbox.messages.map((m) => m.subject)).toEqual(['Agenda for Thursday’s steering committee']);
@@ -66,6 +87,23 @@ describe('demo backend', () => {
     expect(swapped.bodyHtml).toContain('data-signature="sig-coda"');
     const thread = await demoApi.getThread(sarah.id);
     expect(thread.drafts.map((x) => x.id)).toEqual([d.id]);
+  });
+
+  it('a signature can be added to a draft created without one, swapped and removed', async () => {
+    const [sarah] = await demoApi.listMessages(inbox, 1, 0);
+    const d = await demoApi.createDraft({ mode: 'reply', sourceMessageId: sarah.id });
+    expect(d.signatureId).toBeUndefined();
+    const sigs = await demoApi.saveSignature({ id: '', accountId: d.accountId, name: 'Short', html: '<p>M</p>', defaultNew: false, defaultReply: false });
+    const added = await demoApi.setDraftSignature(d.id, sigs.id);
+    expect(added.id).toBe(d.id);
+    expect(added.signatureId).toBe(sigs.id);
+    expect(added.bodyHtml.match(/data-signature/g)).toHaveLength(1);
+    const again = await demoApi.setDraftSignature(d.id, sigs.id);
+    expect(again.bodyHtml.match(/data-signature/g)).toHaveLength(1);
+    const removed = await demoApi.setDraftSignature(d.id, null);
+    expect(removed.signatureId).toBeUndefined();
+    expect(removed.bodyHtml).not.toContain('data-signature');
+    await expect(demoApi.setDraftSignature(d.id, 'sig-coda')).rejects.toThrow(/another account/);
   });
 
   it('sending files the message in Sent and removes the draft', async () => {

@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Copy, ExternalLink, MoreHorizontal } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Copy, ExternalLink, Forward, MoreHorizontal, Reply, ReplyAll, X } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
-import type { Draft, DraftMode, Folder, Message, Thread } from '../api/types';
+import type { Address, Draft, DraftMode, Folder, Message, Thread } from '../api/types';
 import { useApp } from '../state/app';
 import { useCommand } from '../lib/commands';
 import { isMac } from '../lib/platform';
 import { fullTime } from '../lib/dates';
 import { formatSize } from '../lib/text';
-import { Avatar, Menu, useToast, type Anchor, type MenuItem } from './ui';
+import { Menu, useToast, type Anchor, type MenuItem } from './ui';
 import { MessageBody } from './MessageBody';
 import { splitQuoted } from '../lib/quoted';
 import { FileIcon } from './FileIcon';
@@ -16,10 +16,78 @@ import { ClosedDraft, Compose, PoppedOutDraft } from './Compose';
 
 export type Selection = { kind: 'message' | 'draft'; id: string };
 
-function recipients(m: Message, meName: string, myEmails: string[]): string {
-  const names = m.to.map((a) => (myEmails.includes(a.email.toLowerCase()) ? meName : a.name || a.email));
-  if (names.length <= 2) return names.join(', ');
-  return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+/**
+ * A name in the message header: hover shows the address, and Ctrl/Cmd+C while hovering
+ * (or with the name focused) copies it, unless some text is selected.
+ */
+function AddressName({ address, label, onActive, className }: { address: Address; label: string; onActive: (a: Address | null) => void; className?: string }) {
+  return (
+    <span
+      className={className ? `addr ${className}` : 'addr'}
+      tabIndex={0}
+      title={address.email}
+      onMouseEnter={() => onActive(address)}
+      // A clicked (focused) name stays ready to copy after the pointer moves away.
+      onMouseLeave={(e) => onActive(document.activeElement === e.currentTarget ? address : null)}
+      onFocus={() => onActive(address)}
+      onBlur={() => onActive(null)}
+    >
+      {label}
+    </span>
+  );
+}
+
+function useCopyHoveredAddress() {
+  const toast = useToast();
+  const [active, setActive] = useState<Address | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'c') return;
+      if (!window.getSelection()?.isCollapsed) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void navigator.clipboard
+        .writeText(active.email)
+        .then(() => toast(`Copied ${active.email}`))
+        .catch(() => toast("Couldn't copy the address"));
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [active, toast]);
+  return setActive;
+}
+
+/** To, then cc and bcc; long To lists fold to two names and "N more" until clicked. */
+function RecipientLine({ message, onActive }: { message: Message; onActive: (a: Address | null) => void }) {
+  const { me, accounts } = useApp();
+  const myEmails = accounts.map((a) => a.email.toLowerCase());
+  const [all, setAll] = useState(false);
+  const label = (a: Address) => (myEmails.includes(a.email.toLowerCase()) ? me.name : a.name || a.email);
+  const list = (addrs: Address[]) =>
+    addrs.map((a, i) => (
+      <Fragment key={`${a.email}-${i}`}>
+        {i > 0 && ', '}
+        <AddressName address={a} label={label(a)} onActive={onActive} />
+      </Fragment>
+    ));
+  const folded = !all && message.to.length > 2;
+  return (
+    <span className={all ? 'meta all' : 'meta'}>
+      To {list(folded ? message.to.slice(0, 2) : message.to)}
+      {folded && (
+        <>
+          {' and '}
+          <button type="button" className="link-button more-recipients" onClick={() => setAll(true)}>
+            {message.to.length - 2} more
+          </button>
+        </>
+      )}
+      {message.cc.length > 0 && <>, cc {list(message.cc)}</>}
+      {message.bcc.length > 0 && <>, bcc {list(message.bcc)}</>}
+    </span>
+  );
 }
 
 /** Click selects (Ctrl/Cmd+click adds), Ctrl/Cmd+C copies the files, double-click or Enter opens. */
@@ -91,12 +159,42 @@ export function AttachmentList({ message }: { message: Message }) {
   );
 }
 
+/** Per-message actions shown as icons in the top right of an expanded card. */
+type MessageActions = {
+  reply: () => void;
+  replyAll: () => void;
+  forward: () => void;
+  popOut: () => void;
+  more: (anchor: HTMLElement) => void;
+};
+
+function MessageActionIcons({ actions, disabled }: { actions: MessageActions; disabled: boolean }) {
+  const items: { label: string; icon: React.ReactNode; run: (e: React.MouseEvent<HTMLButtonElement>) => void }[] = [
+    { label: 'Reply', icon: <Reply size={16} />, run: actions.reply },
+    { label: 'Reply all', icon: <ReplyAll size={16} />, run: actions.replyAll },
+    { label: 'Forward', icon: <Forward size={16} />, run: actions.forward },
+    { label: 'Open in new window', icon: <ExternalLink size={15} />, run: actions.popOut },
+    { label: 'More actions', icon: <MoreHorizontal size={16} />, run: (e) => actions.more(e.currentTarget) },
+  ];
+  return (
+    <div className="message-actions">
+      {items.map((it) => (
+        <button key={it.label} type="button" className="btn btn-ghost btn-icon" aria-label={it.label} title={it.label} disabled={disabled} onClick={it.run}>
+          {it.icon}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MessageView({
   message,
   expanded,
   onExpand,
   onCollapse,
   onChanged,
+  actions,
+  actionsDisabled,
 }: {
   message: Message;
   expanded: boolean;
@@ -104,93 +202,119 @@ function MessageView({
   /** Set for messages that can fold back to one line (not the one that was opened). */
   onCollapse?: () => void;
   onChanged: (m: Message) => void;
+  actions: MessageActions;
+  actionsDisabled: boolean;
 }) {
-  const { accountById, me, accounts, settings } = useApp();
+  const { accountById, settings } = useApp();
   const acc = accountById(message.accountId);
-  const myEmails = accounts.map((a) => a.email.toLowerCase());
+  const setActiveAddress = useCopyHoveredAddress();
   const split = useMemo(() => splitQuoted(message.bodyHtml), [message.bodyHtml]);
   const [showQuoted, setShowQuoted] = useState(false);
   if (!expanded) {
     return (
-      <div className="message-block">
-        <button type="button" className="collapsed-message" onClick={onExpand}>
-          <b style={{ color: 'var(--text)', fontWeight: 600 }}>{message.from.name || message.from.email}</b> · {fullTime(message.receivedAt)} · {message.snippet}
-        </button>
+      <div className="message-entry">
+        <time className="message-timestamp" dateTime={message.receivedAt}>
+          {fullTime(message.receivedAt)}
+        </time>
+        <div className="message-block collapsed">
+          {/* Not a <button>: the sender's name inside is focusable for copying, and clicking
+              it focuses the name rather than expanding. */}
+          <div
+            className="collapsed-message"
+            role="button"
+            tabIndex={0}
+            aria-expanded={false}
+            onClick={(e) => {
+              if (!window.getSelection()?.isCollapsed) return;
+              if ((e.target as Element).closest('.addr')) return;
+              onExpand();
+            }}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+              e.preventDefault();
+              onExpand();
+            }}
+          >
+            <AddressName className="collapsed-sender" address={message.from} label={message.from.name || message.from.email} onActive={setActiveAddress} /> · {message.snippet}
+          </div>
+        </div>
       </div>
     );
   }
   return (
-    <div className="message-block">
-      <div
-        className={onCollapse ? 'message-head collapsible' : 'message-head'}
-        {...(onCollapse && {
-          role: 'button',
-          tabIndex: 0,
-          'aria-expanded': true,
-          title: 'Collapse',
-          onClick: (e: React.MouseEvent) => {
-            // Leave selecting text in the header alone.
-            if (!window.getSelection()?.isCollapsed) return;
-            if ((e.target as Element).closest('a, button')) return;
-            onCollapse();
-          },
-          onKeyDown: (e: React.KeyboardEvent) => {
-            if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
-            e.preventDefault();
-            onCollapse();
-          },
-        })}
-      >
-        <Avatar name={message.from.name || message.from.email} />
-        <div className="who">
-          <span className="name" title={message.from.email}>
-            {message.from.name || message.from.email}
-          </span>
-          <span className="meta">
-            To {recipients(message, me.name, myEmails)}
-            {message.cc.length > 0 && `, cc ${message.cc.map((a) => a.name || a.email).join(', ')}`} · {fullTime(message.receivedAt)}
-          </span>
+    <div className="message-entry">
+      <time className="message-timestamp" dateTime={message.receivedAt}>
+        {fullTime(message.receivedAt)}
+      </time>
+      <div className="message-block">
+        <div
+          className={onCollapse ? 'message-head collapsible' : 'message-head'}
+          {...(onCollapse && {
+            role: 'button',
+            tabIndex: 0,
+            'aria-expanded': true,
+            title: 'Collapse',
+            onClick: (e: React.MouseEvent) => {
+              // Leave selecting text in the header alone.
+              if (!window.getSelection()?.isCollapsed) return;
+              if ((e.target as Element).closest('a, button, .addr')) return;
+              onCollapse();
+            },
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+              e.preventDefault();
+              onCollapse();
+            },
+          })}
+        >
+          <div className="who">
+            <span className="name-line">
+              <AddressName className="name" address={message.from} label={message.from.name || message.from.email} onActive={setActiveAddress} />
+              {acc && (
+                <span className="acc-chip" title={acc.displayName}>
+                  <span className="acc-dot" style={{ background: acc.color }} />
+                  <span className="acc-name">{acc.displayName}</span>
+                </span>
+              )}
+            </span>
+            <RecipientLine message={message} onActive={setActiveAddress} />
+          </div>
+          <MessageActionIcons actions={actions} disabled={actionsDisabled} />
         </div>
-        {acc && (
-          <span className="acc-chip">
-            <span className="acc-dot" style={{ background: acc.color }} />
-            {acc.displayName}
-          </span>
+        {message.remoteImagesBlocked && (
+          <div className="images-bar">
+            {/* With images on, only Junk blocks them. */}
+            <span>{settings.remoteImages === 'ask' ? 'Remote images blocked' : 'Images are hidden in Junk'}</span>
+            <button type="button" className="link-button" onClick={async () => onChanged(await api.showRemoteImagesOnce(message.id))}>
+              Show images
+            </button>
+            <button
+              type="button"
+              className="link-button"
+              onClick={async () => {
+                await api.allowRemoteImages(message.from.email);
+                onChanged(await api.showRemoteImagesOnce(message.id));
+              }}
+            >
+              Always show from {message.from.name || message.from.email}
+            </button>
+          </div>
         )}
-      </div>
-      {message.remoteImagesBlocked && (
-        <div className="images-bar">
-          {/* With images on, only Junk blocks them. */}
-          <span>{settings.remoteImages === 'ask' ? 'Remote images blocked' : 'Images are hidden in Junk'}</span>
-          <button type="button" className="link-button" onClick={async () => onChanged(await api.showRemoteImagesOnce(message.id))}>
-            Show images
-          </button>
+        {message.meeting && <MeetingCard message={message} onChanged={onChanged} />}
+        <AttachmentList message={message} />
+        <MessageBody html={showQuoted ? message.bodyHtml : split.main} cacheKey={showQuoted || !split.hasQuote ? message.id : `${message.id}:new`} />
+        {split.hasQuote && (
           <button
             type="button"
-            className="link-button"
-            onClick={async () => {
-              await api.allowRemoteImages(message.from.email);
-              onChanged(await api.showRemoteImagesOnce(message.id));
-            }}
+            className="quote-toggle"
+            aria-expanded={showQuoted}
+            title={showQuoted ? 'Hide quoted text' : 'Show quoted text'}
+            onClick={() => setShowQuoted((v) => !v)}
           >
-            Always show from {message.from.name || message.from.email}
+            {showQuoted ? 'Hide quoted text' : '•••'}
           </button>
-        </div>
-      )}
-      {message.meeting && <MeetingCard message={message} onChanged={onChanged} />}
-      <AttachmentList message={message} />
-      <MessageBody html={showQuoted ? message.bodyHtml : split.main} cacheKey={showQuoted || !split.hasQuote ? message.id : `${message.id}:new`} />
-      {split.hasQuote && (
-        <button
-          type="button"
-          className="quote-toggle"
-          aria-expanded={showQuoted}
-          title={showQuoted ? 'Hide quoted text' : 'Show quoted text'}
-          onClick={() => setShowQuoted((v) => !v)}
-        >
-          {showQuoted ? 'Hide quoted text' : '•••'}
-        </button>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -309,26 +433,33 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
     [selection, loadThread],
   );
 
-  const startDraft = async (mode: DraftMode) => {
-    if (!selectedMessage) return;
+  const startDraft = async (mode: DraftMode, source: Message | null = selectedMessage) => {
+    if (!source || !selectedMessage) return;
     const open = thread?.drafts.find((d) => !d.poppedOut);
     if (open) {
       setClosedDraftId(null);
       setFocusDraft(true);
       return;
     }
-    await api.createDraft({ mode, sourceMessageId: selectedMessage.id });
+    await api.createDraft({ mode, sourceMessageId: source.id });
     setFocusDraft(true);
     await loadThread(selectedMessage.id);
   };
 
-  const removeWithUndo = async (kind: 'archive' | 'delete') => {
-    if (!selectedMessage) return;
-    const ids = [selectedMessage.id];
-    const original = selectedMessage.folderId;
+  // Removing the opened message moves the selection on; removing another message in the
+  // thread just drops it from the thread.
+  const afterRemoving = (m: Message) => {
+    if (m.id === selectedMessage?.id) onRemoved();
+    else if (selectedMessage) loadThread(selectedMessage.id);
+  };
+
+  const removeWithUndo = async (kind: 'archive' | 'delete', m: Message | null = selectedMessage) => {
+    if (!m || !selectedMessage) return;
+    const ids = [m.id];
+    const original = m.folderId;
     if (kind === 'archive') await api.archive(ids);
     else await api.deleteMessages(ids);
-    onRemoved();
+    afterRemoving(m);
     toast(kind === 'archive' ? 'Archived' : 'Deleted', { label: 'Undo', run: () => api.moveMessages(ids, original) });
   };
 
@@ -358,18 +489,20 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
     hasMessage,
   );
 
-  const moreMenu = async (anchor: HTMLElement) => {
+  const moreMenu = async (anchor: HTMLElement, m: Message) => {
     if (!selectedMessage) return;
-    const m = selectedMessage;
+    const openedId = selectedMessage.id;
     const folders: Folder[] = await api.listFolders(m.accountId);
     const items: MenuItem[] = [
-      { label: m.isRead ? 'Mark as unread' : 'Mark as read', onSelect: async () => {
+      { label: 'Archive', onSelect: () => removeWithUndo('archive', m) },
+      { label: 'Delete', onSelect: () => removeWithUndo('delete', m) },
+      { label: m.isRead ? 'Mark as unread' : 'Mark as read', separatorBefore: true, onSelect: async () => {
         await api.markRead([m.id], !m.isRead);
-        loadThread(m.id);
+        loadThread(openedId);
       } },
       { label: m.isFlagged ? 'Unflag' : 'Flag', onSelect: async () => {
         await api.setFlag([m.id], !m.isFlagged);
-        loadThread(m.id);
+        loadThread(openedId);
       } },
       ...folders
         .filter((f) => f.id !== m.folderId && f.role !== 'drafts')
@@ -378,7 +511,7 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
           separatorBefore: i === 0,
           onSelect: async () => {
             await api.moveMessages([m.id], f.id);
-            onRemoved();
+            afterRemoving(m);
             toast(`Moved to ${f.name}`, { label: 'Undo', run: () => api.moveMessages([m.id], m.folderId) });
           },
         })),
@@ -423,31 +556,10 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
 
   return (
     <article className="reading-pane" aria-label="Reading pane">
-      <div className="reading-toolbar">
+      {/* Actions live on each message card; this bar only carries Back on narrow layouts. */}
+      <div className="reading-toolbar back-only">
         <button type="button" className="btn btn-ghost back-button" onClick={onBack} aria-label="Back to list">
           <ArrowLeft size={15} />
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={() => startDraft('reply')} disabled={!thread}>
-          Reply
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={() => startDraft('replyAll')} disabled={!thread}>
-          Reply all
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={() => startDraft('forward')} disabled={!thread}>
-          Forward
-        </button>
-        <span className="spacer" />
-        <button type="button" className="btn btn-ghost" onClick={() => removeWithUndo('archive')} disabled={!thread}>
-          Archive
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={() => removeWithUndo('delete')} disabled={!thread}>
-          Delete
-        </button>
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="More actions" onClick={(e) => moreMenu(e.currentTarget)} disabled={!thread}>
-          <MoreHorizontal size={16} />
-        </button>
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="Open in new window" onClick={() => selectedMessage && api.popOut('message', selectedMessage.id)} disabled={!thread}>
-          <ExternalLink size={15} />
         </button>
       </div>
       <div className="reading-scroll" ref={scrollRef}>
@@ -458,7 +570,12 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
         )}
         {thread && (
           <div className="reading-content">
-            <h2 className="thread-subject">{thread.subject || '(no subject)'}</h2>
+            <div className="thread-header">
+              <h2 className="thread-subject">{thread.subject || '(no subject)'}</h2>
+              <button type="button" className="btn btn-ghost btn-icon thread-close" aria-label="Close" title="Close" onClick={onBack}>
+                <X size={18} />
+              </button>
+            </div>
             {inlineDraft &&
               (inlineDraft.poppedOut ? (
                 <PoppedOutDraft draft={inlineDraft} />
@@ -512,6 +629,14 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
                               })
                       }
                       onChanged={(updated) => setThread((t) => (t ? { ...t, messages: t.messages.map((x) => (x.id === updated.id ? updated : x)) } : t))}
+                      actionsDisabled={!current}
+                      actions={{
+                        reply: () => void startDraft('reply', m),
+                        replyAll: () => void startDraft('replyAll', m),
+                        forward: () => void startDraft('forward', m),
+                        popOut: () => void api.popOut('message', m.id),
+                        more: (anchor) => void moreMenu(anchor, m),
+                      }}
                     />
                   ))}
                 </>

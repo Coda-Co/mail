@@ -187,6 +187,29 @@ async fn reply_is_created_saved_and_sent() {
 }
 
 #[tokio::test]
+async fn sending_deletes_dropped_copies() {
+    let (server, svc, acc, _) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    Mock::given(method("POST")).and(path("/me/messages")).respond_with(ResponseTemplate::new(201).set_body_json(json!({"id": "D9"}))).mount(&server).await;
+    Mock::given(method("PATCH")).and(path("/me/messages/D9")).respond_with(ResponseTemplate::new(200).set_body_json(json!({}))).mount(&server).await;
+    Mock::given(method("GET")).and(path("/me/messages/D9/attachments")).respond_with(ResponseTemplate::new(200).set_body_json(json!({"value": []}))).mount(&server).await;
+    Mock::given(method("POST")).and(path("/me/messages/D9/attachments")).respond_with(ResponseTemplate::new(201).set_body_json(json!({"id": "ATT9"}))).expect(1).mount(&server).await;
+    Mock::given(method("POST")).and(path("/me/messages/D9/send")).respond_with(ResponseTemplate::new(202)).expect(1).mount(&server).await;
+
+    let mut d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(acc.id.clone()) }).unwrap();
+    d.to = vec![Address::new("Sarah", "sarah@harbour.example")];
+    svc.update_draft(&d).unwrap();
+    let d = svc.add_attachment_bytes(&d.id, "notes.txt", b"hello").unwrap();
+    let copy = std::path::PathBuf::from(d.attachments[0].local_path.clone().unwrap());
+    svc.send_draft(&d.id).unwrap();
+    assert!(copy.exists(), "kept while queued: the upload still needs it");
+    Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run().await.unwrap();
+    assert!(svc.get_draft(&d.id).is_err(), "sent");
+    assert!(!copy.exists(), "copy deleted once sent");
+}
+
+#[tokio::test]
 async fn unknown_send_is_held_never_repeated() {
     let (server, svc, acc, _) = setup().await;
     // Short client timeout so the slow send below has no answer.

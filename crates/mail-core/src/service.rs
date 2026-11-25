@@ -55,6 +55,11 @@ impl Paths {
     pub fn attachments_dir(&self, id: &str) -> PathBuf {
         self.account_dir(id).join("attachments")
     }
+    /// Copies of files dropped onto drafts, kept until the draft is sent or discarded. Not
+    /// under an account, so a draft moved to another account keeps its files.
+    pub fn outgoing_dir(&self) -> PathBuf {
+        self.root.join("outgoing")
+    }
     /// Storage for a web account's isolated web view.
     pub fn webview_dir(&self, id: &str) -> PathBuf {
         self.root.join("webviews").join(id)
@@ -836,6 +841,36 @@ impl MailService {
         Ok(d)
     }
 
+    /// Add, swap or remove the draft's signature (`None` removes it). The draft stays in its account.
+    pub fn set_draft_signature(&self, id: &str, signature_id: Option<&str>) -> Result<Draft> {
+        let (acc, raw) = ids::split(id)?;
+        let current = self.get_draft(id)?;
+        Self::editable(&current)?;
+        let sig = match signature_id {
+            Some(sid) => match self.app().get_signature(sid)? {
+                Some(s) if s.account_id == current.account_id => Some(s),
+                Some(_) => return Err(Error::Invalid("That signature belongs to another account".into())),
+                None => return Err(Error::Invalid("That signature no longer exists".into())),
+            },
+            None => None,
+        };
+        let mut d = current.clone();
+        d.body_html = html::swap_signature(&current.body_html, sig.as_ref().map(|s| (s.id.as_str(), s.html.as_str())));
+        d.signature_id = sig.map(|s| s.id);
+        d.edited = true;
+        d.status = DraftStatus::Editing;
+        d.error = None;
+        d.saved_to_server = false;
+        d.updated_at = now_iso();
+        self.with_account(acc, |db| db.save_draft(raw, &d, None, "user"))?;
+        self.enqueue(acc, &Op::SaveDraft { draft_id: raw.to_string() })?;
+        self.events().draft_changed(&d.id);
+        if !current.edited {
+            self.changed(vec![acc.to_string()]);
+        }
+        Ok(d)
+    }
+
     pub fn add_attachment(&self, id: &str, path: &Path) -> Result<Draft> {
         let (acc, raw) = ids::split(id)?;
         let mut d = self.get_draft(id)?;
@@ -862,16 +897,46 @@ impl MailService {
         Ok(d)
     }
 
+    /// Attach a file the person dropped onto the draft (from Explorer or Finder). The web view
+    /// hands over the bytes, not a path, so they are kept under the account's `outgoing`
+    /// folder (never pruned, unlike the download cache) until the draft is sent or discarded.
+    pub fn add_attachment_bytes(&self, id: &str, name: &str, bytes: &[u8]) -> Result<Draft> {
+        Self::editable(&self.get_draft(id)?)?;
+        if bytes.len() as u64 > 150 * 1024 * 1024 {
+            return Err(Error::Invalid("Attachments over 150 MB can't be sent".into()));
+        }
+        let dir = self.paths.outgoing_dir().join(ids::new_local_id("drop"));
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join(crate::sync::safe_file_name(name));
+        std::fs::write(&path, bytes)?;
+        self.add_attachment(id, &path)
+    }
+
+    /// Delete the copies kept for dropped files. Files anywhere else (ones picked with Attach,
+    /// cached downloads) belong to someone else and are left alone. Best effort.
+    pub(crate) fn delete_dropped_copies(&self, attachments: &[Attachment]) {
+        let outgoing = self.paths.outgoing_dir();
+        for path in attachments.iter().filter_map(|a| a.local_path.as_deref()).map(Path::new) {
+            let Some(dir) = path.parent() else { continue };
+            // Each drop has its own folder directly under outgoing/; remove it whole.
+            if dir.parent() == Some(outgoing.as_path()) && !path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+                let _ = std::fs::remove_dir_all(dir);
+            }
+        }
+    }
+
     pub fn remove_attachment(&self, id: &str, attachment_id: &str) -> Result<Draft> {
         let (acc, raw) = ids::split(id)?;
         let mut d = self.get_draft(id)?;
         Self::editable(&d)?;
-        d.attachments.retain(|a| a.id != attachment_id);
+        let (removed, kept) = std::mem::take(&mut d.attachments).into_iter().partition::<Vec<_>, _>(|a| a.id == attachment_id);
+        d.attachments = kept;
         d.saved_to_server = false;
         d.edited = true;
         d.updated_at = now_iso();
         self.with_account(acc, |db| db.save_draft(raw, &d, None, "user"))?;
         self.enqueue(acc, &Op::SaveDraft { draft_id: raw.to_string() })?;
+        self.delete_dropped_copies(&removed);
         Ok(d)
     }
 
@@ -894,6 +959,7 @@ impl MailService {
         if let Some(s) = server_id {
             self.enqueue(acc, &Op::DeleteServerDraft { server_id: s })?;
         }
+        self.delete_dropped_copies(&d.attachments);
         self.changed(vec![acc.to_string()]);
         Ok(())
     }

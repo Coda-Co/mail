@@ -29,6 +29,7 @@ permissions = [
   "allow-update-draft",
   "allow-change-draft-account",
   "allow-add-attachment",
+  "allow-add-attachment-data",
   "allow-remove-attachment",
   "allow-discard-draft",
   "allow-send-draft",
@@ -62,6 +63,9 @@ permissions = [
   "allow-refresh-web-calendars",
   "allow-fetch-web-event-attendees",
   "allow-open-web-event",
+  "allow-update-status",
+  "allow-check-for-update",
+  "allow-install-update",
 ]
 
 [[set]]

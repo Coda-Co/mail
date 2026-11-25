@@ -27,6 +27,7 @@ const COMMANDS: &[&str] = &[
     "update_draft",
     "change_draft_account",
     "add_attachment",
+    "add_attachment_data",
     "remove_attachment",
     "discard_draft",
     "send_draft",
@@ -64,6 +65,9 @@ const COMMANDS: &[&str] = &[
     "fetch_web_event_attendees",
     "open_web_event",
     "refresh_web_calendars",
+    "update_status",
+    "check_for_update",
+    "install_update",
 ];
 
 fn main() {

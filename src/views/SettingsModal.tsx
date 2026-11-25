@@ -7,7 +7,7 @@ import { Modal, Popover, useToast } from '../components/ui';
 import { RichEditor, format, type RichEditorHandle } from '../components/RichEditor';
 import { AddAccountForm, AddWebAccountForm, RemoveAccountDialog } from './AccountDialogs';
 import { PALETTE } from '../lib/colors';
-import { keyLabel } from '../lib/platform';
+import { isMac, keyLabel } from '../lib/platform';
 import { webCalendarStatus } from '../lib/webCalendar';
 import { now } from '../lib/clock';
 
@@ -49,6 +49,71 @@ function WebCalendarConfirm({ account, onClose, onConfirm }: { account: Account;
 }
 
 type Tab = 'general' | 'accounts' | 'signatures';
+
+function UpdatesGroup() {
+  const { update, setUpdate } = useApp();
+  const [checked, setChecked] = useState(false);
+  if (update.state === 'unavailable') {
+    return (
+      <div className="settings-group">
+        <h3>Updates</h3>
+        <span className="hint">Version {update.currentVersion || 'unknown'}. This build doesn’t update itself; release builds check for updates automatically.</span>
+      </div>
+    );
+  }
+  const check = async () => {
+    setChecked(true);
+    setUpdate({ ...update, state: 'checking', error: undefined });
+    setUpdate(await api.checkForUpdate());
+  };
+  const busy = update.state === 'checking' || update.state === 'downloading' || update.state === 'installing';
+  let line: string;
+  switch (update.state) {
+    case 'checking':
+      line = 'Checking for updates…';
+      break;
+    case 'downloading':
+      line = `Downloading ${update.version}${update.progress != null ? ` · ${Math.round(update.progress * 100)}%` : '…'}`;
+      break;
+    case 'ready':
+      line = `Version ${update.version} is ready. Restart to update${isMac ? '; it also installs the next time you quit' : ''}.`;
+      break;
+    case 'installing':
+      line = `Installing ${update.version}…`;
+      break;
+    case 'error':
+      line = `Couldn’t check for updates: ${update.error ?? 'unknown error'}`;
+      break;
+    case 'upToDate':
+      line = checked ? 'You have the latest version.' : 'Up to date.';
+      break;
+    default:
+      line = 'Mail checks for updates automatically every few hours.';
+  }
+  return (
+    <div className="settings-group">
+      <h3>Updates</h3>
+      <div className="form-inline" style={{ alignItems: 'center' }}>
+        <span>Version {update.currentVersion}</span>
+        <span className="spacer" style={{ flex: 1 }} />
+        {update.state === 'ready' ? (
+          <button type="button" className="btn btn-primary" onClick={() => api.installUpdate()}>
+            Restart to update
+          </button>
+        ) : (
+          <button type="button" className="btn" disabled={busy} onClick={check}>
+            Check for updates
+          </button>
+        )}
+      </div>
+      <span className="hint" role="status">
+        {line}
+        {update.checkedAt && update.state !== 'checking' && update.state !== 'downloading' && ` Last checked ${new Date(update.checkedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}.`}
+      </span>
+      {update.state === 'ready' && update.notes && <div className="hint" style={{ whiteSpace: 'pre-wrap' }}>{update.notes}</div>}
+    </div>
+  );
+}
 
 function GeneralTab() {
   const { settings, updateSettings, disk } = useApp();
@@ -113,6 +178,7 @@ function GeneralTab() {
           <b>{disk === 'on' ? 'on' : disk === 'off' ? 'off' : 'unknown'}</b>.
         </span>
       </div>
+      <UpdatesGroup />
     </>
   );
 }
@@ -396,7 +462,7 @@ function SignaturesTab() {
             type="button"
             className="chip"
             onClick={async () => {
-              const s = await api.saveSignature({ id: '', accountId, name: 'New signature', html: '<p><br></p>', defaultNew: sigs.length === 0, defaultReply: sigs.length === 0 });
+              const s = await api.saveSignature({ id: '', accountId, name: 'New signature', html: '<div><br></div>', defaultNew: sigs.length === 0, defaultReply: sigs.length === 0 });
               reload(s.id);
             }}
           >
