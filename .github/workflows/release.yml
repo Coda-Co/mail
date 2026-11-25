@@ -6,6 +6,9 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   release:
     strategy:
@@ -31,15 +34,28 @@ jobs:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
       - run: pnpm install --frozen-lockfile
-      - uses: tauri-apps/tauri-action@v0
+      # Only pass Apple signing settings when a certificate is configured; empty values make
+      # Tauri try (and fail) to import a blank certificate, so unsigned macOS builds need them unset.
+      - name: Apple signing env
+        if: runner.os == 'macOS'
+        shell: bash
         env:
-          MAIL_APP_SECURITY_NOTE_URL: ${{ vars.MAIL_APP_SECURITY_NOTE_URL }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ]; then
+            for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+              { echo "$v<<__EOF__"; printenv "$v"; echo "__EOF__"; } >> "$GITHUB_ENV"
+            done
+          fi
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          MAIL_APP_SECURITY_NOTE_URL: ${{ vars.MAIL_APP_SECURITY_NOTE_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
