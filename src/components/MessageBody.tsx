@@ -82,6 +82,23 @@ export function MessageBody({ html, cacheKey }: { html: string; cacheKey?: strin
         const href = a.getAttribute('href') ?? '';
         if (/^(https?:|mailto:)/i.test(href)) api.openExternal(href);
       });
+      // Keys pressed with focus in the message (e.g. after selecting text) never
+      // reach the app's window listener, so forward them; otherwise Ctrl+R etc.
+      // fall through to the webview and reload the app.
+      d.addEventListener('keydown', (e) => {
+        const copy = new KeyboardEvent('keydown', {
+          key: e.key,
+          code: e.code,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+          repeat: e.repeat,
+          cancelable: true,
+        });
+        window.dispatchEvent(copy);
+        if (copy.defaultPrevented) e.preventDefault();
+      });
       // Re-measure after fonts and images settle.
       setTimeout(measure, 100);
       setTimeout(measure, 600);

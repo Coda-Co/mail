@@ -12,13 +12,16 @@ import { WebAccountView } from './views/WebAccountView';
 import { SettingsModal } from './views/SettingsModal';
 import { ComposeWindow, MessageWindow } from './views/PopOutWindows';
 import { runCommand, useCommand } from './lib/commands';
-import { isTypingTarget, resolveShortcut } from './lib/shortcuts';
+import { isBrowserReserved, isTypingTarget, resolveShortcut } from './lib/shortcuts';
 import { isMac } from './lib/platform';
 
 function useGlobalShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing) return;
+      // Swallow reload keys up front: if reply/reply all has no handler yet
+      // (thread still loading), letting them through reloads the whole app.
+      if (isBrowserReserved(e, isMac)) e.preventDefault();
       const id = resolveShortcut(e, isTypingTarget(e.target), isMac);
       if (id && runCommand(id)) e.preventDefault();
     };
