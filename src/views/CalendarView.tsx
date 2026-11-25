@@ -6,6 +6,7 @@ import { useApp } from '../state/app';
 import { addDays, dayShort, hhmm, longDate, monthName, rangeTitle, sameDay, shortDate, startOfDay, startOfWeek } from '../lib/dates';
 import { now } from '../lib/clock';
 import { eventFill, eventSelectedFill } from '../lib/colors';
+import { layoutDay } from '../lib/eventLayout';
 import { EventForm } from './EventForm';
 import { eventWhere } from '../components/Agenda';
 import { Menu, Modal, useToast } from '../components/ui';
@@ -15,37 +16,6 @@ import { eventActions, webEventSource } from '../lib/webCalendar';
 
 type Mode = 'day' | 'week' | 'month';
 const HOUR = 56;
-
-interface Placed {
-  event: CalendarEvent;
-  lane: number;
-  lanes: number;
-}
-
-/** Side-by-side lanes for overlapping events in one day. */
-function layoutDay(events: CalendarEvent[]): Placed[] {
-  const sorted = [...events].sort((a, b) => a.start.localeCompare(b.start) || b.end.localeCompare(a.end));
-  const placed: Placed[] = [];
-  let group: Placed[] = [];
-  let groupEnd = '';
-  const flush = () => {
-    const lanes = Math.max(1, ...group.map((p) => p.lane + 1));
-    group.forEach((p) => (p.lanes = lanes));
-    group = [];
-  };
-  for (const e of sorted) {
-    if (group.length && e.start >= groupEnd) flush();
-    const used = new Set(group.filter((p) => p.event.end > e.start).map((p) => p.lane));
-    let lane = 0;
-    while (used.has(lane)) lane++;
-    const p = { event: e, lane, lanes: 1 };
-    group.push(p);
-    placed.push(p);
-    if (e.end > groupEnd) groupEnd = e.end;
-  }
-  flush();
-  return placed;
-}
 
 const RESPONSE_TEXT: Partial<Record<ResponseStatus, string>> = { accepted: 'You’re going', tentative: 'You said maybe', declined: 'You declined' };
 

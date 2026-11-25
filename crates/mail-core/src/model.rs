@@ -272,6 +272,55 @@ pub struct Message {
     pub body_html: String,
     pub remote_images_blocked: bool,
     pub attachments: Vec<Attachment>,
+    /// Set for meeting requests, cancellations and responses once their event has been read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meeting: Option<MeetingInfo>,
+}
+
+/// What a meeting message is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum MeetingKind {
+    #[default]
+    Request,
+    Cancelled,
+    Accepted,
+    Tentative,
+    Declined,
+    Other,
+}
+
+impl MeetingKind {
+    /// From an eventMessage's meetingMessageType (and responseType, for responses).
+    pub fn from_graph(meeting_type: &str, response_type: &str) -> Self {
+        match (meeting_type, response_type) {
+            ("meetingRequest", _) => MeetingKind::Request,
+            ("meetingCancelled", _) => MeetingKind::Cancelled,
+            ("meetingAccepted", _) | (_, "accepted") => MeetingKind::Accepted,
+            ("meetingTenativelyAccepted" | "meetingTentativelyAccepted", _) | (_, "tentativelyAccepted") => MeetingKind::Tentative,
+            ("meetingDeclined", _) | (_, "declined") => MeetingKind::Declined,
+            _ => MeetingKind::Other,
+        }
+    }
+}
+
+/// When and where a meeting message's event happens, as the message described it, plus the
+/// event itself when it is in the local calendar (its time wins, and it carries my response).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeetingInfo {
+    pub kind: MeetingKind,
+    pub start: String,
+    pub end: String,
+    #[serde(default)]
+    pub is_all_day: bool,
+    #[serde(default)]
+    pub location: String,
+    /// The event's ID (public in the API; raw while stored).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<CalendarEvent>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

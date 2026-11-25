@@ -97,6 +97,22 @@ export interface Message extends MessageSummary {
   bodyHtml: string;
   remoteImagesBlocked: boolean;
   attachments: Attachment[];
+  /** Meeting requests, cancellations and responses, once the event has been read. */
+  meeting?: MeetingInfo;
+}
+
+export type MeetingKind = 'request' | 'cancelled' | 'accepted' | 'tentative' | 'declined' | 'other';
+
+/** When and where a meeting message's event is, as the message said. */
+export interface MeetingInfo {
+  kind: MeetingKind;
+  start: string;
+  end: string;
+  isAllDay: boolean;
+  location: string;
+  eventId?: string;
+  /** The event in the local calendar, when it is there: its time wins and it carries my response. */
+  event?: CalendarEvent;
 }
 
 export type DraftMode = 'new' | 'reply' | 'replyAll' | 'forward';

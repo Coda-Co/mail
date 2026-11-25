@@ -167,8 +167,13 @@ function view(m: Message): Message {
   const allowed = showByDefault || state.settings.remoteImageSenders.includes(m.from.email.toLowerCase()) || shownOnce.has(m.id);
   const hasRemote = REMOTE_IMG.test(m.bodyHtml);
   REMOTE_IMG.lastIndex = 0;
-  if (!hasRemote || allowed) return { ...clone(m), remoteImagesBlocked: false };
-  return { ...clone(m), bodyHtml: m.bodyHtml.replace(REMOTE_IMG, ''), remoteImagesBlocked: true };
+  const out: Message = !hasRemote || allowed ? { ...clone(m), remoteImagesBlocked: false } : { ...clone(m), bodyHtml: m.bodyHtml.replace(REMOTE_IMG, ''), remoteImagesBlocked: true };
+  // The calendar's copy of a meeting message's event, as the core does.
+  if (out.meeting?.eventId) {
+    const e = state.events.find((x) => x.id === out.meeting!.eventId);
+    out.meeting.event = e ? clone(e) : undefined;
+  }
+  return out;
 }
 
 function getMsg(id: string): Message {
