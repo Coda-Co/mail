@@ -281,7 +281,13 @@ export function Sidebar() {
             {me.email}
           </span>
         </div>
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="Settings" onClick={() => app.openSettings()}>
+        <button
+          type="button"
+          className={`btn btn-ghost btn-icon${app.update.state === 'ready' ? ' has-dot' : ''}`}
+          aria-label={app.update.state === 'ready' ? 'Settings (update ready)' : 'Settings'}
+          title={app.update.state === 'ready' ? `Mail ${app.update.version} is ready to install` : undefined}
+          onClick={() => app.openSettings()}
+        >
           <Gear size={16} />
         </button>
       </div>

@@ -6,6 +6,7 @@ mod clipboard;
 mod events;
 mod state;
 mod tray;
+mod updater;
 mod webaccounts;
 
 use mail_core::MailService;
@@ -88,6 +89,7 @@ pub fn run() {
             app.manage(state);
             app.manage(webaccounts::WebCalendars::default());
 
+            app.manage(updater::Updates::new(app));
             create_main_window(app)?;
             tray::create(&handle)?;
             if !demo {
@@ -97,6 +99,7 @@ pub fn run() {
             }
             tauri::async_runtime::spawn(events::reminder_loop(handle.clone()));
             tauri::async_runtime::spawn(webaccounts::calendar_loop(handle.clone()));
+            tauri::async_runtime::spawn(updater::check_loop(handle.clone()));
             // Web accounts stay loaded in the background so counts and notifications stay live.
             let h = handle.clone();
             tauri::async_runtime::spawn(async move {
@@ -184,6 +187,9 @@ pub fn run() {
             webaccounts::fetch_web_event_attendees,
             webaccounts::open_web_event,
             webaccounts::refresh_web_calendars,
+            updater::update_status,
+            updater::check_for_update,
+            updater::install_update,
         ])
         .build(context())
         .expect("error while building the mail app")
@@ -202,6 +208,8 @@ pub fn run() {
                     api.prevent_exit();
                     let h = app.clone();
                     webaccounts::persist_all_then(app.clone(), move || {
+                        // A downloaded update installs now, so the next launch is the new version.
+                        updater::install_on_quit(&h);
                         h.exit(0);
                     });
                 }
@@ -211,7 +219,7 @@ pub fn run() {
 
 /// Set once the quit handler has persisted the sign-in cookies, so the re-triggered exit runs for
 /// real instead of persisting again (see the ExitRequested handler).
-static PERSISTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+pub(crate) static PERSISTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 #[cfg(test)]
 mod tests {

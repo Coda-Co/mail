@@ -450,6 +450,28 @@ h3 {
   flex: 1;
 }
 
+.update-banner {
+  background: var(--panel-muted);
+  border-color: var(--border);
+}
+
+/* A dot on the settings button when an app update is ready. */
+.has-dot {
+  position: relative;
+}
+
+.has-dot::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--panel, var(--bg));
+}
+
 /* ---------- Buttons ---------- */
 
 .btn {

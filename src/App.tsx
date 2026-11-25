@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { WifiOff } from 'lucide-react';
+import { Download, WifiOff } from 'lucide-react';
+import { api } from './api';
 import { AppProvider, useApp } from './state/app';
 import { ToastProvider } from './components/ui';
 import { Sidebar } from './components/Sidebar';
@@ -25,6 +26,32 @@ function useGlobalShortcuts() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+}
+
+/** A new version has downloaded: offer to restart now. "Later" hides it until the next version. */
+function UpdateBanner() {
+  const { update } = useApp();
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  if (update.state !== 'ready' && update.state !== 'installing') return null;
+  if (update.state === 'ready' && dismissed === update.version) return null;
+  const installing = update.state === 'installing';
+  return (
+    <div className="banner update-banner" role="status">
+      <Download size={15} />
+      {installing ? `Installing Mail ${update.version}…` : `Mail ${update.version} is ready. Restart to update${isMac ? '; it also installs the next time you quit' : ''}.`}
+      <span className="spacer" />
+      {!installing && (
+        <>
+          <button type="button" className="btn btn-small btn-ghost" onClick={() => setDismissed(update.version ?? null)}>
+            Later
+          </button>
+          <button type="button" className="btn btn-small btn-primary" onClick={() => api.installUpdate()}>
+            Restart now
+          </button>
+        </>
+      )}
+    </div>
+  );
 }
 
 function Shell() {
@@ -54,6 +81,7 @@ function Shell() {
       <Resizer variable="--sidebar-w" pane="before" label="Resize sidebar" className="sidebar-resizer" />
       <main className="app-main">
         <TopBar slotRef={setSearchSlot} />
+        <UpdateBanner />
         {!app.sync.online && (
           <div className="banner" style={{ background: 'var(--panel-muted)', borderColor: 'var(--border)' }}>
             <WifiOff size={15} />
