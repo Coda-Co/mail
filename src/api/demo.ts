@@ -20,6 +20,7 @@ import type {
   SearchResult,
   Signature,
   SyncStatus,
+  UpdateStatus,
   ViewScope,
 } from './types';
 import { EVENTS } from './types';
@@ -950,4 +951,19 @@ export const demoApi: MailApi = {
   async openExternal(url) {
     if (hasWindow) window.open(url, '_blank', 'noopener');
   },
+
+  // The preview can't update itself. `?update=ready` shows the top-bar button and settings as
+  // they look once a new version has downloaded.
+  async updateStatus() {
+    return demoUpdate();
+  },
+  async checkForUpdate() {
+    return demoUpdate();
+  },
+  async installUpdate() {},
 };
+
+function demoUpdate(): UpdateStatus {
+  const ready = hasWindow && new URLSearchParams(window.location.search).get('update') === 'ready';
+  return ready ? { state: 'ready', currentVersion: '0.1.0', version: '0.2.0', checkedAt: now().toISOString() } : { state: 'unavailable', currentVersion: '0.1.0' };
+}
