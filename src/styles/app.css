@@ -33,7 +33,7 @@
   --input-border: #dde1e6;
   --tag-border: #cfd5dc;
   --nav-selected: #dfe5ec;
-  --row-selected: #eef3fa;
+  --row-selected: #e2ebf6;
   --row-hover: #f4f6f8;
   --chip-neutral: #eef1f4;
   --accent: #0b5cc4;
@@ -103,7 +103,7 @@
   --input-border: #353c45;
   --tag-border: #444c56;
   --nav-selected: #2b323b;
-  --row-selected: #1f2b3d;
+  --row-selected: #253550;
   --row-hover: #20252b;
   --chip-neutral: #2a3038;
   --accent: #3b82e0;
@@ -932,7 +932,7 @@ h3 {
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   padding: 12px 20px;
   border: none;
   border-bottom: 1px solid var(--border-subtle);
@@ -970,6 +970,13 @@ h3 {
 
 .message-row .from {
   flex: 1;
+  font-size: var(--fs-reading);
+}
+
+/* Sender leads in the larger size; subject and preview sit beneath it smaller, as in Outlook. */
+.message-row .subject,
+.message-row .snippet {
+  font-size: var(--fs-meta);
 }
 
 .message-row .snippet {
