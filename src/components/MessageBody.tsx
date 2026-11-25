@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import fontUrl from '../assets/fonts/Geist-Variable.woff2?url';
 import { api } from '../api';
+import { frameTheme, type FrameTheme } from '../lib/messageTheme';
 
 // Mail HTML is rendered in a sandboxed iframe: no scripts (sandbox without
 // allow-scripts), a strict CSP, and links opened in the system browser.
 // The base styles below are only defaults: the sender's own <style> blocks and inline
 // styles come later / are more specific, so their fonts and spacing win, as in Outlook.
+// In dark mode, mail that sets its own colours is shown on a light "paper" surface
+// (see lib/messageTheme.ts); the rest follows the dark theme.
 
-function srcdoc(html: string, dark: boolean): string {
+function srcdoc(html: string, theme: FrameTheme): string {
   const font = new URL(fontUrl, window.location.href).href;
+  const dark = theme === 'dark';
+  const paper = theme === 'paper';
   const text = dark ? '#E6E8EB' : '#1F2328';
   const link = dark ? '#5A98E8' : '#0B5CC4';
   const csp = "default-src 'none'; img-src data: cid: https: http:; style-src 'unsafe-inline'; font-src 'self' data: " + new URL(font).origin;
@@ -18,7 +23,8 @@ function srcdoc(html: string, dark: boolean): string {
 <style>
 @font-face{font-family:Geist;src:url(${font}) format('woff2');font-weight:100 900}
 html{color-scheme:${dark ? 'dark' : 'light'}}
-html,body{margin:0;padding:0;background:transparent}
+html,body{margin:0;padding:0;background:${paper ? '#FFFFFF' : 'transparent'}}
+${paper ? 'body{padding:16px 20px}' : ''}
 body{font-family:Geist,system-ui,sans-serif;font-size:15px;line-height:1.4;color:${text};overflow-wrap:anywhere}
 body>:last-child{margin-bottom:0}
 img{max-width:100%;height:auto}
@@ -44,7 +50,8 @@ export function MessageBody({ html, cacheKey }: { html: string; cacheKey?: strin
   // Hidden until first measured: a frame or two of nothing beats a clipped box that jumps.
   const [measured, setMeasured] = useState(cached !== undefined);
   const dark = document.documentElement.dataset.theme === 'dark';
-  const doc = useMemo(() => srcdoc(html, dark), [html, dark]);
+  const theme = useMemo(() => frameTheme(html, dark), [html, dark]);
+  const doc = useMemo(() => srcdoc(html, theme), [html, theme]);
 
   useEffect(() => {
     const frame = ref.current;
@@ -96,5 +103,5 @@ export function MessageBody({ html, cacheKey }: { html: string; cacheKey?: strin
     };
   }, [doc, cacheKey]);
 
-  return <iframe ref={ref} className="message-body-frame" title="Message" sandbox="allow-same-origin" srcDoc={doc} style={{ height, visibility: measured ? undefined : 'hidden', colorScheme: dark ? 'dark' : 'light' }} />;
+  return <iframe ref={ref} className={theme === 'paper' ? 'message-body-frame paper' : 'message-body-frame'} title="Message" sandbox="allow-same-origin" srcDoc={doc} style={{ height, visibility: measured ? undefined : 'hidden', colorScheme: theme === 'dark' ? 'dark' : 'light' }} />;
 }

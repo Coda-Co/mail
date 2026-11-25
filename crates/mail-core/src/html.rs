@@ -72,6 +72,8 @@ pub fn sanitize_mail_for_display(html: &str, allow_remote: bool, inline: &HashMa
 
 /// Collect the contents of every `<style>` element, made safe to re-emit: no `@import`,
 /// no way to close the element early, and `url(...)` removed unless remote content is allowed.
+/// `<style>` elements inside comments are skipped: Word wraps a VML one in
+/// `<!--[if !mso]>…<![endif]-->` in every message, and browsers never apply it.
 fn extract_styles(html: &str, allow_remote: bool) -> (String, bool) {
     let lower = html.to_ascii_lowercase();
     let mut css = String::new();
@@ -79,6 +81,16 @@ fn extract_styles(html: &str, allow_remote: bool) -> (String, bool) {
     let mut i = 0;
     while let Some(p) = lower[i..].find("<style") {
         let open = i + p;
+        if let Some(c) = lower[i..open].find("<!--") {
+            let comment = i + c;
+            match lower[comment + 4..].find("-->") {
+                Some(e) => {
+                    i = comment + 4 + e + 3;
+                    continue;
+                }
+                None => break,
+            }
+        }
         let Some(gt) = lower[open..].find('>') else { break };
         let start = open + gt + 1;
         let end = lower[start..].find("</style").map(|e| start + e).unwrap_or(html.len());

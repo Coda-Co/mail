@@ -42,7 +42,6 @@ fn outlook_desktop_cid_logo_becomes_data_url() {
 /// into the head of every message. That is a comment, not a remote resource, so a message
 /// whose only image is an inline logo must not report blocked remote content.
 #[test]
-#[ignore = "bug: extract_styles reads <style> inside conditional comments, so url(#default#VML) flags every Outlook desktop message"]
 fn outlook_desktop_vml_behaviour_is_not_remote_content() {
     let mut inline = HashMap::new();
     inline.insert("image001.png@01DC5E2B.7A9F1B30".to_string(), "data:image/png;base64,AA==".to_string());

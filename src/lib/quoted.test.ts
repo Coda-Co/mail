@@ -1,11 +1,11 @@
-// Needs a DOM: add `jsdom` as a dev dependency and set this file's vitest environment to
-// jsdom (a vitest-environment comment at the top). Until then these tests are skipped.
+// @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { splitQuoted } from './quoted';
 
 // Bodies in fixtures/mail/ copy the markup real clients send (content is synthetic).
-const fixture = (name: string) => readFileSync(new URL(`../../fixtures/mail/${name}`, import.meta.url), 'utf8');
+const fixture = (name: string) => readFileSync(join(process.cwd(), 'fixtures/mail', name), 'utf8');
 
 function text(html: string): string {
   return (new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '').replace(/\s+/g, ' ').trim();
@@ -24,7 +24,7 @@ function trailingBlankLines(html: string): number {
   return n;
 }
 
-describe.skipIf(typeof DOMParser === 'undefined')('splitQuoted on real-world markup', () => {
+describe('splitQuoted on real-world markup', () => {
   it('Outlook desktop: cuts at the first border-top header, keeps signature and styles', () => {
     const { main, hasQuote } = splitQuoted(fixture('outlook-desktop-reply.html'));
     expect(hasQuote).toBe(true);
@@ -48,15 +48,15 @@ describe.skipIf(typeof DOMParser === 'undefined')('splitQuoted on real-world mar
   });
 
   // OWA puts `#appendonsend`, `<div><br></div>` and a 12pt `<div><br></div>` between the
-  // signature and the separator, so the collapsed view ends in empty lines above the toggle.
-  it.fails('Outlook on the web: leaves no blank lines above the quote toggle', () => {
+  // signature and the separator; they must not end up as empty lines above the toggle.
+  it('Outlook on the web: leaves no blank lines above the quote toggle', () => {
     const { main } = splitQuoted(fixture('owa-reply.html'));
     expect(trailingBlankLines(main)).toBe(0);
   });
 
-  // The separator is wrapped: `<div align=center><hr></div><div id=divRplyFwdMsg>`. Only a
-  // bare <hr> sibling is taken with the header, so a stray rule is left under the reply.
-  it.fails('Outlook mobile: takes the centred <div><hr></div> separator with the header', () => {
+  // The separator is wrapped: `<div align=center><hr></div><div id=divRplyFwdMsg>`, so it
+  // isn't the header's sibling; it must still go rather than leave a rule under the reply.
+  it('Outlook mobile: takes the centred <div><hr></div> separator with the header', () => {
     const { main, hasQuote } = splitQuoted(fixture('outlook-centered-hr-reply.html'));
     expect(hasQuote).toBe(true);
     expect(text(main)).toBe('Apologies, I missed the attachment from my last email. Please find it attached here.');

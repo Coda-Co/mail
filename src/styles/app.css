@@ -1151,6 +1151,11 @@ h3 {
   min-height: 40px;
   background: transparent;
 }
+/* Dark mode: mail that pins its own colours sits on a light card (see lib/messageTheme.ts). */
+.message-body-frame.paper {
+  background: #ffffff;
+  border-radius: 8px;
+}
 
 .images-bar {
   display: flex;
