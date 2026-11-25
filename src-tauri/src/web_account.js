@@ -19,25 +19,50 @@
     const m = String(s || '').match(/(\d[\d,.]*)/);
     return m ? parseInt(m[1].replace(/[,.]/g, ''), 10) : NaN;
   };
+  // Text of a folder item without its subfolders (expanded tree items nest them).
+  const ownText = (el) => {
+    let out = '';
+    for (const n of el.childNodes) {
+      if (n.nodeType === 3) out += n.textContent;
+      else if (n.nodeType === 1 && !n.matches('[role="group"], [role="treeitem"]')) out += ' ' + ownText(n);
+    }
+    return out;
+  };
+  // Outlook's class names are generated, so look for the count by content: "4 unread" in a
+  // label or screen-reader text, else a leaf element whose whole text is a number ("4", "99+").
+  function countIn(el) {
+    for (const s of [el.getAttribute('aria-label'), el.getAttribute('title'), ownText(el)]) {
+      const m = String(s || '').match(/(\d[\d,.]*)\+?\s+unread/i);
+      if (m) return num(m[1]);
+    }
+    const walk = (node) => {
+      for (const c of node.children) {
+        if (c.matches('[role="group"], [role="treeitem"]')) continue;
+        if (c.children.length === 0 && /^\s*\d[\d,.]*\+?\s*$/.test(c.textContent || '')) return num(c.textContent);
+        const n = walk(c);
+        if (n !== null) return n;
+      }
+      return null;
+    };
+    return walk(el);
+  }
   function readUnread() {
     const items = document.querySelectorAll('[role="treeitem"], [role="option"], [data-folder-name]');
+    let found = false;
     for (const el of items) {
-      const name = (el.getAttribute('data-folder-name') || el.getAttribute('title') || el.getAttribute('aria-label') || el.textContent || '').trim();
-      if (!/^inbox\b/i.test(name)) continue;
-      const label = el.getAttribute('aria-label') || '';
-      const viaLabel = label.match(/(\d[\d,.]*)\s+unread/i);
-      if (viaLabel) return num(viaLabel[1]);
-      const badge = el.querySelector('[class*="unread" i], [class*="count" i], [aria-label*="unread" i]');
-      if (badge) {
-        const n = num(badge.textContent || badge.getAttribute('aria-label'));
-        if (!Number.isNaN(n)) return n;
-      }
-      return 0;
+      const name = (el.getAttribute('data-folder-name') || el.getAttribute('title') || el.getAttribute('aria-label') || ownText(el) || '').trim();
+      // "Inbox", "Inbox 4", "Inbox4" (text runs together), "Inbox, 4 unread"; not "Inbox rules".
+      if (!/^inbox(?![a-z])(?!\s+[a-z])/i.test(name)) continue;
+      found = true;
+      const n = countIn(el);
+      // Favorites and the folder list both show Inbox; take the first that shows a count.
+      if (n !== null && !Number.isNaN(n)) return n;
     }
     // Some builds put "(3)" in the title.
     const t = document.title.match(/\((\d+)\)/);
     if (t) return parseInt(t[1], 10);
-    return null;
+    // Inbox found with no badge: Outlook hides the badge at zero.
+    return found ? 0 : null;
   }
   let last;
   const tick = () => {
