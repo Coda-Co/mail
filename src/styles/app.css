@@ -707,15 +707,28 @@ h3 {
   height: 40px;
   border-radius: 50%;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
-  padding-top: 8px;
   color: #ffffff;
   font-weight: 650;
   line-height: 1;
   user-select: none;
   opacity: 0.82;
   transition: opacity 0.12s ease, border-radius 0.12s ease;
+}
+
+.rail-glyph .letters {
+  display: flex;
+  align-items: baseline;
+  /* Centre on the capitals, not the line box, so the letter sits in the
+     optical middle. Ignored where unsupported; the fallback nudge below is close. */
+  text-box: trim-both cap alphabetic;
+}
+
+@supports not (text-box: trim-both cap alphabetic) {
+  .rail-glyph .letters {
+    transform: translateY(0.06em);
+  }
 }
 
 .rail-glyph .org {

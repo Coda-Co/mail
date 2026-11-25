@@ -128,8 +128,10 @@ export function Rail() {
           return (
             <RailItem key={a.id} label={mailboxLabel(a, i)} selected={isSelected(a)} onClick={() => openMailbox(a)} onContextMenu={(e) => accountMenu(e, a)}>
               <span className={`rail-glyph${a.kind === 'web' ? ' web' : ''}`} style={{ background: a.color }}>
-                <span className="org">{org}</span>
-                {mailbox && <span className="mailbox">{mailbox}</span>}
+                <span className="letters">
+                  <span className="org">{org}</span>
+                  {mailbox && <span className="mailbox">{mailbox}</span>}
+                </span>
               </span>
               {!!a.unread && a.unread > 0 && <span className="rail-badge">{badgeText(a.unread)}</span>}
               {attention ? (
