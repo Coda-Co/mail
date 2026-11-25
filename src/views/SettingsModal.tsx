@@ -396,7 +396,7 @@ function SignaturesTab() {
             type="button"
             className="chip"
             onClick={async () => {
-              const s = await api.saveSignature({ id: '', accountId, name: 'New signature', html: '<p><br></p>', defaultNew: sigs.length === 0, defaultReply: sigs.length === 0 });
+              const s = await api.saveSignature({ id: '', accountId, name: 'New signature', html: '<div><br></div>', defaultNew: sigs.length === 0, defaultReply: sigs.length === 0 });
               reload(s.id);
             }}
           >

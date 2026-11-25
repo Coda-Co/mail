@@ -1439,6 +1439,7 @@ h3 {
 
 .rich-editor [data-signature] {
   color: var(--text-secondary);
+  line-height: 1.35;
 }
 
 .rich-editor img {
@@ -2167,7 +2168,7 @@ h3 {
   padding: 10px 12px;
   min-height: 120px;
   outline: none;
-  line-height: 1.5;
+  line-height: 1.35;
 }
 
 .signature-editor .rich-editor p {
