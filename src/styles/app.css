@@ -1145,6 +1145,8 @@ h3 {
 
 .folder-tab:hover {
   color: var(--text);
+  /* A lighter version of the selected underline. */
+  border-bottom-color: color-mix(in srgb, var(--text) 35%, transparent);
 }
 
 .folder-tab.selected {
