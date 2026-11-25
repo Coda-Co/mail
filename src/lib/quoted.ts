@@ -29,6 +29,29 @@ function hasContent(root: Element): boolean {
   return (root.textContent ?? '').replace(/ /g, ' ').trim().length > 0 || !!root.querySelector('img');
 }
 
+const INVISIBLE = /[\s ​-‍⁠﻿]/g;
+
+/** No visible text and no image: an empty line, a spacer or a bare separator rule. */
+function isBlank(n: Node): boolean {
+  if (n.nodeType === Node.TEXT_NODE) return !(n.textContent ?? '').replace(INVISIBLE, '');
+  if (n.nodeType !== Node.ELEMENT_NODE) return true;
+  const el = n as Element;
+  return !(el.textContent ?? '').replace(INVISIBLE, '') && el.tagName !== 'IMG' && !el.querySelector('img');
+}
+
+/** Drop the empty lines and separator left above the quote (Outlook on the web leaves
+ *  `<div><br></div>`s, Outlook mobile wraps its rule in `<div align=center><hr></div>`). */
+function trimTrailing(el: Node) {
+  for (let last = el.lastChild; last; last = el.lastChild) {
+    if (!isBlank(last)) {
+      // Don't reach into tables: an empty last cell can be part of a signature's layout.
+      if (last.nodeType === Node.ELEMENT_NODE && (last as Element).tagName !== 'TABLE') trimTrailing(last);
+      return;
+    }
+    el.removeChild(last);
+  }
+}
+
 export interface SplitBody {
   /** The new part of the message, without quoted history. */
   main: string;
@@ -61,6 +84,7 @@ export function splitQuoted(html: string): SplitBody {
     range.deleteContents();
     // A message that is nothing but a forward keeps everything.
     if (!hasContent(trimmed)) return { main: html, hasQuote: false };
+    trimTrailing(trimmed);
     // Keep the sender's <style> blocks, which sit in <head> after parsing.
     return { main: doc.head.innerHTML + trimmed.innerHTML, hasQuote: true };
   }
