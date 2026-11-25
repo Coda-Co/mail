@@ -76,6 +76,14 @@ pub struct Account {
     pub tenant_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub web_url: Option<String>,
+    /// Web accounts: the calendar is read from Outlook on the web (off by default).
+    pub web_calendar: bool,
+    /// Last successful web calendar refresh.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub web_calendar_synced_at: Option<String>,
+    /// Short code for the last failed web calendar refresh, cleared by the next success.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub web_calendar_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -85,6 +93,8 @@ pub struct AccountPatch {
     pub color: Option<String>,
     pub notifications: Option<bool>,
     pub offline_months: Option<i64>,
+    /// Web accounts only: show the calendar from Outlook on the web.
+    pub web_calendar: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -490,6 +500,8 @@ pub struct CalendarInfo {
     pub color: String,
     pub visible: bool,
     pub is_default: bool,
+    /// Events can't be created, changed or answered here (web calendars, shared read-only calendars).
+    pub read_only: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -554,6 +566,9 @@ pub struct CalendarEvent {
     pub reminder_minutes: Option<i64>,
     pub is_cancelled: bool,
     pub color: String,
+    /// From a read-only calendar: no responses, edits or deletes here.
+    #[serde(default)]
+    pub read_only: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

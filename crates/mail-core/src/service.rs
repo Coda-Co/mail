@@ -11,6 +11,7 @@ use crate::ids;
 use crate::model::*;
 use crate::ops::Op;
 use crate::people;
+use crate::webcal;
 use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, TimeZone, Utc};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -207,6 +208,12 @@ impl MailService {
         Ok(self.app().list_accounts()?.into_iter().filter(|a| a.kind == AccountKind::Graph).collect())
     }
 
+    /// Accounts whose calendar shows in Calendar: Graph accounts, plus web accounts with
+    /// "Show this calendar in Calendar" on.
+    fn calendar_accounts(&self) -> Result<Vec<Account>> {
+        Ok(self.app().list_accounts()?.into_iter().filter(|a| a.kind == AccountKind::Graph || a.web_calendar).collect())
+    }
+
     pub fn add_web_account(&self, email: &str, display_name: &str) -> Result<Account> {
         let email = email.trim();
         if !email.contains('@') {
@@ -234,7 +241,11 @@ impl MailService {
     pub fn add_graph_account(&self, email: &str, display_name: &str, tenant_id: Option<String>, home_account_id: Option<String>) -> Result<Account> {
         let existing = self.app().find_account_by_email(email)?;
         let a = match existing {
-            Some(a) if a.kind == AccountKind::Web => self.app().convert_to_graph(&a.id, tenant_id, home_account_id)?,
+            Some(a) if a.kind == AccountKind::Web => {
+                // Graph sync takes over the calendar: drop what was read from Outlook on the web.
+                self.with_account(&a.id, |db| db.delete_calendar(webcal::CALENDAR_ID))?;
+                self.app().convert_to_graph(&a.id, tenant_id, home_account_id)?
+            }
             Some(a) => {
                 self.app().set_sync_state(&a.id, SyncState::Idle, None)?;
                 a
@@ -254,9 +265,77 @@ impl MailService {
     }
 
     pub fn update_account(&self, id: &str, patch: &AccountPatch) -> Result<Account> {
+        let before = self.app().get_account(id)?;
+        let toggle = patch.web_calendar.filter(|on| *on != before.web_calendar);
+        if toggle.is_some() && before.kind != AccountKind::Web {
+            return Err(Error::Invalid("Only web accounts read their calendar from Outlook on the web".into()));
+        }
         self.app().update_account(id, patch)?;
-        self.events().accounts_changed();
+        match toggle {
+            Some(true) => {
+                self.app().set_web_calendar(id, true)?;
+                self.with_account(id, |db| db.upsert_calendar(webcal::CALENDAR_ID, webcal::CALENDAR_NAME, true, false))?;
+                self.changed(vec![id.to_string()]);
+            }
+            Some(false) => {
+                // Turning it off deletes everything read from Outlook on the web straight away.
+                self.with_account(id, |db| db.delete_calendar(webcal::CALENDAR_ID))?;
+                self.app().set_web_calendar(id, false)?;
+                self.changed(vec![id.to_string()]);
+            }
+            None => self.events().accounts_changed(),
+        }
         self.get_account(id)
+    }
+
+    /// Store a calendar report from a web account's Outlook on the web page, for the range the
+    /// shell requested. A failed or rejected report keeps the stored events and records the
+    /// error; it never wipes data. Emits only when something the interface shows changed.
+    pub fn store_web_calendar(&self, account_id: &str, range_start: &str, range_end: &str, report: &webcal::Report) -> Result<()> {
+        let a = self.app().get_account(account_id)?;
+        if a.kind != AccountKind::Web || !a.web_calendar {
+            return Err(Error::Invalid("This account doesn't read its calendar from Outlook on the web".into()));
+        }
+        webcal::check_range(range_start, range_end)?;
+        let outcome = match &report.error {
+            Some(e) => Err(webcal::error_code(e)),
+            None => webcal::validate(report, range_start, range_end).map_err(String::from),
+        };
+        let (events_changed, error) = match outcome {
+            Ok(events) => {
+                let changed = self.with_account(account_id, |db| {
+                    db.upsert_calendar(webcal::CALENDAR_ID, webcal::CALENDAR_NAME, true, false)?;
+                    db.replace_events_in_range(webcal::CALENDAR_ID, range_start, range_end, &events)
+                })?;
+                (changed, None)
+            }
+            Err(code) => (false, Some(code)),
+        };
+        let (old_synced, old_error) = self.app().set_web_calendar_result(account_id, error.as_deref())?;
+        // The interface shows "updated N min ago" and a stale note after an hour, so re-send the
+        // account list now and then even when nothing else changed.
+        let old_age = old_synced.as_deref().and_then(|t| DateTime::parse_from_rfc3339(t).ok()).map(|t| Utc::now() - t.with_timezone(&Utc));
+        let status_due = error.is_none() && old_age.is_none_or(|age| age > Duration::minutes(30));
+        if events_changed {
+            self.changed(vec![account_id.to_string()]);
+        } else if old_error != error || status_due {
+            self.events().accounts_changed();
+        }
+        Ok(())
+    }
+
+    /// Web accounts whose calendar should be refreshed from Outlook on the web.
+    pub fn web_calendar_accounts(&self) -> Result<Vec<Account>> {
+        Ok(self.app().list_accounts()?.into_iter().filter(|a| a.kind == AccountKind::Web && a.web_calendar).collect())
+    }
+
+    /// Refuse changes to events from read-only calendars and web accounts.
+    fn editable_event(&self, id: &str) -> Result<CalendarEvent> {
+        let ev = self.get_event(id)?;
+        if ev.read_only {
+            return Err(Error::Invalid("This event is read-only. Change it in Outlook on the web.".into()));
+        }
+        Ok(ev)
     }
 
     /// Deletes the account's database, cached files and web view storage. Tokens are removed by the caller.
@@ -925,15 +1004,15 @@ impl MailService {
 
     pub fn list_calendars(&self) -> Result<Vec<CalendarInfo>> {
         let mut out = vec![];
-        let accounts = self.app().list_accounts()?;
-        for a in accounts {
-            if a.kind == AccountKind::Web {
-                continue;
-            }
-            for (raw, name, is_default) in self.with_account(&a.id, |db| db.list_calendars())? {
+        for a in self.calendar_accounts()? {
+            let web = a.kind == AccountKind::Web;
+            for (raw, name, is_default, can_edit) in self.with_account(&a.id, |db| db.list_calendars())? {
+                if web && raw != webcal::CALENDAR_ID {
+                    continue;
+                }
                 let id = ids::join(&a.id, &raw);
                 let visible = self.app().calendar_visible(&id)?;
-                out.push(CalendarInfo { id, account_id: a.id.clone(), name, color: a.color.clone(), visible, is_default });
+                out.push(CalendarInfo { id, account_id: a.id.clone(), name, color: a.color.clone(), visible, is_default, read_only: web || !can_edit });
             }
         }
         Ok(out)
@@ -950,10 +1029,12 @@ impl MailService {
         let start = normalize_time(start)?;
         let end = normalize_time(end)?;
         let mut out = vec![];
-        for a in self.graph_accounts()? {
+        for a in self.calendar_accounts()? {
+            let web = a.kind == AccountKind::Web;
             let evs = self.with_account(&a.id, |db| db.list_events(&start, &end, &a.color))?;
-            for e in evs {
+            for mut e in evs {
                 if self.app().calendar_visible(&e.calendar_id)? && !e.is_cancelled {
+                    e.read_only |= web;
                     out.push(e);
                 }
             }
@@ -1010,14 +1091,12 @@ impl MailService {
         Ok(out)
     }
 
-    fn event_color(&self, account_id: &str) -> Result<String> {
-        Ok(self.app().get_account(account_id)?.color)
-    }
-
     pub fn get_event(&self, id: &str) -> Result<CalendarEvent> {
         let (acc, raw) = ids::split(id)?;
-        let color = self.event_color(acc)?;
-        self.with_account(acc, |db| db.get_event(raw, &color))
+        let a = self.app().get_account(acc)?;
+        let mut e = self.with_account(acc, |db| db.get_event(raw, &a.color))?;
+        e.read_only |= a.kind == AccountKind::Web;
+        Ok(e)
     }
 
     fn event_record(&self, raw_id: &str, input: &EventInput, raw_calendar: &str, organizer: Address) -> Result<EventRecord> {
@@ -1058,7 +1137,13 @@ impl MailService {
             return Err(Error::Invalid("Web accounts manage their calendar in Outlook on the web".into()));
         }
         let raw_cal = match &input.calendar_id {
-            Some(c) => ids::split(c)?.1.to_string(),
+            Some(c) => {
+                let (cacc, raw) = ids::split(c)?;
+                if cacc != account.id || !self.with_account(&account.id, |db| db.calendar_can_edit(raw))? {
+                    return Err(Error::Invalid("You can't add events to that calendar".into()));
+                }
+                raw.to_string()
+            }
             None => self.with_account(&account.id, |db| db.default_calendar())?.ok_or_else(|| Error::Invalid("This account's calendar hasn't synced yet".into()))?,
         };
         let raw_id = ids::new_local_id("local-ev");
@@ -1071,7 +1156,7 @@ impl MailService {
 
     pub fn update_event(&self, id: &str, input: &EventInput) -> Result<CalendarEvent> {
         let (acc, raw) = ids::split(id)?;
-        let old = self.get_event(id)?;
+        let old = self.editable_event(id)?;
         let raw_cal = ids::split(&old.calendar_id)?.1.to_string();
         let mut rec = self.event_record(raw, input, &raw_cal, old.organizer.clone())?;
         rec.local_only = raw.starts_with("local-ev");
@@ -1094,7 +1179,7 @@ impl MailService {
 
     pub fn respond_event(&self, id: &str, response: EventResponse) -> Result<CalendarEvent> {
         let (acc, raw) = ids::split(id)?;
-        let ev = self.get_event(id)?;
+        let ev = self.editable_event(id)?;
         if ev.my_response == ResponseStatus::Organizer {
             return Err(Error::Invalid("You organised this event".into()));
         }
@@ -1106,6 +1191,7 @@ impl MailService {
 
     pub fn delete_event(&self, id: &str) -> Result<()> {
         let (acc, raw) = ids::split(id)?;
+        self.editable_event(id)?;
         self.with_account(acc, |db| db.delete_event(raw))?;
         if raw.starts_with("local-ev") {
             // Never reached the server: drop the queued create.
@@ -1128,7 +1214,12 @@ impl MailService {
     pub fn due_reminders(&self, since: DateTime<Utc>, now: DateTime<Utc>) -> Result<Vec<CalendarEvent>> {
         let window_end = (now + Duration::days(2)).to_rfc3339();
         let mut out = vec![];
+        let web: Vec<String> = self.web_calendar_accounts()?.into_iter().map(|a| a.id).collect();
         for e in self.list_events(&since.to_rfc3339(), &window_end)? {
+            // Outlook on the web reminds about its own events (v1: no reminders here).
+            if web.contains(&e.account_id) {
+                continue;
+            }
             let (Some(mins), Ok(start)) = (e.reminder_minutes, DateTime::parse_from_rfc3339(&e.start)) else { continue };
             if e.my_response == ResponseStatus::Declined {
                 continue;

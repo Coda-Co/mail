@@ -6,6 +6,9 @@ import { useApp } from '../state/app';
 import { Avatar, Menu, useToast, type Anchor, type MenuItem } from './ui';
 import { RemoveAccountDialog, ApprovalDialog } from '../views/AccountDialogs';
 import type { AddAccountResult } from '../api/types';
+import { webCalendarNote } from '../lib/webCalendar';
+import { now } from '../lib/clock';
+import { useTick } from '../lib/useTick';
 
 const ROLE_ORDER: FolderRole[] = ['inbox', 'drafts', 'sent', 'archive', 'deleted', 'junk'];
 const UNIFIED_ROLES: { role: FolderRole; name: string }[] = [
@@ -94,23 +97,27 @@ export function Sidebar() {
 
   const accountSelected = (a: Account) => (a.kind === 'web' ? route.view === 'web' && route.param === a.id : inMail && scope.accountId === a.id && isRole('inbox'));
 
+  useTick();
+
   const calendarSection = () => {
     const rows = accounts.map((a) => {
-      if (a.kind === 'web')
+      if (a.kind === 'web' && !a.webCalendar)
         return (
-          <label key={a.id} className="cal-check disabled">
+          <label key={a.id} className="cal-check disabled" title="Turn on “Show this calendar in Calendar” in the account’s settings">
             <input type="checkbox" disabled />
             {a.displayName} (web only)
           </label>
         );
       const cals = calendars.filter((c) => c.accountId === a.id);
       const visible = cals.some((c) => c.visible);
+      const note = webCalendarNote(a, now());
       return (
         <div key={a.id}>
-          <label className="cal-check">
+          <label className={`cal-check${cals.length === 0 ? ' disabled' : ''}`}>
             <input
               type="checkbox"
               checked={visible}
+              disabled={cals.length === 0}
               style={{ accentColor: a.color }}
               onChange={async (e) => {
                 for (const c of cals) await api.setCalendarVisible(c.id, e.target.checked);
@@ -119,7 +126,18 @@ export function Sidebar() {
               }}
             />
             {a.displayName}
+            {a.kind === 'web' && (
+              <>
+                {' '}
+                <span className="web-tag">web</span>
+              </>
+            )}
           </label>
+          {note && (
+            <div className="cal-note" title={a.webCalendarError ? 'Showing the last events read' : undefined}>
+              {note}
+            </div>
+          )}
           {cals.length > 1 &&
             cals.map((c) => (
               <label key={c.id} className="cal-check" style={{ paddingLeft: 34 }}>

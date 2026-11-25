@@ -86,6 +86,7 @@ pub fn run() {
             let wake = state.wake.clone();
             let clients = state.client_factory();
             app.manage(state);
+            app.manage(webaccounts::WebCalendars::default());
 
             create_main_window(app)?;
             tray::create(&handle)?;
@@ -95,6 +96,7 @@ pub fn run() {
                 tauri::async_runtime::spawn(mail_core::sync::run_loop(svc.clone(), clients, wake, inbox_every, full_every));
             }
             tauri::async_runtime::spawn(events::reminder_loop(handle.clone()));
+            tauri::async_runtime::spawn(webaccounts::calendar_loop(handle.clone()));
             // Web accounts stay loaded in the background so counts and notifications stay live.
             let h = handle.clone();
             tauri::async_runtime::spawn(async move {
@@ -177,10 +179,38 @@ pub fn run() {
             webaccounts::reload_web_account,
             webaccounts::web_account_report,
             webaccounts::web_account_notify,
+            webaccounts::web_account_calendar_report,
+            webaccounts::web_account_event_attendees_report,
+            webaccounts::fetch_web_event_attendees,
+            webaccounts::refresh_web_calendars,
         ])
-        .run(context())
-        .expect("error while running the mail app");
+        .build(context())
+        .expect("error while building the mail app")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                // Quit cleanly so the next launch keeps its Outlook sign-in:
+                // 1. First pass — hold the exit, make each web account's sign-in cookies
+                //    persistent on a worker (reading them blocks on the main loop, which stays
+                //    free because we haven't exited), then ask to exit again.
+                // 2. Second pass (PERSISTED set) — close the web-account views, which lets their
+                //    WebView2 browser processes flush cookies and release the profile locks, then
+                //    fall through to a real exit.
+                if PERSISTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                    webaccounts::close_all(app);
+                } else {
+                    api.prevent_exit();
+                    let h = app.clone();
+                    webaccounts::persist_all_then(app.clone(), move || {
+                        h.exit(0);
+                    });
+                }
+            }
+        });
 }
+
+/// Set once the quit handler has persisted the sign-in cookies, so the re-triggered exit runs for
+/// real instead of persisting again (see the ExitRequested handler).
+static PERSISTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 #[cfg(test)]
 mod tests {

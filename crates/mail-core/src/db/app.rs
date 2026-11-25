@@ -36,7 +36,13 @@ CREATE TABLE signatures (
   default_reply INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE calendar_visibility (calendar_id TEXT PRIMARY KEY, visible INTEGER NOT NULL);
-"#, "ALTER TABLE accounts DROP COLUMN agents_enabled"];
+"#,
+    "ALTER TABLE accounts DROP COLUMN agents_enabled",
+    // Web accounts: optionally read the calendar from Outlook on the web (docs/WEB_CALENDAR.md).
+    "ALTER TABLE accounts ADD COLUMN web_calendar INTEGER NOT NULL DEFAULT 0;
+     ALTER TABLE accounts ADD COLUMN web_calendar_synced_at TEXT;
+     ALTER TABLE accounts ADD COLUMN web_calendar_error TEXT",
+];
 
 pub const PALETTE: [&str; 6] = ["#1F883D", "#8250DF", "#D4600F", "#0B5CC4", "#BF3989", "#1A7F8E"];
 pub const WEB_COLOR: &str = "#6E7781";
@@ -45,7 +51,8 @@ pub struct AppDb {
     pub conn: Connection,
 }
 
-const ACCOUNT_COLS: &str = "id, email, display_name, kind, color, notifications, offline_months, tenant_id, web_url, web_unread, sync_state, sync_error, last_synced_at";
+const ACCOUNT_COLS: &str =
+    "id, email, display_name, kind, color, notifications, offline_months, tenant_id, web_url, web_unread, sync_state, sync_error, last_synced_at, web_calendar, web_calendar_synced_at, web_calendar_error";
 
 fn row_account(r: &Row) -> rusqlite::Result<Account> {
     let kind = AccountKind::parse(&r.get::<_, String>(3)?);
@@ -64,6 +71,9 @@ fn row_account(r: &Row) -> rusqlite::Result<Account> {
         sync_state: SyncState::parse(&r.get::<_, String>(10)?),
         sync_error: r.get(11)?,
         last_synced_at: r.get(12)?,
+        web_calendar: kind == AccountKind::Web && r.get::<_, bool>(13)?,
+        web_calendar_synced_at: r.get(14)?,
+        web_calendar_error: r.get(15)?,
     })
 }
 
@@ -141,7 +151,8 @@ impl AppDb {
     pub fn convert_to_graph(&self, id: &str, tenant_id: Option<String>, home_account_id: Option<String>) -> Result<Account> {
         let color = self.next_color()?;
         self.conn.execute(
-            "UPDATE accounts SET kind = 'graph', color = ?2, tenant_id = ?3, home_account_id = ?4, web_unread = NULL WHERE id = ?1",
+            "UPDATE accounts SET kind = 'graph', color = ?2, tenant_id = ?3, home_account_id = ?4, web_unread = NULL,
+                    web_calendar = 0, web_calendar_synced_at = NULL, web_calendar_error = NULL WHERE id = ?1",
             params![id, color, tenant_id, home_account_id],
         )?;
         self.get_account(id)
@@ -175,6 +186,28 @@ impl AppDb {
         let old: Option<i64> = self.conn.query_row("SELECT web_unread FROM accounts WHERE id = ?1", [id], |r| r.get(0)).optional()?.flatten();
         self.conn.execute("UPDATE accounts SET web_unread = ?2 WHERE id = ?1", params![id, unread])?;
         Ok(old != unread)
+    }
+
+    /// Turn reading the calendar from Outlook on the web on or off. Off clears the status.
+    pub fn set_web_calendar(&self, id: &str, on: bool) -> Result<()> {
+        if on {
+            self.conn.execute("UPDATE accounts SET web_calendar = 1 WHERE id = ?1", [id])?;
+        } else {
+            self.conn.execute("UPDATE accounts SET web_calendar = 0, web_calendar_synced_at = NULL, web_calendar_error = NULL WHERE id = ?1", [id])?;
+        }
+        Ok(())
+    }
+
+    /// Record a web calendar refresh: success sets the time and clears the error; a failure
+    /// sets the error and keeps the time. Returns the previous (synced_at, error).
+    pub fn set_web_calendar_result(&self, id: &str, error: Option<&str>) -> Result<(Option<String>, Option<String>)> {
+        let old: (Option<String>, Option<String>) =
+            self.conn.query_row("SELECT web_calendar_synced_at, web_calendar_error FROM accounts WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        match error {
+            None => self.conn.execute("UPDATE accounts SET web_calendar_synced_at = ?2, web_calendar_error = NULL WHERE id = ?1", params![id, now_iso()])?,
+            Some(e) => self.conn.execute("UPDATE accounts SET web_calendar_error = ?2 WHERE id = ?1", params![id, e])?,
+        };
+        Ok(old)
     }
 
     pub fn delete_account(&self, id: &str) -> Result<()> {

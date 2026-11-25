@@ -102,6 +102,7 @@ Each account has one of two backends. The interface treats them the same where i
 - Each account in its own isolated web view with separate storage, so sign-ins never collide.
 - Web views stay loaded in the background to keep counts and notifications live.
 - Unread count read from the page's Inbox count; neutral dot when it can't be read.
+- Optional, per account: the calendar is read from Outlook on the web for a window around today and shown read-only in Calendar (docs/WEB_CALENDAR.md).
 
 ### 3.6 Notifications
 

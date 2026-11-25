@@ -8,6 +8,45 @@ import { RichEditor, format, type RichEditorHandle } from '../components/RichEdi
 import { AddAccountForm, AddWebAccountForm, RemoveAccountDialog } from './AccountDialogs';
 import { PALETTE } from '../lib/colors';
 import { keyLabel } from '../lib/platform';
+import { webCalendarStatus } from '../lib/webCalendar';
+import { now } from '../lib/clock';
+
+function WebCalendarConfirm({ account, onClose, onConfirm }: { account: Account; onClose: () => void; onConfirm: () => void }) {
+  return (
+    <Modal
+      title="Show this calendar in Calendar?"
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+          >
+            Turn on
+          </button>
+        </>
+      }
+    >
+      <div className="modal-body">
+        <p style={{ margin: 0 }}>
+          This reads your {account.displayName} calendar from Outlook on the web, using your sign-in there, and stores the next few weeks on this device. You can see it in Calendar, but changes still happen in Outlook on
+          the web.
+        </p>
+        <p style={{ margin: 0 }}>{account.displayName} blocks third-party apps, so check that the client is fine with this before turning it on.</p>
+        <p className="hint" style={{ margin: 0 }}>
+          Nothing leaves this device. Turning it off deletes the stored events straight away.
+        </p>
+      </div>
+    </Modal>
+  );
+}
 
 type Tab = 'general' | 'accounts' | 'signatures';
 
@@ -80,13 +119,19 @@ function GeneralTab() {
 
 function AccountCard({ account, highlight }: { account: Account; highlight: boolean }) {
   const app = useApp();
+  const toast = useToast();
   const [removing, setRemoving] = useState(false);
+  const [confirmingCalendar, setConfirmingCalendar] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (highlight) ref.current?.scrollIntoView({ block: 'center' });
   }, [highlight]);
   const patch = async (p: Parameters<typeof api.updateAccount>[1]) => {
-    await api.updateAccount(account.id, p);
+    try {
+      await api.updateAccount(account.id, p);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e));
+    }
     await app.reloadAccounts();
   };
   return (
@@ -150,6 +195,15 @@ function AccountCard({ account, highlight }: { account: Account; highlight: bool
           </button>
         )}
       </div>
+      {account.kind === 'web' && (
+        <div className="web-calendar-setting">
+          <label className="check">
+            <input type="checkbox" checked={account.webCalendar} onChange={(e) => (e.target.checked ? setConfirmingCalendar(true) : patch({ webCalendar: false }))} /> Show this calendar in Calendar
+          </label>
+          <span className="hint">{account.webCalendar ? webCalendarStatus(account, now()) : 'Read-only, from Outlook on the web. Off by default.'}</span>
+        </div>
+      )}
+      {confirmingCalendar && <WebCalendarConfirm account={account} onClose={() => setConfirmingCalendar(false)} onConfirm={() => patch({ webCalendar: true })} />}
       {removing && <RemoveAccountDialog account={account} onClose={() => setRemoving(false)} />}
     </div>
   );

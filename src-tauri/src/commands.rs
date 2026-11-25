@@ -108,14 +108,21 @@ pub async fn upgrade_web_account(app: AppHandle, s: State<'_, AppState>, account
 }
 
 #[tauri::command]
-pub async fn update_account(s: State<'_, AppState>, account_id: String, patch: AccountPatch) -> R<Account> {
-    s.svc.update_account(&account_id, &patch)
+pub async fn update_account(app: AppHandle, s: State<'_, AppState>, account_id: String, patch: AccountPatch) -> R<Account> {
+    let a = s.svc.update_account(&account_id, &patch)?;
+    if patch.web_calendar == Some(true) && a.web_calendar {
+        crate::webaccounts::calendar_turned_on(&app, &account_id);
+    }
+    Ok(a)
 }
 
 /// Deletes the account's database, cache, web view storage and tokens.
 #[tauri::command]
 pub async fn remove_account(app: AppHandle, s: State<'_, AppState>, account_id: String) -> R<()> {
     crate::webaccounts::close(&app, &account_id);
+    if let Some(cal) = app.try_state::<crate::webaccounts::WebCalendars>() {
+        cal.forget(&account_id);
+    }
     s.forget_tokens(&account_id);
     // Give a closed web view a moment to release its storage folder.
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;

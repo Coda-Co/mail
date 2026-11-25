@@ -23,6 +23,12 @@ export interface Account {
   tenantId?: string;
   /** Outlook on the web URL for web accounts. */
   webUrl?: string;
+  /** Web accounts: the calendar is read from Outlook on the web (off by default). */
+  webCalendar: boolean;
+  /** Last successful read of the web calendar. */
+  webCalendarSyncedAt?: string;
+  /** Short code for the last failed read (`signed_out`, `timeout`, `http_500`, ...). */
+  webCalendarError?: string;
 }
 
 export type FolderRole = 'inbox' | 'drafts' | 'sent' | 'archive' | 'deleted' | 'junk';
@@ -175,6 +181,8 @@ export interface CalendarInfo {
   color: string;
   visible: boolean;
   isDefault: boolean;
+  /** No new events, edits or responses here (web calendars, shared read-only calendars). */
+  readOnly: boolean;
 }
 
 export type ResponseStatus = 'none' | 'organizer' | 'accepted' | 'tentative' | 'declined';
@@ -203,6 +211,8 @@ export interface CalendarEvent {
   reminderMinutes?: number;
   isCancelled: boolean;
   color: string;
+  /** From a read-only calendar: no responses, edits or deletes here. */
+  readOnly: boolean;
 }
 
 /** What event search text is matched against. "people" is organizer and attendees. */
@@ -302,7 +312,7 @@ export interface MailApi {
   addAccount(email: string): Promise<AddAccountResult>;
   addWebAccount(email: string, displayName: string): Promise<Account>;
   upgradeWebAccount(accountId: string): Promise<AddAccountResult>;
-  updateAccount(accountId: string, patch: Partial<Pick<Account, 'displayName' | 'color' | 'notifications' | 'offlineMonths'>>): Promise<Account>;
+  updateAccount(accountId: string, patch: Partial<Pick<Account, 'displayName' | 'color' | 'notifications' | 'offlineMonths' | 'webCalendar'>>): Promise<Account>;
   removeAccount(accountId: string): Promise<void>;
 
   listFolders(accountId?: string): Promise<Folder[]>;
@@ -365,6 +375,13 @@ export interface MailApi {
   showWebAccount(accountId: string, bounds: { x: number; y: number; width: number; height: number }): Promise<void>;
   hideWebAccounts(): Promise<void>;
   reloadWebAccount(accountId: string): Promise<void>;
+  /** Calendar opened: ask web accounts with the calendar on to refresh (at most once a minute). */
+  refreshWebCalendars(): Promise<void>;
+  /**
+   * Fetch a web-calendar event's attendees on demand (the calendar view doesn't carry them).
+   * Returns an empty list if the page can't answer (signed out, timed out); never throws.
+   */
+  fetchWebEventAttendees(accountId: string, eventId: string): Promise<Attendee[]>;
 
   /** Open a link in the system browser (message links, admin consent URL). */
   openExternal(url: string): Promise<void>;

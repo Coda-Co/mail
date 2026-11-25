@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AlertTriangle, Check, CloudOff, RefreshCw } from 'lucide-react';
 import { api } from '../api';
 import type { Account } from '../api/types';
@@ -6,17 +6,9 @@ import { useApp } from '../state/app';
 import { agoTime } from '../lib/dates';
 import { now } from '../lib/clock';
 import { Popover, useToast } from './ui';
+import { useTick } from '../lib/useTick';
 
 type Tone = 'ok' | 'busy' | 'offline' | 'warn';
-
-/** Re-renders every 30 seconds so "4 min ago" stays true. */
-function useTick() {
-  const [, setT] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setT((t) => t + 1), 30_000);
-    return () => clearInterval(id);
-  }, []);
-}
 
 function accountStatus(a: Account, online: boolean, ref: Date): { tone: Tone; text: string } {
   if (!online) return { tone: 'offline', text: a.lastSyncedAt ? `Offline · last synced ${agoTime(a.lastSyncedAt, ref)}` : 'Offline' };
