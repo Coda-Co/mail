@@ -48,6 +48,21 @@ function layoutDay(events: CalendarEvent[]): Placed[] {
 
 const RESPONSE_TEXT: Partial<Record<ResponseStatus, string>> = { accepted: 'You’re going', tentative: 'You said maybe', declined: 'You declined' };
 
+/** "Join Teams meeting" / "Join Zoom meeting" etc., from the join link's host. */
+function joinLabel(url: string): string {
+  let host = '';
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return 'Join meeting';
+  }
+  if (/teams\./.test(host)) return 'Join Teams meeting';
+  if (/zoom\.us$/.test(host)) return 'Join Zoom meeting';
+  if (/meet\.google\.com$/.test(host)) return 'Join Google Meet';
+  if (/webex\.com$/.test(host)) return 'Join Webex meeting';
+  return 'Join meeting';
+}
+
 function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: CalendarEvent; onClose: () => void; onChanged: (e: CalendarEvent) => void; onEdit: () => void; onDeleted: () => void }) {
   const { accountById, navigate } = useApp();
   const toast = useToast();
@@ -57,7 +72,27 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
   const start = new Date(event.start);
   const end = new Date(event.end);
   const actions = eventActions(event);
-  const attendees = [...event.attendees].sort((a, b) => (a.response === 'organizer' ? -1 : b.response === 'organizer' ? 1 : 0));
+  // The web calendar view doesn't carry attendees; fetch them when a meeting is opened.
+  const [webAttendees, setWebAttendees] = useState(event.attendees);
+  const [loadingAttendees, setLoadingAttendees] = useState(false);
+  useEffect(() => {
+    setWebAttendees(event.attendees);
+    if (!fromWeb || event.attendees.length > 0 || !event.isOnlineMeeting) return;
+    let live = true;
+    setLoadingAttendees(true);
+    api
+      .fetchWebEventAttendees(event.accountId, event.id)
+      .then((list) => {
+        if (live) setWebAttendees(list);
+      })
+      .finally(() => {
+        if (live) setLoadingAttendees(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [event.id, event.accountId, event.attendees, event.isOnlineMeeting, fromWeb]);
+  const attendees = [...webAttendees].sort((a, b) => (a.response === 'organizer' ? -1 : b.response === 'organizer' ? 1 : 0));
   const shown = showAll ? attendees : attendees.slice(0, 3);
   const respond = async (r: 'accepted' | 'tentative' | 'declined') => {
     try {
@@ -123,7 +158,7 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
           {!actions.respond && event.readOnly && RESPONSE_TEXT[event.myResponse] && <span>{RESPONSE_TEXT[event.myResponse]}</span>}
           {event.isOnlineMeeting && event.onlineMeetingUrl && (
             <button type="button" className="link-button" style={{ alignSelf: 'flex-start', display: 'inline-flex', gap: 6, alignItems: 'center' }} onClick={() => api.openExternal(event.onlineMeetingUrl!)}>
-              Join Teams meeting <ExternalLink size={13} />
+              {joinLabel(event.onlineMeetingUrl)} <ExternalLink size={13} />
             </button>
           )}
         </div>
@@ -136,6 +171,16 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
             ))}
           </div>
         )}
+        {loadingAttendees && attendees.length === 0 && (
+          <>
+            <div className="form-label" style={{ paddingTop: 6 }}>
+              Attendees
+            </div>
+            <div className="attendees">
+              <span className="muted">Loading…</span>
+            </div>
+          </>
+        )}
         {attendees.length > 0 && (
           <>
             <div className="form-label" style={{ paddingTop: 6 }}>
@@ -143,8 +188,9 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
             </div>
             <div className="attendees">
               {shown.map((a) => (
-                <span key={a.address.email} title={a.address.email}>
+                <span key={a.address.email || a.address.name} title={a.address.email}>
                   {a.address.name || a.address.email}
+                  {a.address.email && a.address.name && <span className="muted"> · {a.address.email}</span>}
                   {a.response === 'organizer' && <span className="muted"> · organiser</span>}
                   {a.response === 'declined' && <span className="muted"> · declined</span>}
                   {a.response === 'tentative' && <span className="muted"> · maybe</span>}

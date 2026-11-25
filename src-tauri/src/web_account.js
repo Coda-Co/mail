@@ -142,11 +142,43 @@
     throw fail('no_token');
   }
 
+  // One Outlook on the web service.svc call (header form, Outlook's own token), the way its
+  // Calendar makes them (checked 24-25 Nov 2026, docs/WEB_CALENDAR.md §8). Returns parsed JSON.
+  async function serviceCall(action, body, token, signal) {
+    const url = new URL('/owa/service.svc?action=' + action + '&app=Calendar', location.origin);
+    if (url.origin !== location.origin) throw fail('unsupported');
+    let res;
+    try {
+      res = await nativeFetch(url.href, {
+        method: 'POST',
+        credentials: 'same-origin',
+        redirect: 'manual',
+        signal,
+        // Like Outlook itself: the request goes in a header, with no body.
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json; charset=utf-8',
+          Action: action,
+          'x-req-source': 'Calendar',
+          'x-owa-urlpostdata': encodeURIComponent(JSON.stringify(body)),
+        },
+      });
+    } catch (_) {
+      throw fail(signal && signal.aborted ? 'timeout' : 'network');
+    }
+    // A redirect or 440 means the session ended; 401 means the token was refused.
+    if (res.type === 'opaqueredirect' || res.status === 440) throw fail('signed_out');
+    if (!res.ok) throw fail('http_' + res.status);
+    try {
+      return await res.json();
+    } catch (_) {
+      throw fail('parse');
+    }
+  }
+
   // The one place that knows how Outlook on the web loads a range of events: the request its
   // Calendar makes (checked 24 Nov 2026, docs/WEB_CALENDAR.md §8), with Outlook's own token.
   async function fetchCalendarRange(start, end, token, signal) {
-    const url = new URL('/owa/service.svc?action=GetCalendarView&app=Calendar', location.origin);
-    if (url.origin !== location.origin) throw fail('unsupported');
     const body = {
       __type: 'GetCalendarViewJsonRequest:#Exchange',
       Header: {
@@ -161,37 +193,48 @@
         RangeEnd: end,
       },
     };
-    let res;
-    try {
-      res = await nativeFetch(url.href, {
-        method: 'POST',
-        credentials: 'same-origin',
-        redirect: 'manual',
-        signal,
-        // Like Outlook itself: the request goes in a header, with no body.
-        headers: {
-          Authorization: 'Bearer ' + token,
-          'Content-Type': 'application/json; charset=utf-8',
-          Action: 'GetCalendarView',
-          'x-req-source': 'Calendar',
-          'x-owa-urlpostdata': encodeURIComponent(JSON.stringify(body)),
-        },
-      });
-    } catch (_) {
-      throw fail(signal.aborted ? 'timeout' : 'network');
-    }
-    // A redirect or 440 means the session ended; 401 means the token was refused.
-    if (res.type === 'opaqueredirect' || res.status === 440) throw fail('signed_out');
-    if (!res.ok) throw fail('http_' + res.status);
-    let data;
-    try {
-      data = await res.json();
-    } catch (_) {
-      throw fail('parse');
-    }
-    const items = findItems(data);
+    const items = findItems(await serviceCall('GetCalendarView', body, token, signal));
     if (!items) throw fail('unsupported');
     return items;
+  }
+
+  // The attendees for one event: the calendar view doesn't carry them, so ask GetItem for just
+  // the attendee lists and organizer (docs/WEB_CALENDAR.md §8). Only done when an event is opened.
+  async function fetchEventAttendees(id, token, signal) {
+    const body = {
+      __type: 'GetItemJsonRequest:#Exchange',
+      Header: {
+        __type: 'JsonRequestHeaders:#Exchange',
+        RequestServerVersion: 'V2018_01_08',
+        TimeZoneContext: { __type: 'TimeZoneContext:#Exchange', TimeZoneDefinition: { __type: 'TimeZoneDefinitionType:#Exchange', Id: 'UTC' } },
+      },
+      Body: {
+        __type: 'GetItemRequest:#Exchange',
+        ItemShape: {
+          __type: 'ItemResponseShape:#Exchange',
+          BaseShape: 'IdOnly',
+          AdditionalProperties: [
+            { __type: 'PropertyUri:#Exchange', FieldURI: 'calendar:RequiredAttendees' },
+            { __type: 'PropertyUri:#Exchange', FieldURI: 'calendar:OptionalAttendees' },
+            { __type: 'PropertyUri:#Exchange', FieldURI: 'calendar:Resources' },
+            { __type: 'PropertyUri:#Exchange', FieldURI: 'calendar:Organizer' },
+          ],
+        },
+        ItemIds: [{ __type: 'ItemId:#Exchange', Id: id }],
+      },
+    };
+    const items = findItems(await serviceCall('GetItem', body, token, signal));
+    const it = Array.isArray(items) && items[0];
+    if (!it) throw fail('unsupported');
+    const list = [];
+    const add = (arr, type) => {
+      if (!Array.isArray(arr)) return;
+      for (const a of arr) list.push({ ...person(a), type, response: response(get(a, 'ResponseType', 'Status')) });
+    };
+    add(get(it, 'RequiredAttendees'), 'required');
+    add(get(it, 'OptionalAttendees'), 'optional');
+    add(get(it, 'Resources'), 'resource');
+    return list;
   }
 
   function findItems(data) {
@@ -246,6 +289,20 @@
     return m ? m[1] : null;
   }
 
+  // The online-meeting join link as it appears in the event body/preview. Only well-known
+  // conferencing hosts, https only; the core validates the scheme again before storing it.
+  const MEETING_HOSTS = /^(?:teams\.microsoft\.com|teams\.live\.com|.*\.zoom\.us|zoom\.us|meet\.google\.com|.*\.webex\.com|.*\.gotomeeting\.com)$/i;
+  function joinUrlFromText(s) {
+    if (!s) return '';
+    for (const m of s.matchAll(/https:\/\/[^\s"'<>)\]]+/g)) {
+      try {
+        const u = new URL(m[0].replace(/[.,;]+$/, ''));
+        if (MEETING_HOSTS.test(u.hostname)) return u.href;
+      } catch (_) {}
+    }
+    return '';
+  }
+
   function normalise(it) {
     const id = text(get(get(it, 'ItemId'), 'Id')) || text(get(it, 'Id'));
     const allDay = !!get(it, 'IsAllDayEvent', 'IsAllDay');
@@ -265,7 +322,12 @@
     add(get(it, 'OptionalAttendees'), 'optional');
     add(get(it, 'Resources'), 'resource');
     add(get(it, 'Attendees'), '');
-    const url = text(get(it, 'OnlineMeetingJoinUrl', 'JoinOnlineMeetingUrl', 'OnlineMeetingUrl', 'SkypeTeamsMeetingUrl')) || text(get(get(it, 'OnlineMeeting'), 'JoinUrl'));
+    // The calendar view carries no join link in a field, but the body preview holds the
+    // provider's own "Join: <url>" line (Teams, Zoom, Meet, Webex). Fall back to that.
+    const url =
+      text(get(it, 'OnlineMeetingJoinUrl', 'JoinOnlineMeetingUrl', 'OnlineMeetingUrl', 'SkypeTeamsMeetingUrl')) ||
+      text(get(get(it, 'OnlineMeeting'), 'JoinUrl')) ||
+      joinUrlFromText(text(get(it, 'Preview', 'BodyPreview')) || text(get(get(it, 'Body'), 'Value')));
     const showAs = SHOW_AS[text(get(it, 'FreeBusyType', 'LegacyFreeBusyStatus', 'ShowAs')).toLowerCase()];
     const ev = {
       id,
@@ -286,21 +348,24 @@
     return ev;
   }
 
+  // Just after a start Outlook may still be fetching its tokens: wait up to ~20 s for one.
+  async function waitForToken(signal, maxTries = 10) {
+    for (let tries = 0; ; tries++) {
+      try {
+        return await outlookToken();
+      } catch (err) {
+        if (tries >= maxTries || (signal && signal.aborted)) throw err;
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
+  }
+
   // The range in week-long slices (the server's own paging is unknown), deduplicated by id.
   async function readRange(start, end, signal) {
     const s = Date.parse(start);
     const e = Date.parse(end);
     if (Number.isNaN(s) || Number.isNaN(e) || e <= s) throw fail('unsupported');
-    // Just after a start Outlook may still be fetching its tokens: wait up to 20 s for one.
-    let token = null;
-    for (let tries = 0; !token; tries++) {
-      try {
-        token = await outlookToken();
-      } catch (err) {
-        if (tries >= 10 || signal.aborted) throw err;
-        await new Promise((r) => setTimeout(r, 2000));
-      }
-    }
+    const token = await waitForToken(signal);
     const byId = new Map();
     let seen = 0;
     for (let t = s; t < e; t += CAL_SLICE_MS) {
@@ -331,7 +396,24 @@
         if (calRun === ctrl) calRun = null;
       });
   }
+  // The app calls this when an event is opened (web accounts, calendar toggle on). It asks the
+  // server for just this event's attendees and reports them back with the same request id, the
+  // way calendarFetch does. Same-origin only; only attendee names, emails and responses cross.
+  const ATT_TIMEOUT_MS = 20000;
+  function eventAttendeesFetch(eventId, requestId) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ATT_TIMEOUT_MS);
+    const report = (attendees, error) => invoke('web_account_event_attendees_report', { requestId: String(requestId), attendees, error });
+    (async () => {
+      const token = await waitForToken(ctrl.signal, 2);
+      return fetchEventAttendees(String(eventId), token, ctrl.signal);
+    })()
+      .then((attendees) => report(attendees, null))
+      .catch((e) => report([], e instanceof CalError ? e.message : ctrl.signal.aborted ? 'timeout' : 'parse'))
+      .finally(() => clearTimeout(timer));
+  }
   try {
     Object.defineProperty(window, '__mailCalendarFetch', { value: calendarFetch, enumerable: false, configurable: false, writable: false });
+    Object.defineProperty(window, '__mailEventAttendees', { value: eventAttendeesFetch, enumerable: false, configurable: false, writable: false });
   } catch (_) {}
 })();

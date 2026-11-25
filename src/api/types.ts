@@ -354,6 +354,11 @@ export interface MailApi {
   reloadWebAccount(accountId: string): Promise<void>;
   /** Calendar opened: ask web accounts with the calendar on to refresh (at most once a minute). */
   refreshWebCalendars(): Promise<void>;
+  /**
+   * Fetch a web-calendar event's attendees on demand (the calendar view doesn't carry them).
+   * Returns an empty list if the page can't answer (signed out, timed out); never throws.
+   */
+  fetchWebEventAttendees(accountId: string, eventId: string): Promise<Attendee[]>;
 
   /** Open a link in the system browser (message links, admin consent URL). */
   openExternal(url: string): Promise<void>;

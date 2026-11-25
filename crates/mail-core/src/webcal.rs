@@ -157,6 +157,28 @@ fn overlaps(start: &str, end: &str, range_start: &str, range_end: &str) -> bool 
     start < range_end && (end > range_start || start >= range_start)
 }
 
+/// Normalise an attendee list reported by the page: names and emails capped, count limited,
+/// and entries with neither a name nor an email dropped. Shared by the calendar-view events and
+/// the on-demand attendee fetch (see `parse_attendees`).
+fn attendees(list: &[PageAttendee]) -> Vec<Attendee> {
+    list.iter()
+        .take(MAX_ATTENDEES)
+        .map(|a| Attendee {
+            address: Address::new(cap(&a.name, MAX_NAME), cap(&a.email, MAX_EMAIL)),
+            kind: attendee_type(a.kind.as_deref()),
+            response: response(a.response.as_deref()),
+        })
+        .filter(|a| !a.address.email.is_empty() || !a.address.name.is_empty())
+        .collect()
+}
+
+/// Parse an attendee list reported by the page for a single event (the on-demand GetItem path,
+/// see webaccounts `fetch_web_event_attendees`). Same validation as the calendar view's events.
+pub fn parse_attendees(list: &[serde_json::Value]) -> Vec<Attendee> {
+    let page: Vec<PageAttendee> = list.iter().filter_map(|v| serde_json::from_value(v.clone()).ok()).collect();
+    attendees(&page)
+}
+
 fn event(v: &serde_json::Value, range_start: &str, range_end: &str) -> Option<EventRecord> {
     let e: PageEvent = serde_json::from_value(v.clone()).ok()?;
     let id = cap(&e.id, MAX_ID);
@@ -169,13 +191,7 @@ fn event(v: &serde_json::Value, range_start: &str, range_end: &str) -> Option<Ev
         return None;
     }
     let addr = |name: &str, email: &str| Address::new(cap(name, MAX_NAME), cap(email, MAX_EMAIL));
-    let attendees = e
-        .attendees
-        .iter()
-        .take(MAX_ATTENDEES)
-        .map(|a| Attendee { address: addr(&a.name, &a.email), kind: attendee_type(a.kind.as_deref()), response: response(a.response.as_deref()) })
-        .filter(|a| !a.address.email.is_empty() || !a.address.name.is_empty())
-        .collect();
+    let attendees = attendees(&e.attendees);
     let online_meeting_url = meeting_url(e.online_meeting_url.as_deref());
     Some(EventRecord {
         id,
@@ -335,5 +351,32 @@ mod tests {
         assert_eq!(error_code("http_401"), "http_401");
         assert_eq!(error_code("<script>alert(1)</script>"), "scriptalert1script");
         assert_eq!(error_code("   "), "unknown");
+    }
+
+    #[test]
+    fn parse_attendees_validates_like_events() {
+        let list: Vec<serde_json::Value> = vec![
+            json!({ "name": "n".repeat(300), "email": "a@x.com", "type": "optional", "response": "accepted" }),
+            json!({ "name": "Bob", "email": "b@x.com", "type": "resource", "response": "declined" }),
+            // Neither a name nor an email: dropped.
+            json!({ "name": "", "email": "", "type": "required" }),
+            // An unknown type falls back to required; unknown response to none.
+            json!({ "name": "Cara", "email": "c@x.com", "type": "chair", "response": "huh" }),
+        ];
+        let out = parse_attendees(&list);
+        assert_eq!(out.len(), 3, "the name/email-less entry is dropped");
+        assert_eq!(out[0].address.name.chars().count(), 200, "name capped");
+        assert_eq!(out[0].kind, AttendeeType::Optional);
+        assert_eq!(out[0].response, ResponseStatus::Accepted);
+        assert_eq!(out[1].kind, AttendeeType::Resource);
+        assert_eq!(out[1].response, ResponseStatus::Declined);
+        assert_eq!(out[2].kind, AttendeeType::Required, "unknown type → required");
+        assert_eq!(out[2].response, ResponseStatus::None, "unknown response → none");
+    }
+
+    #[test]
+    fn parse_attendees_caps_count() {
+        let list: Vec<serde_json::Value> = (0..250).map(|i| json!({ "name": format!("p{i}"), "email": format!("p{i}@x.com") })).collect();
+        assert_eq!(parse_attendees(&list).len(), MAX_ATTENDEES);
     }
 }

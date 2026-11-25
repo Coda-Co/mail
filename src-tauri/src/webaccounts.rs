@@ -66,7 +66,7 @@ fn builder(app: &AppHandle, a: &Account) -> Result<WebviewBuilder<tauri::Wry>, E
     let mut b = WebviewBuilder::new(label(&a.id), WebviewUrl::External(url_for(a)?))
         .initialization_script(SCRIPT)
         .data_directory(dir)
-        .on_page_load(|w, p| on_page_load(w.app_handle(), w.label(), p.url(), p.event()));
+        .on_page_load(|w, p| on_page_load(&w, p.url(), p.event()));
     #[cfg(target_os = "macos")]
     {
         b = b.data_store_identifier(store_id(&a.id));
@@ -92,7 +92,7 @@ pub fn ensure(app: &AppHandle, a: &Account) -> Option<Webview> {
             .visible(false)
             .initialization_script(SCRIPT)
             .data_directory(dir)
-            .on_page_load(|w, p| on_page_load(w.app_handle(), w.label(), p.url(), p.event()));
+            .on_page_load(|w, p| on_page_load(w.as_ref(), p.url(), p.event()));
         #[cfg(target_os = "macos")]
         {
             wb = wb.data_store_identifier(store_id(&a.id));
@@ -129,6 +129,77 @@ pub fn close(app: &AppHandle, account_id: &str) {
     }
     if let Some(w) = app.get_webview_window(&label(account_id)) {
         let _ = w.close();
+    }
+}
+
+/// Microsoft's sign-in hosts. Their session cookies carry the Outlook sign-in.
+const LOGIN_URLS: [&str; 3] = ["https://login.microsoftonline.com/", "https://login.microsoft.com/", "https://login.live.com/"];
+/// How long a rewritten sign-in cookie should last. Long enough to survive a restart (and a
+/// few days away); not so long that a stale sign-in lingers for weeks.
+const COOKIE_TTL_DAYS: i64 = 14;
+
+/// Keep the Outlook sign-in across restarts by making its session cookies persistent.
+///
+/// After sign-in, Microsoft stores `ESTSAUTH` (and friends) as *session* cookies — no expiry.
+/// WebView2 drops session cookies on restart, so MSAL's silent token renewal has no sign-in
+/// session and falls back to an interactive password prompt: the user re-authenticates every
+/// launch. Here we read those session cookies and write them back with a bounded future expiry,
+/// so WebView2 keeps them on disk and the next launch signs in silently. Called whenever an
+/// Outlook page finishes loading (see on_page_load), which is also when Microsoft has just
+/// refreshed them. Persistent sign-in cookies (e.g. ESTSAUTHPERSISTENT) are left untouched.
+///
+/// Best-effort: cookie read/write can fail (view gone, API unsupported); we log and move on.
+///
+/// Reading cookies blocks until WebView2 answers on the main thread, so never call this from a
+/// main-thread context (page-load hook, window/run events) — use persist_auth_cookies_async.
+pub fn persist_auth_cookies(webview: &Webview) {
+    use cookie::time::{Duration, OffsetDateTime};
+    let expires = OffsetDateTime::now_utc() + Duration::days(COOKIE_TTL_DAYS);
+    let mut kept = 0;
+    for base in LOGIN_URLS {
+        let Ok(url) = tauri::Url::parse(base) else { continue };
+        let cookies = match webview.cookies_for_url(url) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::debug!("read sign-in cookies from {base}: {e}");
+                continue;
+            }
+        };
+        for mut c in cookies {
+            // Only rewrite cookies the browser would otherwise drop at shutdown.
+            if c.expires().is_some_and(|e| e != cookie::Expiration::Session) {
+                continue;
+            }
+            c.set_expires(expires);
+            match webview.set_cookie(c) {
+                Ok(()) => kept += 1,
+                Err(e) => tracing::debug!("persist sign-in cookie: {e}"),
+            }
+        }
+    }
+    if kept > 0 {
+        tracing::debug!("kept {kept} Outlook sign-in cookie(s) for {COOKIE_TTL_DAYS} day(s)");
+    }
+}
+
+/// Close every web-account view before the app exits.
+///
+/// Each view runs its own WebView2 browser process holding an exclusive lock on its user
+/// data folder (`EBWebView\lockfile`). If the app process dies without closing them, those
+/// browser processes are orphaned and keep the lock; the next launch finds the profile
+/// locked, falls back to a fresh empty profile and loses the sign-in — so the user has to
+/// re-authenticate every restart. Closing the views here lets WebView2 release the lock and
+/// delete `lockfile` cleanly, so the persisted cookies and MSAL token cache are reused next
+/// time. Call this on every quit path (see RunEvent::ExitRequested in lib.rs).
+pub fn close_all(app: &AppHandle) {
+    let Some(s) = app.try_state::<AppState>() else { return };
+    for a in s.svc.list_accounts().unwrap_or_default() {
+        if a.kind == AccountKind::Web {
+            // The sign-in cookies were already made persistent on each page load and on the
+            // calendar schedule (persist_auth_cookies_async); we don't read cookies here, because
+            // this runs on the main thread at exit and the cookie read would deadlock on it.
+            close(app, &a.id);
+        }
     }
 }
 
@@ -254,11 +325,16 @@ struct CalAccount {
     pending: Option<CalRequest>,
 }
 
+/// The page's answer to one on-demand attendee request: the attendee list, or an error code.
+type AttendeeReply = std::result::Result<Vec<serde_json::Value>, String>;
+
 /// Per-account refresh schedule and outstanding requests (memory only).
 #[derive(Default)]
 pub struct WebCalendars {
     accounts: Mutex<HashMap<String, CalAccount>>,
     wake: tokio::sync::Notify,
+    /// Outstanding attendee fetches, by one-time request id (see `fetch_web_event_attendees`).
+    attendee_waiters: Mutex<HashMap<String, tokio::sync::oneshot::Sender<AttendeeReply>>>,
 }
 
 impl WebCalendars {
@@ -332,19 +408,80 @@ impl WebCalendars {
         }
         a.pending.take().map(|p| (p.start, p.end))
     }
+
+    /// Register an outstanding attendee request and return the receiver its reply will arrive on.
+    fn await_attendees(&self, request_id: &str) -> tokio::sync::oneshot::Receiver<AttendeeReply> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.attendee_waiters.lock().unwrap_or_else(|p| p.into_inner()).insert(request_id.to_string(), tx);
+        rx
+    }
+
+    /// Deliver the page's reply to the matching attendee request. Replies without a waiting
+    /// request (unknown or already-answered id) are dropped.
+    fn fulfil_attendees(&self, request_id: &str, reply: AttendeeReply) {
+        if let Some(tx) = self.attendee_waiters.lock().unwrap_or_else(|p| p.into_inner()).remove(request_id) {
+            let _ = tx.send(reply);
+        }
+    }
+
+    /// Give up on an attendee request (timed out, or the view was gone), freeing its slot.
+    fn drop_attendees(&self, request_id: &str) {
+        self.attendee_waiters.lock().unwrap_or_else(|p| p.into_inner()).remove(request_id);
+    }
 }
 
 fn is_outlook(url: &tauri::Url) -> bool {
     url.scheme() == "https" && url.host_str().is_some_and(|h| OUTLOOK_HOSTS.contains(&h))
 }
 
-fn on_page_load(app: &AppHandle, label: &str, url: &tauri::Url, event: PageLoadEvent) {
-    let (Some(id), Some(cal)) = (account_of_label(label), app.try_state::<WebCalendars>()) else { return };
+fn on_page_load(webview: &Webview, url: &tauri::Url, event: PageLoadEvent) {
+    let app = webview.app_handle();
+    let (Some(id), Some(cal)) = (account_of(webview), app.try_state::<WebCalendars>()) else { return };
     match event {
-        PageLoadEvent::Started => cal.page_started(id),
-        PageLoadEvent::Finished if is_outlook(url) => cal.page_loaded(id, Instant::now()),
+        PageLoadEvent::Started => cal.page_started(&id),
+        PageLoadEvent::Finished if is_outlook(url) => {
+            cal.page_loaded(&id, Instant::now());
+            // Signed in and loaded: keep the sign-in cookies so the next restart doesn't re-prompt.
+            // Reading cookies blocks on a WebView2 callback that runs on this (the main) thread, so
+            // it must not run here — do it on a worker instead (see persist_auth_cookies_async).
+            persist_auth_cookies_async(app.clone(), id);
+        }
         PageLoadEvent::Finished => {}
     }
+}
+
+/// Persist the sign-in cookies off the main thread.
+///
+/// `Webview::cookies_for_url` blocks until WebView2 answers on the main thread, so calling it
+/// from a main-thread context (a page-load hook, a window event) deadlocks. This hops onto a
+/// blocking worker, which is free to wait while the main thread keeps pumping the callback.
+fn persist_auth_cookies_async(app: AppHandle, account_id: String) {
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Some(w) = find(&app, &account_id) {
+            persist_auth_cookies(&w);
+        }
+    });
+}
+
+/// Persist every web account's sign-in cookies, then run `done`.
+///
+/// For the clean-quit path: the final cookie values (including any Microsoft refreshed during the
+/// run) must be made persistent before the views are torn down, or the next launch re-prompts.
+/// Runs on a worker so the main event loop stays free to answer the cookie reads (see
+/// persist_auth_cookies); `done` fires on the worker once every account is handled.
+pub fn persist_all_then(app: AppHandle, done: impl FnOnce() + Send + 'static) {
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Some(s) = app.try_state::<AppState>() {
+            for a in s.svc.list_accounts().unwrap_or_default() {
+                if a.kind == AccountKind::Web {
+                    if let Some(w) = find(&app, &a.id) {
+                        persist_auth_cookies(&w);
+                    }
+                }
+            }
+        }
+        done();
+    });
 }
 
 /// The toggle was turned on: ask the page right away (or as soon as it has loaded).
@@ -365,6 +502,16 @@ pub async fn calendar_loop(app: AppHandle) {
         let (Some(s), Some(cal)) = (app.try_state::<AppState>(), app.try_state::<WebCalendars>()) else { continue };
         if s.demo {
             continue;
+        }
+        // Keep each web account's sign-in cookies persistent, in case Microsoft refreshed them to
+        // new session cookies during a long run. This loop is off the main thread, so the blocking
+        // cookie read is safe here (unlike the page-load hook or the exit handler).
+        for a in s.svc.list_accounts().unwrap_or_default() {
+            if a.kind == AccountKind::Web {
+                if let Some(w) = find(&app, &a.id) {
+                    persist_auth_cookies(&w);
+                }
+            }
         }
         let Ok(accounts) = s.svc.web_calendar_accounts() else { continue };
         let (start, end) = mail_core::webcal::window();
@@ -419,6 +566,64 @@ pub async fn web_account_calendar_report(
     if let Err(e) = s.svc.store_web_calendar(&id, &range_start, &range_end, &report) {
         tracing::debug!("web calendar report for {id}: {e}");
     }
+    Ok(())
+}
+
+/// How long to wait for the page to answer an attendee request before giving up.
+const ATTENDEE_TIMEOUT: Duration = Duration::from_secs(25);
+
+/// Fetch one web-calendar event's attendees on demand (when the event is opened). The calendar
+/// view doesn't carry attendee lists, so the page asks the server for just this event's
+/// attendees (`__mailEventAttendees` → GetItem) and answers with a one-time request id. Returns
+/// the attendees (name, email, response), validated and capped the same as calendar events.
+#[tauri::command]
+pub async fn fetch_web_event_attendees(app: AppHandle, s: tauri::State<'_, AppState>, cal: tauri::State<'_, WebCalendars>, account_id: String, event_id: String) -> Result<Vec<mail_core::model::Attendee>, Error> {
+    if s.demo {
+        return Ok(Vec::new());
+    }
+    let Some(view) = find(&app, &account_id) else { return Ok(Vec::new()) };
+    let request_id = uuid::Uuid::new_v4().simple().to_string();
+    let rx = cal.await_attendees(&request_id);
+    let js = format!(
+        "window.__mailEventAttendees && window.__mailEventAttendees({}, {})",
+        serde_json::Value::from(event_id),
+        serde_json::Value::from(request_id.clone())
+    );
+    if let Err(e) = view.eval(js) {
+        cal.drop_attendees(&request_id);
+        tracing::debug!("request web event attendees for {account_id}: {e}");
+        return Ok(Vec::new());
+    }
+    match tokio::time::timeout(ATTENDEE_TIMEOUT, rx).await {
+        Ok(Ok(Ok(list))) => Ok(mail_core::webcal::parse_attendees(&list)),
+        // Page reported an error, the sender was dropped, or we timed out: no attendees, no fuss.
+        _ => {
+            cal.drop_attendees(&request_id);
+            Ok(Vec::new())
+        }
+    }
+}
+
+/// The page's answer to a `fetch_web_event_attendees` request. Answers without a matching
+/// outstanding request (unknown or already-answered id) are dropped, so the page can only answer
+/// what it was asked. Nothing is returned to the page.
+#[tauri::command]
+pub async fn web_account_event_attendees_report(
+    webview: Webview,
+    cal: tauri::State<'_, WebCalendars>,
+    request_id: String,
+    attendees: Vec<serde_json::Value>,
+    error: Option<String>,
+) -> Result<(), Error> {
+    // Only a web-account view may answer (the report comes from the injected script).
+    if account_of(&webview).is_none() {
+        return Ok(());
+    }
+    let reply = match error {
+        Some(code) => Err(code),
+        None => Ok(attendees),
+    };
+    cal.fulfil_attendees(&request_id, reply);
     Ok(())
 }
 

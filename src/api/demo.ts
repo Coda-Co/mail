@@ -740,6 +740,10 @@ export const demoApi: MailApi = {
   async refreshWebCalendars() {
     /* The demo has no Outlook page to read. */
   },
+  async fetchWebEventAttendees() {
+    /* The demo has no Outlook page to read; demo events carry their attendees already. */
+    return [];
+  },
   async setCalendarVisible(calendarId, visible) {
     const c = state.calendars.find((x) => x.id === calendarId);
     if (c) c.visible = visible;

@@ -58,6 +58,8 @@ const COMMANDS: &[&str] = &[
     "web_account_report",
     "web_account_notify",
     "web_account_calendar_report",
+    "web_account_event_attendees_report",
+    "fetch_web_event_attendees",
     "refresh_web_calendars",
 ];
 
