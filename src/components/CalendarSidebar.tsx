@@ -5,9 +5,10 @@ import { useApp } from '../state/app';
 import { webCalendarNote } from '../lib/webCalendar';
 import { now } from '../lib/clock';
 import { useTick } from '../lib/useTick';
+import { MiniCalendar } from './MiniCalendar';
 
-/** Calendar's own sidebar: which accounts' calendars to show. */
-export function CalendarSidebar() {
+/** Calendar's own sidebar: a month overview, and which accounts' calendars to show. */
+export function CalendarSidebar({ anchor, range, onPick }: { anchor: Date; range: Date[]; onPick: (d: Date) => void }) {
   const app = useApp();
   const { accounts } = app;
   const [calendars, setCalendars] = useState<CalendarInfo[]>([]);
@@ -27,6 +28,7 @@ export function CalendarSidebar() {
   return (
     <aside className="side-panel cal-sidebar" aria-label="Calendars">
       <div className="side-panel-scroll">
+        <MiniCalendar anchor={anchor} range={range} onPick={onPick} />
         <div className="nav-section">Calendars</div>
         {accounts.map((a) => {
           if (a.kind === 'web' && !a.webCalendar)

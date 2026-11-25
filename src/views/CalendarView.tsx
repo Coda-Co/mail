@@ -547,7 +547,15 @@ export function CalendarView() {
 
   return (
     <div className="calendar-view">
-      <CalendarSidebar />
+      <CalendarSidebar
+        anchor={anchor}
+        range={days}
+        onPick={(d) => {
+          setQuery('');
+          setDateFilter('any');
+          setAnchor(d);
+        }}
+      />
       <Resizer variable="--sidebar-w" pane="before" label="Resize calendars" className="sidebar-resizer" />
       <div className="calendar-main">
       <TopSearch
