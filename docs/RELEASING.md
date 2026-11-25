@@ -48,14 +48,13 @@ Code: `src-tauri/src/updater.rs`.
 
 - The app checks the release channel 15 seconds after launch, then whenever the last check is over 4 hours old (it looks every 10 minutes, so a laptop that slept checks soon after waking).
 - A new version downloads in the background and is verified against the public key. Then:
-  - a banner above the mail view says "Mail x.y.z is ready" with **Restart now** and **Later** (Later hides it until the next version);
-  - the settings button gets a dot;
+  - a **Restart to update** button appears in the top bar, beside the sync status (hover for the version);
   - a desktop notification goes out once per version (if notifications are on);
   - the tray / menu-bar item changes to **Restart to update to x.y.z**.
-- **Restart now** saves web-account sign-ins as quitting does, installs and relaunches. On macOS a downloaded update also installs when the user quits; on Windows the installer runs only on restart, because it shows a window and relaunches the app.
+- **Restart to update** saves web-account sign-ins as quitting does, installs and relaunches. On macOS a downloaded update also installs when the user quits; on Windows the installer runs only on restart, because it shows a window and relaunches the app.
 - To check by hand: **Settings → General → Updates → Check for updates** (it also shows the current version and when the app last checked), or **Check for updates…** in the tray / menu-bar menu.
 
-Builds without the `updater` feature, and `pnpm tauri dev`, show the version and say the build doesn't update itself. In the browser preview, `?update=ready` shows the banner and settings as they look with an update ready.
+Builds without the `updater` feature, and `pnpm tauri dev`, show the version and say the build doesn't update itself. In the browser preview, `?update=ready` shows the top-bar button and settings as they look with an update ready.
 
 ## Before retiring Outlook
 
