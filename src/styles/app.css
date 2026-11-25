@@ -1086,13 +1086,9 @@ h3 {
 }
 
 .mail-panes .list-header {
-  padding-top: 14px;
+  padding-top: 8px;
 }
 
-
-.mail-panes .list-header .view-subtitle {
-  margin-top: 0;
-}
 
 .list-title-row {
   display: flex;
@@ -1121,19 +1117,11 @@ h3 {
   gap: 6px;
 }
 
-.view-subtitle .truncate {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Folder icons above the message list. */
 .folder-bar {
   display: flex;
   align-items: stretch;
   gap: 2px;
-  margin-top: 10px;
   border-bottom: 1px solid var(--border);
 }
 

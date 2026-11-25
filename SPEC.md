@@ -65,7 +65,7 @@ Each account has one of two backends. The interface treats them the same where i
 
 - **One mailbox at a time.** Each mailbox is its own space, like a separate app; there is no combined inbox. Mail opens the mailbox used last.
 - **Rail** down the left: Calendar and People (shared across mailboxes), a divider, then one glyph per mailbox (Graph and Web), then + to add an account; Settings and your avatar at the bottom. A glyph is the organisation's initial on the account colour; with more than one mailbox in the same organisation (same tenant or domain) it adds the mailbox's initial (Cm, Cs). Badges: unread count; orange ! for sign-in needed; red ! for a sync error; a globe for Web accounts. Right-click a glyph for Sign in again, Sync now, Account settings, Remove.
-- **Folder icons** above the message list: Inbox, Unread (the inbox's unread mail), Drafts, Sent, Archive, Deleted, Junk, then a folder menu with the user's own folders. Above them, the mailbox and folder name.
+- **Folder icons** above the message list: Inbox, Unread (the inbox's unread mail), Drafts, Sent, Archive, Deleted, Junk, then a folder menu with the user's own folders.
 - **Calendar** has its own sidebar listing each account's calendars to show or hide.
 - **Reading pane** with actions: Reply, Reply all, Forward, Archive, Delete, Open in new window.
 - **Replies draft at the top of the conversation**, above the message being answered, with From, To, Cc, Bcc, Send, Attach, Discard and Pop out. Drafts save to the server's Drafts folder automatically.

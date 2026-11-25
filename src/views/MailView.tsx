@@ -259,14 +259,6 @@ export function MailView() {
       <section className="list-pane" aria-label={searchActive ? 'Results' : 'Message list'}>
         {!searchActive && (
           <div className="list-header">
-            {account && (
-              <div className="view-subtitle" title={account.email}>
-                <span className="acc-dot" style={{ background: account.color }} />
-                <span className="truncate">
-                  {account.displayName} · {folderName}
-                </span>
-              </div>
-            )}
             <FolderBar scope={scope} folders={folders} onChange={app.setScope} />
           </div>
         )}
