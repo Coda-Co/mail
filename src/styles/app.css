@@ -1266,14 +1266,18 @@ h3 {
 .attachment-chip .file-video { color: var(--file-media); }
 
 .attachment-chip .name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* The size never wraps; the file name truncates instead. */
 .attachment-chip .size {
   color: var(--text-muted);
   font-size: var(--fs-small);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .attachment-chip .remove {
