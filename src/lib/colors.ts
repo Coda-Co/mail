@@ -24,10 +24,6 @@ export function eventFill(color: string, dark: boolean): string {
   return dark ? mix(color, 0.4, '#16191D') : mix(color, 0.32);
 }
 
-export function eventBorder(color: string, dark: boolean): string {
-  return dark ? mix(color, 0.62, '#16191D') : mix(color, 0.55);
-}
-
 export function eventSelectedFill(color: string, dark: boolean): string {
   return dark ? mix(color, 0.55, '#16191D') : mix(color, 0.48);
 }

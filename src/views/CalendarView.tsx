@@ -5,7 +5,7 @@ import type { CalendarEvent, EventField, ResponseStatus } from '../api/types';
 import { useApp } from '../state/app';
 import { addDays, dayShort, hhmm, longDate, monthName, rangeTitle, sameDay, shortDate, startOfDay, startOfWeek } from '../lib/dates';
 import { now } from '../lib/clock';
-import { eventBorder, eventFill, eventSelectedFill } from '../lib/colors';
+import { eventFill, eventSelectedFill } from '../lib/colors';
 import { EventForm } from './EventForm';
 import { eventWhere } from '../components/Agenda';
 import { Menu, Modal, useToast } from '../components/ui';
@@ -420,12 +420,14 @@ export function CalendarView() {
 
   const style = (e: CalendarEvent, isSelected: boolean) => ({
     background: isSelected ? eventSelectedFill(e.color, dark) : eventFill(e.color, dark),
-    border: `1px solid ${eventBorder(e.color, dark)}`,
+    border: 'none',
     borderLeft: `4px solid ${e.color}`,
     outline: isSelected ? '2px solid var(--text)' : undefined,
     outlineOffset: -1,
   });
 
+  // Outlook shows the location under the title; online meetings without one read as Teams.
+  const eventLocation = (e: CalendarEvent) => e.location || (e.isOnlineMeeting ? 'Microsoft Teams Meeting' : '');
   const dayEvents = (d: Date) => events.filter((e) => new Date(e.start) < addDays(d, 1) && new Date(e.end) > d);
   const webTag = (e: CalendarEvent) =>
     app.accountById(e.accountId)?.kind === 'web' ? (
@@ -497,7 +499,7 @@ export function CalendarView() {
                   const en = new Date(e.end);
                   const startMin = sameDay(s, d) ? s.getHours() * 60 + s.getMinutes() : 0;
                   const endMin = sameDay(en, d) ? en.getHours() * 60 + en.getMinutes() : 24 * 60;
-                  const height = Math.max(22, ((endMin - startMin) / 60) * HOUR - 4);
+                  const height = Math.max(22, ((endMin - startMin) / 60) * HOUR - 1);
                   const width = 100 / lanes;
                   const short = endMin - startMin <= 30;
                   return (
@@ -507,10 +509,10 @@ export function CalendarView() {
                       className={`cal-event${e.myResponse === 'declined' ? ' declined' : ''}${e.myResponse === 'tentative' ? ' tentative' : ''}`}
                       style={{
                         ...style(e, e.id === selectedId),
-                        top: (startMin / 60) * HOUR + 2,
+                        top: (startMin / 60) * HOUR,
                         height,
-                        left: `calc(${lane * width}% + 4px)`,
-                        width: `calc(${width}% - 8px)`,
+                        left: `${lane * width}%`,
+                        width: `calc(${width}% - 1px)`,
                         padding: short ? '3px 8px' : undefined,
                       }}
                       onClick={() => setSelectedId(e.id)}
@@ -521,11 +523,7 @@ export function CalendarView() {
                         {eventTitle(e)}
                         {webTag(e)}
                       </span>
-                      {!short && (
-                        <span className="time">
-                          {hhmm(s)} – {hhmm(en)}
-                        </span>
-                      )}
+                      {!short && eventLocation(e) && <span className="location">{eventLocation(e)}</span>}
                     </button>
                   );
                 })}
