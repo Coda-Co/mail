@@ -257,6 +257,13 @@ pub async fn reload_web_account(app: AppHandle, account_id: String) -> Result<()
     Ok(())
 }
 
+/// The Outlook item id inside one of the app's public event ids (`<accountId>:<itemId>`), if
+/// the event belongs to `account_id`. Outlook only knows the item id; sending the prefixed id
+/// makes GetItem and the event link fail.
+fn outlook_item_id<'a>(account_id: &str, event_id: &'a str) -> Option<&'a str> {
+    mail_core::ids::split(event_id).ok().filter(|(acc, _)| *acc == account_id).map(|(_, raw)| raw)
+}
+
 /// Longest event id we'll put in a link (Outlook item ids are a few hundred characters).
 const MAX_EVENT_ID: usize = 1024;
 
@@ -291,7 +298,8 @@ pub async fn open_web_event(app: AppHandle, s: tauri::State<'_, AppState>, accou
     let view = ensure(&app, &a).ok_or_else(|| Error::Other("Couldn't open Outlook on the web".into()))?;
     // Stay on the host the page is already signed in on (outlook.cloud.microsoft or office.com).
     let base = view.url().ok().filter(is_outlook).map_or_else(|| url_for(&a), Ok)?;
-    let url = event_url(&base, &event_id).ok_or_else(|| Error::Invalid("Not an Outlook on the web event".into()))?;
+    let raw = outlook_item_id(&account_id, &event_id).ok_or_else(|| Error::Invalid("Not an event of this account".into()))?;
+    let url = event_url(&base, raw).ok_or_else(|| Error::Invalid("Not an Outlook on the web event".into()))?;
     view.navigate(url).map_err(|e| Error::Other(e.to_string()))?;
     Ok(())
 }
@@ -620,12 +628,13 @@ pub async fn fetch_web_event_attendees(app: AppHandle, s: tauri::State<'_, AppSt
     if s.demo {
         return Ok(Vec::new());
     }
+    let Some(raw) = outlook_item_id(&account_id, &event_id) else { return Ok(Vec::new()) };
     let Some(view) = find(&app, &account_id) else { return Ok(Vec::new()) };
     let request_id = uuid::Uuid::new_v4().simple().to_string();
     let rx = cal.await_attendees(&request_id);
     let js = format!(
         "window.__mailEventAttendees && window.__mailEventAttendees({}, {})",
-        serde_json::Value::from(event_id),
+        serde_json::Value::from(raw),
         serde_json::Value::from(request_id.clone())
     );
     if let Err(e) = view.eval(js) {
@@ -732,6 +741,13 @@ mod tests {
         assert!(event_url(&base, "").is_none());
         assert!(event_url(&base, &"a".repeat(MAX_EVENT_ID + 1)).is_none());
         assert!(event_url(&tauri::Url::parse("https://evil.example/").unwrap(), "x").is_none());
+    }
+
+    #[test]
+    fn public_event_ids_are_unwrapped_for_outlook() {
+        assert_eq!(outlook_item_id("acc1", "acc1:AAMkAD+a/b="), Some("AAMkAD+a/b="));
+        assert_eq!(outlook_item_id("acc1", "acc2:AAMk"), None, "another account's event");
+        assert_eq!(outlook_item_id("acc1", "AAMk"), None);
     }
 
     #[test]
