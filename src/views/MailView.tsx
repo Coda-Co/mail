@@ -87,7 +87,6 @@ export function MailView() {
   const serverResultFor = useRef<SearchState | null>(null);
   const toast = useToast();
   const searchInput = useRef<HTMLInputElement>(null);
-  const autoSelected = useRef(false);
 
   const account = scope.accountId ? accountById(scope.accountId) : undefined;
   const folderName = useMemo(() => {
@@ -108,10 +107,6 @@ export function MailView() {
       if (cancelled) return;
       setMessages(list);
       setHasMore(list.length === PAGE);
-      if (!autoSelected.current && list.length && window.innerWidth >= 960) {
-        autoSelected.current = true;
-        setSelection((s) => s ?? { kind: list[0].isDraft ? 'draft' : 'message', id: list[0].id });
-      }
     });
     return () => {
       cancelled = true;
