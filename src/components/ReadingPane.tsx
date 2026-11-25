@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Copy, ExternalLink, Forward, MoreHorizontal, Reply, ReplyAll } from 'lucide-react';
+import { ArrowLeft, Copy, ExternalLink, Forward, MoreHorizontal, Reply, ReplyAll, X } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
 import type { Address, Draft, DraftMode, Folder, Message, Thread } from '../api/types';
 import { useApp } from '../state/app';
@@ -552,7 +552,12 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
         )}
         {thread && (
           <div className="reading-content">
-            <h2 className="thread-subject">{thread.subject || '(no subject)'}</h2>
+            <div className="thread-header">
+              <h2 className="thread-subject">{thread.subject || '(no subject)'}</h2>
+              <button type="button" className="btn btn-ghost btn-icon thread-close" aria-label="Close" title="Close" onClick={onBack}>
+                <X size={18} />
+              </button>
+            </div>
             {inlineDraft &&
               (inlineDraft.poppedOut ? (
                 <PoppedOutDraft draft={inlineDraft} />

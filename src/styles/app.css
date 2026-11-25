@@ -1090,6 +1090,28 @@ h3 {
   gap: 12px;
 }
 
+.thread-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.thread-header .thread-subject {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Closes the open thread; on narrow layouts Back does this instead. */
+.thread-close {
+  flex-shrink: 0;
+  margin: -1px -6px 0 0;
+  color: var(--text-muted);
+}
+
+.thread-close:hover {
+  color: var(--text);
+}
+
 .thread-subject {
   margin: 0;
   font-size: var(--fs-subject);
@@ -2898,6 +2920,10 @@ h3 {
 
   .back-button {
     display: inline-flex;
+  }
+
+  .thread-close {
+    display: none;
   }
 
   .reading-toolbar.back-only {
