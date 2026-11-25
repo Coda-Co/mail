@@ -403,6 +403,29 @@ export interface MailApi {
 
   /** Open a link in the system browser (message links, admin consent URL). */
   openExternal(url: string): Promise<void>;
+
+  updateStatus(): Promise<UpdateStatus>;
+  /** Check the release channel now and download a new version if there is one. Resolves with the outcome. */
+  checkForUpdate(): Promise<UpdateStatus>;
+  /** Install the downloaded update and relaunch the app. */
+  installUpdate(): Promise<void>;
+}
+
+export type UpdateState = 'unavailable' | 'idle' | 'checking' | 'downloading' | 'ready' | 'upToDate' | 'error' | 'installing';
+
+export interface UpdateStatus {
+  /** `unavailable`: this build can't update itself (development builds and the browser preview). */
+  state: UpdateState;
+  currentVersion: string;
+  /** The new version, while downloading, ready or installing. */
+  version?: string;
+  /** Release notes for the new version. */
+  notes?: string;
+  /** Download progress, 0 to 1. */
+  progress?: number;
+  error?: string;
+  /** When the release channel last answered (ISO). */
+  checkedAt?: string;
 }
 
 /** Events the core emits (Tauri event names). */
@@ -419,4 +442,6 @@ export const EVENTS = {
   draftChanged: 'draft://changed',
   /** payload: Account[] */
   accountsChanged: 'accounts://changed',
+  /** payload: UpdateStatus */
+  updateStatus: 'update://status',
 } as const;

@@ -74,4 +74,8 @@ export const tauriApi: MailApi = {
   openWebEvent: (accountId, eventId) => call('open_web_event', { accountId, eventId }),
 
   openExternal: (url) => call('open_external', { url }),
+
+  updateStatus: () => call('update_status'),
+  checkForUpdate: () => call('check_for_update'),
+  installUpdate: () => call('install_update'),
 };
