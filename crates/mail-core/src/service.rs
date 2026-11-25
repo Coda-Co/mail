@@ -841,6 +841,36 @@ impl MailService {
         Ok(d)
     }
 
+    /// Add, swap or remove the draft's signature (`None` removes it). The draft stays in its account.
+    pub fn set_draft_signature(&self, id: &str, signature_id: Option<&str>) -> Result<Draft> {
+        let (acc, raw) = ids::split(id)?;
+        let current = self.get_draft(id)?;
+        Self::editable(&current)?;
+        let sig = match signature_id {
+            Some(sid) => match self.app().get_signature(sid)? {
+                Some(s) if s.account_id == current.account_id => Some(s),
+                Some(_) => return Err(Error::Invalid("That signature belongs to another account".into())),
+                None => return Err(Error::Invalid("That signature no longer exists".into())),
+            },
+            None => None,
+        };
+        let mut d = current.clone();
+        d.body_html = html::swap_signature(&current.body_html, sig.as_ref().map(|s| (s.id.as_str(), s.html.as_str())));
+        d.signature_id = sig.map(|s| s.id);
+        d.edited = true;
+        d.status = DraftStatus::Editing;
+        d.error = None;
+        d.saved_to_server = false;
+        d.updated_at = now_iso();
+        self.with_account(acc, |db| db.save_draft(raw, &d, None, "user"))?;
+        self.enqueue(acc, &Op::SaveDraft { draft_id: raw.to_string() })?;
+        self.events().draft_changed(&d.id);
+        if !current.edited {
+            self.changed(vec![acc.to_string()]);
+        }
+        Ok(d)
+    }
+
     pub fn add_attachment(&self, id: &str, path: &Path) -> Result<Draft> {
         let (acc, raw) = ids::split(id)?;
         let mut d = self.get_draft(id)?;

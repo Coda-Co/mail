@@ -33,6 +33,7 @@ export const tauriApi: MailApi = {
   getDraft: (draftId) => call('get_draft', { draftId }),
   updateDraft: (draft) => call('update_draft', { draft }),
   changeDraftAccount: (draftId, accountId) => call('change_draft_account', { draftId, accountId }),
+  setDraftSignature: (draftId, signatureId) => call('set_draft_signature', { draftId, signatureId }),
   addAttachment: (draftId) => call('add_attachment', { draftId }),
   // The bytes go as the raw request body (no JSON encoding); names ride in headers.
   addAttachmentFile: async (draftId, file) =>

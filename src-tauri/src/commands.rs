@@ -276,6 +276,11 @@ pub async fn update_draft(s: State<'_, AppState>, draft: Draft) -> R<Draft> {
 }
 
 #[tauri::command]
+pub async fn set_draft_signature(s: State<'_, AppState>, draft_id: String, signature_id: Option<String>) -> R<Draft> {
+    s.svc.set_draft_signature(&draft_id, signature_id.as_deref())
+}
+
+#[tauri::command]
 pub async fn change_draft_account(app: AppHandle, s: State<'_, AppState>, draft_id: String, account_id: String) -> R<Draft> {
     let d = s.svc.change_draft_account(&draft_id, &account_id)?;
     // A pop-out window keeps working: tell every window the id changed.
