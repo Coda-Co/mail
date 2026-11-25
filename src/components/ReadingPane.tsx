@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Copy, ExternalLink, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, Copy, ExternalLink, Forward, MoreHorizontal, Reply, ReplyAll } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
 import type { Draft, DraftMode, Folder, Message, Thread } from '../api/types';
 import { useApp } from '../state/app';
@@ -91,12 +91,42 @@ export function AttachmentList({ message }: { message: Message }) {
   );
 }
 
+/** Per-message actions shown as icons in the top right of an expanded card. */
+type MessageActions = {
+  reply: () => void;
+  replyAll: () => void;
+  forward: () => void;
+  popOut: () => void;
+  more: (anchor: HTMLElement) => void;
+};
+
+function MessageActionIcons({ actions, disabled }: { actions: MessageActions; disabled: boolean }) {
+  const items: { label: string; icon: React.ReactNode; run: (e: React.MouseEvent<HTMLButtonElement>) => void }[] = [
+    { label: 'Reply', icon: <Reply size={16} />, run: actions.reply },
+    { label: 'Reply all', icon: <ReplyAll size={16} />, run: actions.replyAll },
+    { label: 'Forward', icon: <Forward size={16} />, run: actions.forward },
+    { label: 'Open in new window', icon: <ExternalLink size={15} />, run: actions.popOut },
+    { label: 'More actions', icon: <MoreHorizontal size={16} />, run: (e) => actions.more(e.currentTarget) },
+  ];
+  return (
+    <div className="message-actions">
+      {items.map((it) => (
+        <button key={it.label} type="button" className="btn btn-ghost btn-icon" aria-label={it.label} title={it.label} disabled={disabled} onClick={it.run}>
+          {it.icon}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MessageView({
   message,
   expanded,
   onExpand,
   onCollapse,
   onChanged,
+  actions,
+  actionsDisabled,
 }: {
   message: Message;
   expanded: boolean;
@@ -104,6 +134,8 @@ function MessageView({
   /** Set for messages that can fold back to one line (not the one that was opened). */
   onCollapse?: () => void;
   onChanged: (m: Message) => void;
+  actions: MessageActions;
+  actionsDisabled: boolean;
 }) {
   const { accountById, me, accounts, settings } = useApp();
   const acc = accountById(message.accountId);
@@ -143,20 +175,24 @@ function MessageView({
       >
         <Avatar name={message.from.name || message.from.email} />
         <div className="who">
-          <span className="name" title={message.from.email}>
-            {message.from.name || message.from.email}
+          <span className="name-line">
+            <span className="name" title={message.from.email}>
+              {message.from.name || message.from.email}
+            </span>
+            {acc && (
+              <span className="acc-chip" title={acc.displayName}>
+                <span className="acc-dot" style={{ background: acc.color }} />
+                <span className="acc-name">{acc.displayName}</span>
+              </span>
+            )}
           </span>
           <span className="meta">
             To {recipients(message, me.name, myEmails)}
-            {message.cc.length > 0 && `, cc ${message.cc.map((a) => a.name || a.email).join(', ')}`} · {fullTime(message.receivedAt)}
+            {message.cc.length > 0 && `, cc ${message.cc.map((a) => a.name || a.email).join(', ')}`}
           </span>
         </div>
-        {acc && (
-          <span className="acc-chip">
-            <span className="acc-dot" style={{ background: acc.color }} />
-            {acc.displayName}
-          </span>
-        )}
+        <span className="message-time">{fullTime(message.receivedAt)}</span>
+        <MessageActionIcons actions={actions} disabled={actionsDisabled} />
       </div>
       {message.remoteImagesBlocked && (
         <div className="images-bar">
@@ -309,26 +345,33 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
     [selection, loadThread],
   );
 
-  const startDraft = async (mode: DraftMode) => {
-    if (!selectedMessage) return;
+  const startDraft = async (mode: DraftMode, source: Message | null = selectedMessage) => {
+    if (!source || !selectedMessage) return;
     const open = thread?.drafts.find((d) => !d.poppedOut);
     if (open) {
       setClosedDraftId(null);
       setFocusDraft(true);
       return;
     }
-    await api.createDraft({ mode, sourceMessageId: selectedMessage.id });
+    await api.createDraft({ mode, sourceMessageId: source.id });
     setFocusDraft(true);
     await loadThread(selectedMessage.id);
   };
 
-  const removeWithUndo = async (kind: 'archive' | 'delete') => {
-    if (!selectedMessage) return;
-    const ids = [selectedMessage.id];
-    const original = selectedMessage.folderId;
+  // Removing the opened message moves the selection on; removing another message in the
+  // thread just drops it from the thread.
+  const afterRemoving = (m: Message) => {
+    if (m.id === selectedMessage?.id) onRemoved();
+    else if (selectedMessage) loadThread(selectedMessage.id);
+  };
+
+  const removeWithUndo = async (kind: 'archive' | 'delete', m: Message | null = selectedMessage) => {
+    if (!m || !selectedMessage) return;
+    const ids = [m.id];
+    const original = m.folderId;
     if (kind === 'archive') await api.archive(ids);
     else await api.deleteMessages(ids);
-    onRemoved();
+    afterRemoving(m);
     toast(kind === 'archive' ? 'Archived' : 'Deleted', { label: 'Undo', run: () => api.moveMessages(ids, original) });
   };
 
@@ -358,18 +401,20 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
     hasMessage,
   );
 
-  const moreMenu = async (anchor: HTMLElement) => {
+  const moreMenu = async (anchor: HTMLElement, m: Message) => {
     if (!selectedMessage) return;
-    const m = selectedMessage;
+    const openedId = selectedMessage.id;
     const folders: Folder[] = await api.listFolders(m.accountId);
     const items: MenuItem[] = [
-      { label: m.isRead ? 'Mark as unread' : 'Mark as read', onSelect: async () => {
+      { label: 'Archive', onSelect: () => removeWithUndo('archive', m) },
+      { label: 'Delete', onSelect: () => removeWithUndo('delete', m) },
+      { label: m.isRead ? 'Mark as unread' : 'Mark as read', separatorBefore: true, onSelect: async () => {
         await api.markRead([m.id], !m.isRead);
-        loadThread(m.id);
+        loadThread(openedId);
       } },
       { label: m.isFlagged ? 'Unflag' : 'Flag', onSelect: async () => {
         await api.setFlag([m.id], !m.isFlagged);
-        loadThread(m.id);
+        loadThread(openedId);
       } },
       ...folders
         .filter((f) => f.id !== m.folderId && f.role !== 'drafts')
@@ -378,7 +423,7 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
           separatorBefore: i === 0,
           onSelect: async () => {
             await api.moveMessages([m.id], f.id);
-            onRemoved();
+            afterRemoving(m);
             toast(`Moved to ${f.name}`, { label: 'Undo', run: () => api.moveMessages([m.id], m.folderId) });
           },
         })),
@@ -423,31 +468,10 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
 
   return (
     <article className="reading-pane" aria-label="Reading pane">
-      <div className="reading-toolbar">
+      {/* Actions live on each message card; this bar only carries Back on narrow layouts. */}
+      <div className="reading-toolbar back-only">
         <button type="button" className="btn btn-ghost back-button" onClick={onBack} aria-label="Back to list">
           <ArrowLeft size={15} />
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={() => startDraft('reply')} disabled={!thread}>
-          Reply
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={() => startDraft('replyAll')} disabled={!thread}>
-          Reply all
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={() => startDraft('forward')} disabled={!thread}>
-          Forward
-        </button>
-        <span className="spacer" />
-        <button type="button" className="btn btn-ghost" onClick={() => removeWithUndo('archive')} disabled={!thread}>
-          Archive
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={() => removeWithUndo('delete')} disabled={!thread}>
-          Delete
-        </button>
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="More actions" onClick={(e) => moreMenu(e.currentTarget)} disabled={!thread}>
-          <MoreHorizontal size={16} />
-        </button>
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="Open in new window" onClick={() => selectedMessage && api.popOut('message', selectedMessage.id)} disabled={!thread}>
-          <ExternalLink size={15} />
         </button>
       </div>
       <div className="reading-scroll" ref={scrollRef}>
@@ -512,6 +536,14 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
                               })
                       }
                       onChanged={(updated) => setThread((t) => (t ? { ...t, messages: t.messages.map((x) => (x.id === updated.id ? updated : x)) } : t))}
+                      actionsDisabled={!current}
+                      actions={{
+                        reply: () => void startDraft('reply', m),
+                        replyAll: () => void startDraft('replyAll', m),
+                        forward: () => void startDraft('forward', m),
+                        popOut: () => void api.popOut('message', m.id),
+                        more: (anchor) => void moreMenu(anchor, m),
+                      }}
                     />
                   ))}
                 </>

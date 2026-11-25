@@ -587,6 +587,7 @@ h3 {
   text-align: left;
   cursor: pointer;
   font-size: var(--fs-body);
+  font-weight: 460;
   min-height: 32px;
 }
 
@@ -597,7 +598,7 @@ h3 {
 
 .nav-item.selected {
   background: var(--nav-selected);
-  font-weight: 500;
+  font-weight: 580;
 }
 
 .nav-item .label {
@@ -611,7 +612,7 @@ h3 {
 .nav-item .count {
   font-size: var(--fs-small);
   color: var(--text-muted);
-  font-weight: 400;
+  font-weight: 460;
 }
 
 .nav-item.folder {
@@ -754,7 +755,7 @@ h3 {
 }
 
 .footer-text .name {
-  font-weight: 500;
+  font-weight: 580;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1131,8 +1132,35 @@ h3 {
   min-width: 0;
 }
 
+.message-head .who .name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The sender's name keeps its width; the account chip gives way first. */
 .message-head .who .name {
   font-weight: 600;
+  flex-shrink: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-head .who .acc-chip {
+  padding: 1px 6px;
+  min-width: 0;
+}
+
+.message-head .who .acc-chip .acc-dot {
+  flex-shrink: 0;
+}
+
+.message-head .who .acc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .message-head .who .meta {
@@ -1282,6 +1310,33 @@ h3 {
 
 .back-button {
   display: none;
+}
+
+/* With actions on each message card, the reading toolbar only exists for Back on narrow layouts. */
+.reading-toolbar.back-only {
+  display: none;
+}
+
+.message-time {
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.message-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: -6px;
+  color: var(--text-muted);
+}
+
+.message-actions .btn-icon {
+  color: inherit;
+}
+
+.message-actions .btn-icon:hover:not(:disabled) {
+  color: var(--text);
 }
 
 /* ---------- Inline draft ---------- */
@@ -2807,6 +2862,12 @@ h3 {
 
   .back-button {
     display: inline-flex;
+  }
+
+  .reading-toolbar.back-only {
+    display: flex;
+    min-height: 0;
+    padding: 8px 16px;
   }
 
   .reading-toolbar {
