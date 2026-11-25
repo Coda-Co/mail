@@ -1265,6 +1265,30 @@ h3 {
   display: none;
 }
 
+/* ---------- Dropping files onto a draft ---------- */
+
+.draft-section,
+.popout {
+  position: relative;
+}
+
+.drop-hint {
+  position: absolute;
+  inset: -6px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+  /* Let the drag events land on the draft underneath, not the hint. */
+  pointer-events: none;
+}
+
 /* ---------- Inline draft ---------- */
 
 /* A reply sits in the thread as its own section, ruled off from the

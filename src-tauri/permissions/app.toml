@@ -29,6 +29,7 @@ permissions = [
   "allow-update-draft",
   "allow-change-draft-account",
   "allow-add-attachment",
+  "allow-add-attachment-data",
   "allow-remove-attachment",
   "allow-discard-draft",
   "allow-send-draft",

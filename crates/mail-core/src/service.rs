@@ -858,6 +858,22 @@ impl MailService {
         Ok(d)
     }
 
+    /// Attach a file the person dropped onto the draft (from Explorer or Finder). The web view
+    /// hands over the bytes, not a path, so they are kept under the account's `outgoing`
+    /// folder (never pruned, unlike the download cache) until the draft is sent.
+    pub fn add_attachment_bytes(&self, id: &str, name: &str, bytes: &[u8]) -> Result<Draft> {
+        let (acc, _) = ids::split(id)?;
+        Self::editable(&self.get_draft(id)?)?;
+        if bytes.len() as u64 > 150 * 1024 * 1024 {
+            return Err(Error::Invalid("Attachments over 150 MB can't be sent".into()));
+        }
+        let dir = self.paths.account_dir(acc).join("outgoing").join(ids::new_local_id("drop"));
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join(crate::sync::safe_file_name(name));
+        std::fs::write(&path, bytes)?;
+        self.add_attachment(id, &path)
+    }
+
     pub fn remove_attachment(&self, id: &str, attachment_id: &str) -> Result<Draft> {
         let (acc, raw) = ids::split(id)?;
         let mut d = self.get_draft(id)?;

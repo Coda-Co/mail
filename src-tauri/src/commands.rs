@@ -290,6 +290,22 @@ pub async fn add_attachment(app: AppHandle, s: State<'_, AppState>, draft_id: St
     Ok(d)
 }
 
+/// Attach a file dropped onto a draft. The bytes arrive as the raw request body; the draft id
+/// and the file name come in headers (URI-encoded, since header values must be ASCII).
+#[tauri::command]
+pub async fn add_attachment_data(s: State<'_, AppState>, request: tauri::ipc::Request<'_>) -> R<Draft> {
+    let header = |k: &str| -> R<String> {
+        let v = request.headers().get(k).and_then(|v| v.to_str().ok()).ok_or_else(|| Error::Invalid(format!("missing {k}")))?;
+        urlencoding::decode(v).map(|c| c.into_owned()).map_err(|e| Error::Invalid(e.to_string()))
+    };
+    let draft_id = header("x-draft-id")?;
+    let name = header("x-file-name")?;
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err(Error::Invalid("expected file bytes".into()));
+    };
+    s.svc.add_attachment_bytes(&draft_id, &name, bytes)
+}
+
 #[tauri::command]
 pub async fn remove_attachment(s: State<'_, AppState>, draft_id: String, attachment_id: String) -> R<Draft> {
     s.svc.remove_attachment(&draft_id, &attachment_id)
@@ -483,6 +499,9 @@ pub async fn pop_out(app: AppHandle, s: State<'_, AppState>, kind: PopKind, id: 
         .title(title)
         .inner_size(960.0, 720.0)
         .min_inner_size(560.0, 420.0)
+        // Let files dragged from Explorer or Finder reach the page as HTML drop events
+        // (the native handler swallows them on Windows), like the main window.
+        .disable_drag_drop_handler()
         .build()
         .map_err(|e| Error::Other(e.to_string()))?;
     let _ = w.set_focus();

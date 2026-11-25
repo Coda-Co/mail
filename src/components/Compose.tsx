@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import { ExternalLink, Paperclip, X } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
 import type { Draft, Message } from '../api/types';
@@ -185,6 +185,58 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
     replace(await api.addAttachment(draft.id));
   };
 
+  // Files dragged in from Explorer, Finder or the desktop. Only drags that carry files
+  // are taken over, so dragging text within the editor still works as normal.
+  const [dropping, setDropping] = useState(false);
+  const dragDepth = useRef(0);
+  const carriesFiles = (e: DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
+  const onDragEnter = (e: DragEvent) => {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setDropping(true);
+  };
+  const onDragOver = (e: DragEvent) => {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+  const onDragLeave = (e: DragEvent) => {
+    if (!carriesFiles(e)) return;
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDropping(false);
+  };
+  const onDrop = async (e: DragEvent) => {
+    if (!carriesFiles(e)) return;
+    // Stop the editor (or the web view) from inserting or opening the file.
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth.current = 0;
+    setDropping(false);
+    // Folders show up as entries with no file behind them; skip those.
+    const files = Array.from(e.dataTransfer.items ?? [])
+      .filter((i) => i.kind === 'file' && !i.webkitGetAsEntry?.()?.isDirectory)
+      .map((i) => i.getAsFile())
+      .filter((f): f is File => f !== null);
+    if (files.length === 0) return;
+    await save();
+    setError(null);
+    for (const f of files) {
+      try {
+        replace(await api.addAttachmentFile(draft.id, f));
+      } catch (err) {
+        setError(`Couldn't attach ${f.name}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  };
+  const dropProps = { onDragEnter, onDragOver, onDragLeave, onDrop };
+  const dropHint = dropping && (
+    <div className="drop-hint" aria-hidden>
+      <Paperclip size={18} />
+      Drop to attach
+    </div>
+  );
+
   const removeAttachment = async (id: string) => {
     await save();
     replace(await api.removeAttachment(draft.id, id));
@@ -276,7 +328,8 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
 
   if (layout === 'popout') {
     return (
-      <div className="popout" ref={root} onKeyDown={onKeyDown}>
+      <div className={`popout${dropping ? ' dropping' : ''}`} ref={root} onKeyDown={onKeyDown} {...dropProps}>
+        {dropHint}
         <div className="popout-toolbar">
           <button type="button" className="btn btn-primary" onClick={send} disabled={sending}>
             Send
@@ -318,7 +371,8 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
   }
 
   return (
-    <div className="draft-section" ref={root} aria-label={`${MODE_TITLE[draft.mode]} draft`} onKeyDown={onKeyDown}>
+    <div className={`draft-section${dropping ? ' dropping' : ''}`} ref={root} aria-label={`${MODE_TITLE[draft.mode]} draft`} onKeyDown={onKeyDown} {...dropProps}>
+      {dropHint}
       <div className="draft-section-header">
         <span className="title">{MODE_TITLE[draft.mode]}</span>
         <button type="button" className="btn btn-ghost" onClick={popOut}>

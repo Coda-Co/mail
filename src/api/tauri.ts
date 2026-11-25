@@ -34,6 +34,11 @@ export const tauriApi: MailApi = {
   updateDraft: (draft) => call('update_draft', { draft }),
   changeDraftAccount: (draftId, accountId) => call('change_draft_account', { draftId, accountId }),
   addAttachment: (draftId) => call('add_attachment', { draftId }),
+  // The bytes go as the raw request body (no JSON encoding); names ride in headers.
+  addAttachmentFile: async (draftId, file) =>
+    invoke('add_attachment_data', new Uint8Array(await file.arrayBuffer()), {
+      headers: { 'x-draft-id': encodeURIComponent(draftId), 'x-file-name': encodeURIComponent(file.name) },
+    }),
   removeAttachment: (draftId, attachmentId) => call('remove_attachment', { draftId, attachmentId }),
   discardDraft: (draftId) => call('discard_draft', { draftId }),
   sendDraft: (draftId) => call('send_draft', { draftId }),

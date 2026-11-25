@@ -336,6 +336,8 @@ export interface MailApi {
   /** Swap From: re-inserts that account's signature. */
   changeDraftAccount(draftId: string, accountId: string): Promise<Draft>;
   addAttachment(draftId: string): Promise<Draft>;
+  /** Attach a file dropped onto the draft (from Explorer, Finder or the desktop). */
+  addAttachmentFile(draftId: string, file: File): Promise<Draft>;
   removeAttachment(draftId: string, attachmentId: string): Promise<Draft>;
   discardDraft(draftId: string): Promise<void>;
   sendDraft(draftId: string): Promise<Draft>;

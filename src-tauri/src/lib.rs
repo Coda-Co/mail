@@ -147,6 +147,7 @@ pub fn run() {
             commands::update_draft,
             commands::change_draft_account,
             commands::add_attachment,
+            commands::add_attachment_data,
             commands::remove_attachment,
             commands::discard_draft,
             commands::send_draft,

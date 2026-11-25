@@ -660,6 +660,13 @@ export const demoApi: MailApi = {
     save();
     return clone(d);
   },
+  async addAttachmentFile(draftId, file) {
+    const d = getDraftState(draftId);
+    d.attachments.push({ id: `att-${Math.random().toString(36).slice(2, 9)}`, name: file.name, contentType: file.type || 'application/octet-stream', size: file.size, isInline: false });
+    d.edited = true;
+    save();
+    return clone(d);
+  },
   async removeAttachment(draftId, attachmentId) {
     const d = getDraftState(draftId);
     d.attachments = d.attachments.filter((a) => a.id !== attachmentId);

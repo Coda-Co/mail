@@ -425,3 +425,18 @@ fn new_drafts_are_unedited_until_changed() {
     assert!(svc.update_draft(&changed).unwrap().edited);
     assert!(svc.get_draft(&d.id).unwrap().edited, "stays edited once saved");
 }
+
+#[test]
+fn dropped_files_are_kept_and_attached() {
+    let (svc, ids) = setup();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()) }).unwrap();
+    let d = svc.add_attachment_bytes(&d.id, "Q4 plan: draft?.pdf", b"%PDF-1.4 hello").unwrap();
+    let a = &d.attachments[0];
+    assert_eq!(a.name, "Q4 plan_ draft_.pdf", "unsafe characters are replaced");
+    assert_eq!(a.size, 14);
+    assert_eq!(a.content_type, "application/pdf");
+    let path = a.local_path.as_deref().unwrap();
+    assert!(path.contains("outgoing"), "kept outside the pruned download cache: {path}");
+    assert_eq!(std::fs::read(path).unwrap(), b"%PDF-1.4 hello");
+    assert!(ops(&svc, &ids.coda).iter().any(|k| k == "saveDraft"));
+}
