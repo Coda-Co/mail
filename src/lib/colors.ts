@@ -21,9 +21,9 @@ export function mix(color: string, amount: number, base = '#FFFFFF'): string {
 }
 
 export function eventFill(color: string, dark: boolean): string {
-  return dark ? mix(color, 0.4, '#16191D') : mix(color, 0.32);
+  return dark ? mix(color, 0.4, '#1C1A17') : mix(color, 0.32);
 }
 
 export function eventSelectedFill(color: string, dark: boolean): string {
-  return dark ? mix(color, 0.55, '#16191D') : mix(color, 0.48);
+  return dark ? mix(color, 0.55, '#1C1A17') : mix(color, 0.48);
 }
