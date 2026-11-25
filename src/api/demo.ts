@@ -647,6 +647,21 @@ export const demoApi: MailApi = {
     emit(EVENTS.draftChanged, { draftId });
     return clone(d);
   },
+  async setDraftSignature(draftId, signatureId) {
+    const d = getDraftState(draftId);
+    const sig = signatureId ? state.signatures.find((s) => s.id === signatureId) : undefined;
+    if (signatureId && !sig) throw new Error('That signature no longer exists.');
+    if (sig && sig.accountId !== d.accountId) throw new Error('That signature belongs to another account.');
+    const firstEdit = d.edited === false;
+    d.signatureId = sig?.id;
+    d.bodyHtml = withSignature(d.bodyHtml, sig);
+    d.edited = true;
+    d.updatedAt = now().toISOString();
+    save();
+    emit(EVENTS.draftChanged, { draftId });
+    if (firstEdit) changed([d.accountId]);
+    return clone(d);
+  },
   async addAttachment(draftId) {
     const d = getDraftState(draftId);
     if (!hasWindow) return clone(d);

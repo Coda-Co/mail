@@ -33,6 +33,7 @@ export const tauriApi: MailApi = {
   getDraft: (draftId) => call('get_draft', { draftId }),
   updateDraft: (draft) => call('update_draft', { draft }),
   changeDraftAccount: (draftId, accountId) => call('change_draft_account', { draftId, accountId }),
+  setDraftSignature: (draftId, signatureId) => call('set_draft_signature', { draftId, signatureId }),
   addAttachment: (draftId) => call('add_attachment', { draftId }),
   removeAttachment: (draftId, attachmentId) => call('remove_attachment', { draftId, attachmentId }),
   discardDraft: (draftId) => call('discard_draft', { draftId }),

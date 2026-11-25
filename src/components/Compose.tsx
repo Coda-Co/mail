@@ -4,6 +4,7 @@ import { api, EVENTS, onEvent } from '../api';
 import type { Draft, Message } from '../api/types';
 import { AccountPicker } from './AccountPicker';
 import { AddressField } from './AddressField';
+import { SignaturePicker } from './SignaturePicker';
 import { RichEditor, type RichEditorHandle } from './RichEditor';
 import { useToast } from './ui';
 import { useCommand } from '../lib/commands';
@@ -195,6 +196,15 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
     replace(await api.changeDraftAccount(draft.id, accountId));
   };
 
+  const changeSignature = async (signatureId: string | null) => {
+    await save();
+    try {
+      replace(await api.setDraftSignature(draft.id, signatureId));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const onKeyDown = (e: KeyboardEvent) => {
     if (matches(e, 'Mod+Enter', isMac)) {
       e.preventDefault();
@@ -209,6 +219,7 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
     <div className="field-row">
       <span className="field-label">From</span>
       <AccountPicker accountId={draft.accountId} onChange={changeAccount} />
+      <SignaturePicker accountId={draft.accountId} signatureId={draft.signatureId} onChange={changeSignature} />
     </div>
   );
   const toRow = (
