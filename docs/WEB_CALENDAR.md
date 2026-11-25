@@ -30,7 +30,7 @@ These tenants block third-party apps on purpose. Copying their calendar data int
 | Window | 14 days back to 42 days forward from today (constants in one place). Events outside it are pruned on each refresh. |
 | Refresh | When the toggle is turned on, when the web view finishes loading, every 10 minutes after that, and when the user opens the Calendar view (at most once a minute). |
 | Read-only | No Going / Maybe / No, Edit or Delete in the event panel. Web calendars never appear in the new-event account or calendar picker. |
-| Look | Events use the account's colour (web accounts are neutral grey) and a small "web" tag, like the sidebar. The event panel shows "From Outlook on the web · updated 4 min ago" and an **Open event in Outlook on the web** button that switches to that account's web view and opens the event's own page there (`open_web_event` → `https://<host>/calendar/item/<id>`). |
+| Look | Events use the account's colour (web accounts are neutral grey) and a small "web" tag, like the calendar list. The event panel shows "From Outlook on the web · updated 4 min ago" and an **Open event in Outlook on the web** button that switches to that account's web view and opens the event's own page there (`open_web_event` → `https://<host>/calendar/item/<id>`). |
 | Visibility | The web calendar appears in the calendar list with its toggle like any other calendar (`calendar_visibility`). |
 | Staleness | If the last good refresh is older than 1 hour, the calendar list shows "Not updated since 10:42" next to it. If the page is signed out or the fetch fails, keep the last good data and show the error there. Never wipe data on a failed fetch. |
 | Agenda | Web events show in the agenda panel the same way (it reads `list_events`). |

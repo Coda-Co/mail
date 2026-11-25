@@ -619,29 +619,235 @@ h3 {
   color: var(--text-muted);
 }
 
-/* ---------- Sidebar ---------- */
+/* ---------- Rail ---------- */
 
-.sidebar {
-  flex: 0 0 var(--sidebar-w);
-  width: var(--sidebar-w);
+/* The narrow bar down the left: Calendar and People, then one glyph per mailbox. */
+.rail {
+  flex: 0 0 64px;
+  width: 64px;
   background: var(--sidebar);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  padding: 12px 10px 0;
-  gap: 4px;
+  align-items: center;
   overflow: hidden;
 }
 
-.sidebar-scroll {
+.rail-scroll {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  scrollbar-width: none;
+}
+
+.rail-item {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* Selection pill on the left edge, like a tab marker. */
+.rail-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 4px;
+  height: 0;
+  border-radius: 0 3px 3px 0;
+  background: var(--text);
+  transform: translateY(-50%);
+  transition: height 0.12s ease;
+}
+
+.rail-item.selected::before {
+  height: 24px;
+}
+
+.rail-button {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--text-muted);
+}
+
+.rail-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rail-button:hover .rail-icon,
+.rail-add:hover {
+  background: var(--nav-selected);
+  color: var(--text);
+}
+
+.rail-item.selected .rail-icon {
+  background: var(--nav-selected);
+  color: var(--text);
+}
+
+.rail-add {
+  border: 1px dashed var(--tag-border);
+}
+
+.rail-divider {
+  width: 28px;
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+  flex-shrink: 0;
+}
+
+.rail-glyph {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  padding-top: 8px;
+  color: #ffffff;
+  font-weight: 650;
+  line-height: 1;
+  user-select: none;
+  opacity: 0.82;
+  transition: opacity 0.12s ease, border-radius 0.12s ease;
+}
+
+.rail-glyph .org {
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+/* The mailbox's own initial, when there's more than one mailbox in the organisation. */
+.rail-glyph .mailbox {
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 1px;
+  opacity: 0.92;
+}
+
+.rail-button:hover .rail-glyph {
+  opacity: 1;
+}
+
+.rail-item.selected .rail-glyph {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--sidebar), 0 0 0 4px var(--text);
+}
+
+.rail-badge {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--danger);
+  color: #ffffff;
+  font-size: var(--fs-caption);
+  font-weight: 650;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--sidebar);
+  font-variant-numeric: tabular-nums;
+}
+
+.rail-status {
+  position: absolute;
+  bottom: -4px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px var(--sidebar);
+}
+
+.rail-status.auth {
+  background: var(--warning);
+}
+
+.rail-status.error {
+  background: var(--danger);
+}
+
+.rail-status.web {
+  background: var(--bg);
+  color: var(--text-muted);
+  border: 1px solid var(--tag-border);
+}
+
+.rail-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--border);
+  width: 100%;
+}
+
+.rail-me {
+  display: flex;
+}
+
+/* ---------- Side panel (Calendar's list of calendars) ---------- */
+
+.side-panel {
+  flex: 0 0 var(--sidebar-w);
+  width: var(--sidebar-w);
+  background: var(--panel-muted);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.side-panel-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin: 0 -10px;
-  padding: 0 10px;
+  padding: 4px 10px 12px;
+}
+
+.calendar-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  min-height: 0;
 }
 
 .nav-item {
@@ -735,24 +941,6 @@ h3 {
   line-height: 16px;
 }
 
-.sign-in-tag {
-  cursor: pointer;
-  color: var(--accent);
-  border-color: currentColor;
-}
-
-.sign-in-tag:hover {
-  background: var(--chip-neutral);
-}
-
-.neutral-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  opacity: 0.6;
-}
-
 .cal-check {
   display: flex;
   align-items: center;
@@ -784,16 +972,6 @@ h3 {
   color: var(--text-muted);
 }
 
-.sidebar-footer {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  margin: 12px 0 0;
-  border-top: 1px solid var(--border);
-  min-height: 58px;
-}
-
 .avatar {
   width: 34px;
   height: 34px;
@@ -817,21 +995,6 @@ h3 {
   background: var(--avatar-me);
 }
 
-.footer-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
-.footer-text .name {
-  font-weight: 580;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .demo-tag {
   flex-shrink: 0;
   font-size: var(--fs-caption);
@@ -842,14 +1005,6 @@ h3 {
   border-radius: 4px;
   padding: 0 5px;
   line-height: 16px;
-}
-
-.footer-text .email {
-  font-size: var(--fs-small);
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* ---------- Pane resizers ---------- */
@@ -938,9 +1093,6 @@ h3 {
   padding-top: 14px;
 }
 
-.mail-panes .list-header .tabs {
-  margin-top: 10px;
-}
 
 .mail-panes .list-header .view-subtitle {
   margin-top: 0;
@@ -971,6 +1123,76 @@ h3 {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.view-subtitle .truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Folder icons above the message list. */
+.folder-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  margin-top: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.folder-tab {
+  position: relative;
+  flex: 0 1 36px;
+  min-width: 26px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 0 2px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.folder-tab:hover {
+  color: var(--text);
+}
+
+.folder-tab.selected {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+
+.folder-more {
+  margin-left: auto;
+  flex-basis: 40px;
+}
+
+.folder-count {
+  position: absolute;
+  top: 1px;
+  right: -2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--chip-neutral);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.folder-tab.selected .folder-count {
+  background: var(--nav-selected);
+  color: var(--text);
 }
 
 .tabs {
@@ -3040,7 +3262,7 @@ h3 {
 }
 
 @media (max-width: 720px) {
-  .sidebar,
+  .cal-sidebar,
   .sidebar-resizer {
     display: none;
   }

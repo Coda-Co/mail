@@ -1,7 +1,11 @@
 // Keyboard shortcuts, identical on Windows and macOS: "Mod" is Ctrl on
 // Windows/Linux and Cmd on macOS.
 
+/** Mailboxes in the rail, in order, after Calendar and People. */
+export type MailboxSlot = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
 export type ShortcutId =
+  | `goMailbox${MailboxSlot}`
   | 'newMessage'
   | 'reply'
   | 'replyAll'
@@ -13,7 +17,6 @@ export type ShortcutId =
   | 'send'
   | 'search'
   | 'escape'
-  | 'goMail'
   | 'goCalendar'
   | 'goPeople'
   | 'next'
@@ -39,9 +42,10 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'send', combo: 'Mod+Enter', allowInInput: true },
   { id: 'search', combo: 'Mod+E', allowInInput: true },
   { id: 'escape', combo: 'Escape', allowInInput: true },
-  { id: 'goMail', combo: 'Mod+1', allowInInput: true },
-  { id: 'goCalendar', combo: 'Mod+2', allowInInput: true },
-  { id: 'goPeople', combo: 'Mod+3', allowInInput: true },
+  // Mod+1..9 follow the rail top to bottom: Calendar, People, then each mailbox.
+  { id: 'goCalendar', combo: 'Mod+1', allowInInput: true },
+  { id: 'goPeople', combo: 'Mod+2', allowInInput: true },
+  ...([1, 2, 3, 4, 5, 6, 7] as MailboxSlot[]).map((n): Shortcut => ({ id: `goMailbox${n}`, combo: `Mod+${n + 2}`, allowInInput: true })),
   { id: 'next', combo: 'J', allowInInput: false },
   { id: 'next', combo: 'ArrowDown', allowInInput: false },
   { id: 'previous', combo: 'K', allowInInput: false },

@@ -12,6 +12,8 @@ import { eventWhere } from '../components/Agenda';
 import { Menu, Modal, useToast } from '../components/ui';
 import { eventTitle, plural } from '../lib/text';
 import { TopSearch } from '../components/TopSearch';
+import { CalendarSidebar } from '../components/CalendarSidebar';
+import { Resizer } from '../components/Resizer';
 import { eventActions, webEventSource } from '../lib/webCalendar';
 
 type Mode = 'day' | 'week' | 'month';
@@ -545,6 +547,9 @@ export function CalendarView() {
 
   return (
     <div className="calendar-view">
+      <CalendarSidebar />
+      <Resizer variable="--sidebar-w" pane="before" label="Resize calendars" className="sidebar-resizer" />
+      <div className="calendar-main">
       <TopSearch
         value={query}
         onChange={setQuery}
@@ -596,6 +601,7 @@ export function CalendarView() {
         {mode === 'month' ? monthGrid : timeGrid}
       </section>
       )}
+      </div>
       {selected && (
         <EventModal
           key={selected.id}

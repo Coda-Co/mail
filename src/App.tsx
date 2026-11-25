@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { WifiOff } from 'lucide-react';
 import { AppProvider, useApp } from './state/app';
 import { ToastProvider } from './components/ui';
-import { Sidebar } from './components/Sidebar';
-import { Resizer } from './components/Resizer';
+import { Rail } from './components/Rail';
 import { SearchSlot, TopBar } from './components/TopBar';
 import { MailView } from './views/MailView';
 import { CalendarView } from './views/CalendarView';
@@ -34,7 +33,6 @@ function Shell() {
   const app = useApp();
   const [searchSlot, setSearchSlot] = useState<HTMLDivElement | null>(null);
   useGlobalShortcuts();
-  useCommand('goMail', () => app.navigate({ view: 'mail' }));
   useCommand('goCalendar', () => app.navigate({ view: 'calendar' }));
   useCommand('goPeople', () => app.navigate({ view: 'people' }));
   // Outside the mail view, mail shortcuts switch to it first. In the mail
@@ -53,8 +51,7 @@ function Shell() {
   const { route } = app;
   return (
     <div className="app">
-      <Sidebar />
-      <Resizer variable="--sidebar-w" pane="before" label="Resize sidebar" className="sidebar-resizer" />
+      <Rail />
       <main className="app-main">
         <TopBar slotRef={setSearchSlot} />
         {!app.sync.online && (

@@ -1,7 +1,7 @@
 import { LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
-import type { Folder, ListTab, MessageSummary, SearchField, SearchResult } from '../api/types';
+import type { Folder, MessageSummary, SearchField, SearchResult } from '../api/types';
 import { useApp } from '../state/app';
 import { useCommand } from '../lib/commands';
 import { MessageList } from '../components/MessageList';
@@ -9,11 +9,11 @@ import { ReadingPane, type Selection } from '../components/ReadingPane';
 import { Agenda } from '../components/Agenda';
 import { Resizer } from '../components/Resizer';
 import { SearchHeader, type SearchState } from '../components/SearchHeader';
+import { FolderBar, scopeTitle } from '../components/FolderBar';
 import { Avatar, useToast } from '../components/ui';
 import { plural } from '../lib/text';
 
 const PAGE = 100;
-const ROLE_NAMES: Record<string, string> = { inbox: 'Inbox', drafts: 'Drafts', sent: 'Sent', archive: 'Archive', deleted: 'Deleted', junk: 'Junk' };
 
 const FIELD_KEY = 'mail.searchField';
 const FIELDS: SearchField[] = ['from', 'to', 'subject', 'content', 'all'];
@@ -89,12 +89,8 @@ export function MailView() {
   const searchInput = useRef<HTMLInputElement>(null);
 
   const account = scope.accountId ? accountById(scope.accountId) : undefined;
-  const folderName = useMemo(() => {
-    if ('role' in scope.folder) return ROLE_NAMES[scope.folder.role];
-    const id = scope.folder.id;
-    return folders.find((f) => f.id === id)?.name ?? 'Folder';
-  }, [scope.folder, folders]);
-  const scopeLabel = `${folderName}, ${account ? account.displayName : 'all accounts'}`;
+  const folderName = useMemo(() => scopeTitle(scope, folders), [scope, folders]);
+  const scopeLabel = account ? `${folderName}, ${account.displayName}` : folderName;
 
   useEffect(() => {
     api.listFolders(scope.accountId).then(setFolders);
@@ -233,8 +229,6 @@ export function MailView() {
     return false;
   });
 
-  const setTab = (tab: ListTab) => app.setScope({ ...scope, tab });
-
   const searchServer = async () => {
     if (serverBusy) return;
     const forQuery = search;
@@ -266,18 +260,14 @@ export function MailView() {
         {!searchActive && (
           <div className="list-header">
             {account && (
-              <div className="view-subtitle">
+              <div className="view-subtitle" title={account.email}>
                 <span className="acc-dot" style={{ background: account.color }} />
-                {account.displayName}
+                <span className="truncate">
+                  {account.displayName} · {folderName}
+                </span>
               </div>
             )}
-            <div className="tabs" role="tablist">
-              {(['all', 'unread', 'flagged'] as ListTab[]).map((t) => (
-                <button key={t} type="button" role="tab" aria-selected={scope.tab === t} className={`tab${scope.tab === t ? ' selected' : ''}`} onClick={() => setTab(t)}>
-                  {t === 'all' ? (account ? 'All' : 'All accounts') : t === 'unread' ? 'Unread' : 'Flagged'}
-                </button>
-              ))}
-            </div>
+            <FolderBar scope={scope} folders={folders} onChange={app.setScope} />
           </div>
         )}
         <MessageList
@@ -299,10 +289,10 @@ export function MailView() {
                         </span>
                       )
                     : 'No messages match these filters'
-                : scope.tab === 'unread'
-                  ? 'No unread messages'
-                  : scope.tab === 'flagged'
-                    ? 'No flagged messages'
+                : !account
+                  ? 'Add a mailbox with + in the sidebar'
+                  : scope.tab === 'unread'
+                    ? 'No unread messages'
                     : `Nothing in ${folderName}`
           }
           header={searchActive && result && !searchPending ? <ContactCard result={result} onEmail={(email, name) => newMessage({ email, name })} /> : undefined}

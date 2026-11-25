@@ -84,7 +84,7 @@ function GeneralTab() {
         </div>
         <span className="hint">
           {keyLabel('Mod+N')} new · {keyLabel('Mod+R')} reply · {keyLabel('Mod+Shift+R')} reply all · E archive · Delete delete · {keyLabel('Mod+U')} mark unread · {keyLabel('Mod+Z')} undo · {keyLabel('Mod+Enter')} send · {keyLabel('Mod+E')} search · Esc close (empty or unchanged drafts are discarded) ·{' '}
-          {keyLabel('Mod+1')}/{keyLabel('Mod+2')}/{keyLabel('Mod+3')} mail, calendar, people · J/K next, previous
+          {keyLabel('Mod+1')} calendar · {keyLabel('Mod+2')} people · {keyLabel('Mod+3')}–{keyLabel('Mod+9')} mailboxes, in sidebar order · J/K next, previous
         </span>
       </div>
       <div className="settings-group">

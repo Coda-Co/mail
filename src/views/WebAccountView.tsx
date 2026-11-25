@@ -54,7 +54,7 @@ export function WebAccountView({ accountId }: { accountId: string }) {
       <div className="empty-state">
         <AppWindow size={40} strokeWidth={1.5} color="#6E7781" />
         <span className="title">Outlook on the web loads here</span>
-        <span className="body">A web view with its own isolated sign-in. It stays loaded in the background, so new mail still shows in the sidebar count and as desktop notifications.</span>
+        <span className="body">A web view with its own isolated sign-in. It stays loaded in the background, so new mail still shows in its badge in the sidebar and as desktop notifications.</span>
       </div>
     </div>
   );

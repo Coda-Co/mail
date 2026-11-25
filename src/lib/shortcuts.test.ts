@@ -33,7 +33,10 @@ describe('shortcut matching', () => {
     expect(resolveShortcut(key('Enter', { ctrl: true }), true, false)).toBe('send');
     expect(resolveShortcut(key('e', { ctrl: true }), true, false)).toBe('search');
     expect(resolveShortcut(key('Escape'), true, false)).toBe('escape');
-    expect(resolveShortcut(key('2', { meta: true }), true, true)).toBe('goCalendar');
+    expect(resolveShortcut(key('1', { meta: true }), true, true)).toBe('goCalendar');
+    expect(resolveShortcut(key('2', { ctrl: true }), true, false)).toBe('goPeople');
+    expect(resolveShortcut(key('3', { ctrl: true }), true, false)).toBe('goMailbox1');
+    expect(resolveShortcut(key('9', { meta: true }), true, true)).toBe('goMailbox7');
   });
 
   it('does not treat Shift+E as archive', () => {

@@ -34,7 +34,7 @@ Each account has one of two backends. The interface treats them the same where i
 | When | Tenant allows our app (Coda & Co, consenting clients) | Tenant blocks third-party apps |
 | How | Microsoft Graph via our own multi-tenant app registration | Outlook on the web in an embedded web view |
 | Offline | Full (configurable window) | None |
-| Unified inbox, search, agenda, people | Yes | No: own pane only |
+| Mail list, search, agenda, people | Yes | No: own pane only |
 | Unread count | From sync | Read from the page (best effort) |
 | Notifications | From sync | Captured from the page's web notifications |
 
@@ -63,8 +63,10 @@ Each account has one of two backends. The interface treats them the same where i
 
 ### 3.1 Mail
 
-- **Unified inbox** across Graph accounts, each message marked by its account's colour. Tabs: All accounts, Unread, Flagged.
-- **Sidebar**: Inbox, Calendar, People; Accounts (with unread counts; Web accounts tagged "web"); Folders for the selected scope (Drafts, Sent, Archive, Deleted, plus user folders).
+- **One mailbox at a time.** Each mailbox is its own space, like a separate app; there is no combined inbox. Mail opens the mailbox used last.
+- **Rail** down the left: Calendar and People (shared across mailboxes), a divider, then one glyph per mailbox (Graph and Web), then + to add an account; Settings and your avatar at the bottom. A glyph is the organisation's initial on the account colour; with more than one mailbox in the same organisation (same tenant or domain) it adds the mailbox's initial (Cm, Cs). Badges: unread count; orange ! for sign-in needed; red ! for a sync error; a globe for Web accounts. Right-click a glyph for Sign in again, Sync now, Account settings, Remove.
+- **Folder icons** above the message list: Inbox, Unread (the inbox's unread mail), Drafts, Sent, Archive, Deleted, Junk, then a folder menu with the user's own folders. Above them, the mailbox and folder name.
+- **Calendar** has its own sidebar listing each account's calendars to show or hide.
 - **Reading pane** with actions: Reply, Reply all, Forward, Archive, Delete, Open in new window.
 - **Replies draft at the top of the conversation**, above the message being answered, with From, To, Cc, Bcc, Send, Attach, Discard and Pop out. Drafts save to the server's Drafts folder automatically.
 - **Pop out**: any message, reply or new message can open in its own window, and dock back.
@@ -77,8 +79,8 @@ Each account has one of two backends. The interface treats them the same where i
 
 ### 3.2 Search
 
-- Search **filters the current view** (folder, account or unified inbox). It does not open a separate screen.
-- Scope chip: "In: Inbox, all accounts", widenable to all folders.
+- Search **filters the current view** (the mailbox's folder). It does not open a separate screen.
+- Scope chip: "In: Inbox, Coda & Co", widenable to all folders.
 - Facet chips: **From**, **To**, **Has attachment**, **Unread**, **Date**, **Account**.
 - Choosing a person in From or To shows a contact card above the results (Email, Copy address, message count).
 - Runs against the local index first, instantly. "Search the server" extends results beyond the offline window.
@@ -112,13 +114,13 @@ Each account has one of two backends. The interface treats them the same where i
 
 ## 4. Design
 
-- Style: Outline-like. Light grey sidebar, white content, one blue accent, generous spacing.
+- Style: Outline-like. Light grey rail, white content, one blue accent, generous spacing.
 - Type: Geist everywhere, headings included. Bundle the font with the app; never load it from the web.
 - Light mode first; dark mode before v1 ships.
 - Keyboard shortcuts identical on both platforms (Ctrl on Windows, Cmd on Mac):
   - Ctrl+N new message, Ctrl+R reply, Ctrl+Shift+R reply all, Ctrl+F forward (to confirm: clashes with find)
   - E archive, Delete delete, Ctrl+Z undo (archive, delete, move), Ctrl+Enter send, Ctrl+E search, Esc close or clear (closes a draft: an unchanged reply or forward, or a new message with no content, is discarded; anything else is saved. Closes a pop-out window)
-  - Ctrl+1 mail, Ctrl+2 calendar, Ctrl+3 people
+  - Ctrl+1 calendar, Ctrl+2 people, Ctrl+3 to Ctrl+9 the mailboxes in rail order
 - Narrow windows: agenda panel folds away first, then the reading pane stacks.
 
 ## 5. Architecture

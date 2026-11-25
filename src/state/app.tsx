@@ -50,6 +50,16 @@ interface AppState {
 
 const Ctx = createContext<AppState | null>(null);
 
+const LAST_MAILBOX_KEY = 'mail.lastMailbox';
+
+function lastMailbox(): string | undefined {
+  try {
+    return localStorage.getItem(LAST_MAILBOX_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const DEFAULT_SETTINGS: Settings = { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show' };
 const DEFAULT_SYNC: SyncStatus = { online: true, syncing: false, label: 'Loading…', outboxHeld: 0 };
 
@@ -125,6 +135,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setScopeState(s);
     setSearchActive(false);
   }, []);
+
+  // Each mailbox is its own space: mail always shows one account. Open the
+  // last one used, or the first, and move off an account that's gone.
+  useEffect(() => {
+    const graph = accounts.filter((a) => a.kind === 'graph');
+    if (graph.length === 0) return;
+    if (scope.accountId && graph.some((a) => a.id === scope.accountId)) return;
+    const remembered = lastMailbox();
+    const pick = graph.find((a) => a.id === remembered) ?? graph[0];
+    setScopeState({ accountId: pick.id, folder: { role: 'inbox' }, tab: 'all' });
+  }, [accounts, scope.accountId]);
+
+  useEffect(() => {
+    if (!scope.accountId) return;
+    try {
+      localStorage.setItem(LAST_MAILBOX_KEY, scope.accountId);
+    } catch {
+      // Not remembered; fine.
+    }
+  }, [scope.accountId]);
 
   const updateSettings = useCallback(async (patch: Partial<Settings>) => {
     setSettings(await api.updateSettings(patch));
