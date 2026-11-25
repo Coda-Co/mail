@@ -20,6 +20,7 @@ import type {
   SearchResult,
   Signature,
   SyncStatus,
+  UpdateStatus,
   ViewScope,
 } from './types';
 import { EVENTS } from './types';
@@ -666,6 +667,21 @@ export const demoApi: MailApi = {
     emit(EVENTS.draftChanged, { draftId });
     return clone(d);
   },
+  async setDraftSignature(draftId, signatureId) {
+    const d = getDraftState(draftId);
+    const sig = signatureId ? state.signatures.find((s) => s.id === signatureId) : undefined;
+    if (signatureId && !sig) throw new Error('That signature no longer exists.');
+    if (sig && sig.accountId !== d.accountId) throw new Error('That signature belongs to another account.');
+    const firstEdit = d.edited === false;
+    d.signatureId = sig?.id;
+    d.bodyHtml = withSignature(d.bodyHtml, sig);
+    d.edited = true;
+    d.updatedAt = now().toISOString();
+    save();
+    emit(EVENTS.draftChanged, { draftId });
+    if (firstEdit) changed([d.accountId]);
+    return clone(d);
+  },
   async addAttachment(draftId) {
     const d = getDraftState(draftId);
     if (!hasWindow) return clone(d);
@@ -681,6 +697,13 @@ export const demoApi: MailApi = {
       d.attachments.push({ id: `att-${Math.random().toString(36).slice(2, 9)}`, name: f.name, contentType: f.type || 'application/octet-stream', size: f.size, isInline: false });
       d.edited = true;
     }
+    save();
+    return clone(d);
+  },
+  async addAttachmentFile(draftId, file) {
+    const d = getDraftState(draftId);
+    d.attachments.push({ id: `att-${Math.random().toString(36).slice(2, 9)}`, name: file.name, contentType: file.type || 'application/octet-stream', size: file.size, isInline: false });
+    d.edited = true;
     save();
     return clone(d);
   },
@@ -935,4 +958,19 @@ export const demoApi: MailApi = {
   async openExternal(url) {
     if (hasWindow) window.open(url, '_blank', 'noopener');
   },
+
+  // The preview can't update itself. `?update=ready` shows the top-bar button and settings as
+  // they look once a new version has downloaded.
+  async updateStatus() {
+    return demoUpdate();
+  },
+  async checkForUpdate() {
+    return demoUpdate();
+  },
+  async installUpdate() {},
 };
+
+function demoUpdate(): UpdateStatus {
+  const ready = hasWindow && new URLSearchParams(window.location.search).get('update') === 'ready';
+  return ready ? { state: 'ready', currentVersion: '0.1.0', version: '0.2.0', checkedAt: now().toISOString() } : { state: 'unavailable', currentVersion: '0.1.0' };
+}

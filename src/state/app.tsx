@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, EVENTS, onEvent } from '../api';
-import type { Account, DiskEncryption, Me, Settings, SyncStatus, ViewScope } from '../api/types';
+import type { Account, DiskEncryption, Me, Settings, SyncStatus, UpdateStatus, ViewScope } from '../api/types';
 
 export type View = 'mail' | 'calendar' | 'people' | 'web';
 
@@ -30,6 +30,9 @@ interface AppState {
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
   sync: SyncStatus;
   disk: DiskEncryption;
+  /** App updates: whether a new version is downloading or ready to install. */
+  update: UpdateStatus;
+  setUpdate: (u: UpdateStatus) => void;
   route: Route;
   navigate: (r: Route) => void;
   scope: ViewScope;
@@ -61,6 +64,7 @@ function lastMailbox(): string | undefined {
 }
 
 const DEFAULT_SETTINGS: Settings = { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show' };
+const DEFAULT_UPDATE: UpdateStatus = { state: 'unavailable', currentVersion: '' };
 const DEFAULT_SYNC: SyncStatus = { online: true, syncing: false, label: 'Loading…', outboxHeld: 0 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -69,6 +73,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [sync, setSync] = useState<SyncStatus>(DEFAULT_SYNC);
   const [disk, setDisk] = useState<DiskEncryption>('unknown');
+  const [update, setUpdate] = useState<UpdateStatus>(DEFAULT_UPDATE);
   const [route, setRoute] = useState<Route>(() => parseHash(window.location.hash));
   const [scope, setScopeState] = useState<ViewScope>({ folder: { role: 'inbox' }, tab: 'all' });
   const [mailVersion, setMailVersion] = useState(0);
@@ -85,6 +90,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     api.getSettings().then(setSettings);
     api.syncStatus().then(setSync);
     api.diskEncryption().then(setDisk);
+    api.updateStatus().then(setUpdate);
     const offs = [
       onEvent(EVENTS.mailChanged, () => {
         bumpMail();
@@ -92,6 +98,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }),
       onEvent<Account[]>(EVENTS.accountsChanged, (a) => (Array.isArray(a) ? setAccounts(a) : reloadAccounts())),
       onEvent<SyncStatus>(EVENTS.syncStatus, setSync),
+      onEvent<UpdateStatus>(EVENTS.updateStatus, setUpdate),
       onEvent<{ accountId: string; unread: number | null }>(EVENTS.webUnread, ({ accountId, unread }) =>
         setAccounts((list) => list.map((a) => (a.id === accountId ? { ...a, unread } : a))),
       ),
@@ -170,6 +177,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateSettings,
       sync,
       disk,
+      update,
+      setUpdate,
       route,
       navigate,
       scope,
@@ -185,7 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       calendarFocus,
       setCalendarFocus,
     }),
-    [me, accounts, settings, updateSettings, sync, disk, route, navigate, scope, setScope, mailVersion, bumpMail, reloadAccounts, searchActive, settingsTab, calendarFocus],
+    [me, accounts, settings, updateSettings, sync, disk, update, route, navigate, scope, setScope, mailVersion, bumpMail, reloadAccounts, searchActive, settingsTab, calendarFocus],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

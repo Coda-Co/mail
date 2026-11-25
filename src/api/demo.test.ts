@@ -89,6 +89,23 @@ describe('demo backend', () => {
     expect(thread.drafts.map((x) => x.id)).toEqual([d.id]);
   });
 
+  it('a signature can be added to a draft created without one, swapped and removed', async () => {
+    const [sarah] = await demoApi.listMessages(inbox, 1, 0);
+    const d = await demoApi.createDraft({ mode: 'reply', sourceMessageId: sarah.id });
+    expect(d.signatureId).toBeUndefined();
+    const sigs = await demoApi.saveSignature({ id: '', accountId: d.accountId, name: 'Short', html: '<p>M</p>', defaultNew: false, defaultReply: false });
+    const added = await demoApi.setDraftSignature(d.id, sigs.id);
+    expect(added.id).toBe(d.id);
+    expect(added.signatureId).toBe(sigs.id);
+    expect(added.bodyHtml.match(/data-signature/g)).toHaveLength(1);
+    const again = await demoApi.setDraftSignature(d.id, sigs.id);
+    expect(again.bodyHtml.match(/data-signature/g)).toHaveLength(1);
+    const removed = await demoApi.setDraftSignature(d.id, null);
+    expect(removed.signatureId).toBeUndefined();
+    expect(removed.bodyHtml).not.toContain('data-signature');
+    await expect(demoApi.setDraftSignature(d.id, 'sig-coda')).rejects.toThrow(/another account/);
+  });
+
   it('sending files the message in Sent and removes the draft', async () => {
     const d = await demoApi.createDraft({ mode: 'new', accountId: 'acc-coda' });
     await expect(demoApi.sendDraft(d.id)).rejects.toThrow(/recipient/);

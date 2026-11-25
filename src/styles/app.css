@@ -529,6 +529,7 @@ h3 {
   flex: 1;
 }
 
+
 /* ---------- Buttons ---------- */
 
 .btn {
@@ -1684,6 +1685,30 @@ h3 {
   color: var(--text);
 }
 
+/* ---------- Dropping files onto a draft ---------- */
+
+.draft-section,
+.popout {
+  position: relative;
+}
+
+.drop-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px dashed var(--accent);
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+  /* Let the drag events land on the draft underneath, not the hint. */
+  pointer-events: none;
+}
+
 /* ---------- Inline draft ---------- */
 
 /* A reply sits at the top of the thread as a card, like the messages below it,
@@ -1833,6 +1858,11 @@ h3 {
 
 .account-picker:hover {
   background: var(--row-hover);
+}
+
+.signature-picker {
+  margin-left: auto;
+  color: var(--text-secondary);
 }
 
 .draft-editor {
