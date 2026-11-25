@@ -1,13 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { Flag, Paperclip } from 'lucide-react';
 import type { MessageSummary } from '../api/types';
-import { useApp } from '../state/app';
 import { listTime } from '../lib/dates';
 
 export function MessageRow({ m, selected, onSelect }: { m: MessageSummary; selected: boolean; onSelect: () => void }) {
-  const { accountById } = useApp();
   const ref = useRef<HTMLButtonElement>(null);
-  const acc = accountById(m.accountId);
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: 'nearest' });
   }, [selected]);
@@ -22,7 +19,6 @@ export function MessageRow({ m, selected, onSelect }: { m: MessageSummary; selec
       data-id={m.id}
     >
       <span className="line">
-        <span className="acc-dot" style={{ background: acc?.color ?? '#6E7781' }} title={acc?.displayName} />
         <span className="from">
           {m.isDraft && <span className="draft-label">Draft</span>}
           {who}
