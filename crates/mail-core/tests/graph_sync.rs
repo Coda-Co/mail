@@ -488,3 +488,49 @@ async fn cached_attachments_are_pruned_outside_the_window() {
     assert_eq!(m.attachments.len(), 1, "still listed, downloads on demand");
     assert!(m.attachments[0].local_path.is_none());
 }
+
+#[tokio::test]
+async fn meeting_requests_show_their_event() {
+    let (server, svc, acc, _) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    // M1 arrived without a type (as older rows did): one small request finds out what it is.
+    Mock::given(method("GET"))
+        .and(path("/me/messages/M1"))
+        .and(query_param("$select", "id"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"@odata.type": "#microsoft.graph.eventMessageRequest", "id": "M1"})))
+        .expect(1)
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    // Then the message with its event, which is beyond the synced calendar range.
+    Mock::given(method("GET"))
+        .and(path("/me/messages/M1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "@odata.type": "#microsoft.graph.eventMessageRequest", "id": "M1", "meetingMessageType": "meetingRequest",
+            "startDateTime": {"dateTime": "2027-03-04T13:00:00.0000000", "timeZone": "UTC"},
+            "endDateTime": {"dateTime": "2027-03-04T13:30:00.0000000", "timeZone": "UTC"},
+            "location": {"displayName": "Microsoft Teams Meeting"},
+            "event": {"id": "EV9", "subject": "Project Clarity & InfoSec",
+                      "start": {"dateTime": "2027-03-04T13:00:00.0000000", "timeZone": "UTC"}, "end": {"dateTime": "2027-03-04T13:30:00.0000000", "timeZone": "UTC"},
+                      "organizer": {"emailAddress": {"name": "Maurice", "address": "maurice@example.com"}}, "responseStatus": {"response": "notResponded"}, "attendees": []}
+        })))
+        .expect(1)
+        .with_priority(2)
+        .mount(&server)
+        .await;
+    let syncer = Syncer::new(&svc, &g, acc.clone());
+    assert!(syncer.ensure_meeting("M1").await.unwrap());
+    assert!(!syncer.ensure_meeting("M1").await.unwrap(), "read once");
+
+    let m = svc.get_message(&format!("{}:M1", acc.id)).unwrap();
+    let meeting = m.meeting.expect("meeting details");
+    assert_eq!(meeting.kind, MeetingKind::Request);
+    assert_eq!(meeting.start, "2027-03-04T13:00:00Z");
+    let event = meeting.event.expect("event added to the calendar");
+    assert_eq!(event.subject, "Project Clarity & InfoSec");
+    // Answerable from the message, and the answer shows there.
+    svc.respond_event(&event.id, EventResponse::Accepted).unwrap();
+    let again = svc.get_message(&format!("{}:M1", acc.id)).unwrap().meeting.unwrap().event.unwrap();
+    assert_eq!(again.my_response, ResponseStatus::Accepted);
+}

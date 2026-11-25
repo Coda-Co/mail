@@ -162,7 +162,11 @@ pub async fn get_thread(s: State<'_, AppState>, message_id: String) -> R<Thread>
             for (acc, raw) in targets {
                 let Ok(account) = svc.get_account(&acc) else { continue };
                 let Ok(g) = factory(&account) else { continue };
-                if let Ok(true) = Syncer::new(&svc, &g, account).ensure_attachments(&raw).await {
+                let syncer = Syncer::new(&svc, &g, account);
+                if let Ok(true) = syncer.ensure_meeting(&raw).await {
+                    changed = true;
+                }
+                if let Ok(true) = syncer.ensure_attachments(&raw).await {
                     changed = true;
                 }
             }

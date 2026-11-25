@@ -2847,3 +2847,180 @@ h3 {
   outline: 2px solid var(--accent, currentColor);
   outline-offset: 4px;
 }
+
+/* Meeting messages: when and where, Going / Maybe / No, and that part of the day across calendars. */
+.meeting-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--panel-muted);
+}
+
+.meeting-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.meeting-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--text-muted);
+}
+
+.meeting-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.meeting-when {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.meeting-card.cancelled .meeting-when {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.meeting-where {
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+}
+
+.meeting-status {
+  font-size: var(--fs-small);
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--chip-neutral);
+  color: var(--text-secondary);
+}
+
+.meeting-status.accepted {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.meeting-status.cancelled,
+.meeting-status.declined {
+  color: var(--danger);
+}
+
+.meeting-open {
+  font-size: var(--fs-meta);
+}
+
+.meeting-rsvp {
+  max-width: 360px;
+}
+
+.meeting-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+}
+
+.meeting-preview.loading {
+  min-height: 90px;
+}
+
+.meeting-preview-allday {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: 48px;
+}
+
+.meeting-preview-grid {
+  position: relative;
+}
+
+.meeting-preview-hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.meeting-preview-hour span {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.meeting-preview-events {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 48px;
+  right: 0;
+}
+
+.meeting-preview-event {
+  box-sizing: border-box;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 6px;
+  border: none;
+  border-left: 4px solid;
+  border-radius: 2px;
+  font: inherit;
+  font-size: var(--fs-small);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  min-height: 20px;
+}
+
+.meeting-preview-events .meeting-preview-event {
+  position: absolute;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.meeting-preview-event .title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meeting-preview-event .acc {
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The invitation itself: dashed outline, like Outlook's preview. */
+.meeting-preview-event.invite {
+  outline: 1.5px dashed var(--text);
+  outline-offset: -1.5px;
+  z-index: 1;
+}
+
+.meeting-preview-event.tentative {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 255, 255, 0.45) 6px 9px);
+}
+
+.meeting-preview-event.declined .title {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
