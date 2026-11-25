@@ -78,6 +78,10 @@
   --agenda-w: 264px;
   --hour-h: 56px;
 
+  --reading-canvas: #f3f5f7;
+  --message-card: #ffffff;
+  --shadow-card: 0 1px 2px rgba(31, 35, 40, 0.06), 0 2px 8px rgba(31, 35, 40, 0.05);
+  --shadow-card-hover: 0 1px 3px rgba(31, 35, 40, 0.08), 0 4px 12px rgba(31, 35, 40, 0.07);
   --shadow-draft: 0 2px 8px rgba(31, 35, 40, 0.06);
   --shadow-popover: 0 24px 60px rgba(31, 35, 40, 0.22), 0 2px 6px rgba(31, 35, 40, 0.08);
   --shadow-menu: 0 8px 24px rgba(31, 35, 40, 0.14), 0 1px 3px rgba(31, 35, 40, 0.08);
@@ -128,6 +132,10 @@
   --logo-bg: #e6e8eb;
   --logo-text: #16191d;
   --overlay: rgba(0, 0, 0, 0.5);
+  --reading-canvas: #111316;
+  --message-card: #1b1f24;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-card-hover: 0 1px 3px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.35);
   --shadow-draft: 0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-popover: 0 24px 60px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
   --shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.45);
@@ -1071,13 +1079,14 @@ h3 {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  background: var(--reading-canvas);
 }
 
 .reading-content {
   padding: 24px 32px 48px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
 }
 
 .thread-subject {
@@ -1087,16 +1096,25 @@ h3 {
   line-height: 1.25;
 }
 
+/* Each message in a thread is a card on the shaded reading canvas. */
 .message-block {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding-top: 4px;
+  padding: 18px 20px 20px;
+  background: var(--message-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
 }
 
-.message-block + .message-block {
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 18px;
+.message-block.collapsed {
+  padding: 0;
+  transition: box-shadow 0.12s ease;
+}
+
+.message-block.collapsed:hover {
+  box-shadow: var(--shadow-card-hover);
 }
 
 .message-head {
@@ -1141,7 +1159,8 @@ h3 {
   text-align: left;
   border: none;
   background: none;
-  padding: 0;
+  padding: 13px 20px;
+  border-radius: inherit;
   cursor: pointer;
   color: var(--text-muted);
   font-size: var(--fs-meta);
@@ -2792,7 +2811,15 @@ h3 {
   }
 
   .reading-content {
-    padding: 20px 20px 40px;
+    padding: 20px 16px 40px;
+  }
+
+  .message-block {
+    padding: 16px;
+  }
+
+  .collapsed-message {
+    padding: 12px 16px;
   }
 
   .people-list {
@@ -2842,6 +2869,11 @@ h3 {
 .message-head.collapsible {
   cursor: pointer;
   border-radius: 6px;
+}
+
+.collapsed-message:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 2px;
 }
 
 .message-head.collapsible:focus-visible {

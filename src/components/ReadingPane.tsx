@@ -112,7 +112,7 @@ function MessageView({
   const [showQuoted, setShowQuoted] = useState(false);
   if (!expanded) {
     return (
-      <div className="message-block">
+      <div className="message-block collapsed">
         <button type="button" className="collapsed-message" onClick={onExpand}>
           <b style={{ color: 'var(--text)', fontWeight: 600 }}>{message.from.name || message.from.email}</b> · {fullTime(message.receivedAt)} · {message.snippet}
         </button>
