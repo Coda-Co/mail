@@ -7,7 +7,7 @@ import { useCommand } from '../lib/commands';
 import { isMac } from '../lib/platform';
 import { fullTime } from '../lib/dates';
 import { formatSize } from '../lib/text';
-import { Avatar, Menu, useToast, type Anchor, type MenuItem } from './ui';
+import { Menu, useToast, type Anchor, type MenuItem } from './ui';
 import { MessageBody } from './MessageBody';
 import { splitQuoted } from '../lib/quoted';
 import { FileIcon } from './FileIcon';
@@ -152,81 +152,84 @@ function MessageView({
     );
   }
   return (
-    <div className="message-block">
-      <div
-        className={onCollapse ? 'message-head collapsible' : 'message-head'}
-        {...(onCollapse && {
-          role: 'button',
-          tabIndex: 0,
-          'aria-expanded': true,
-          title: 'Collapse',
-          onClick: (e: React.MouseEvent) => {
-            // Leave selecting text in the header alone.
-            if (!window.getSelection()?.isCollapsed) return;
-            if ((e.target as Element).closest('a, button')) return;
-            onCollapse();
-          },
-          onKeyDown: (e: React.KeyboardEvent) => {
-            if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
-            e.preventDefault();
-            onCollapse();
-          },
-        })}
-      >
-        <Avatar name={message.from.name || message.from.email} />
-        <div className="who">
-          <span className="name-line">
-            <span className="name" title={message.from.email}>
-              {message.from.name || message.from.email}
-            </span>
-            {acc && (
-              <span className="acc-chip" title={acc.displayName}>
-                <span className="acc-dot" style={{ background: acc.color }} />
-                <span className="acc-name">{acc.displayName}</span>
+    <div className="message-entry">
+      <time className="message-timestamp" dateTime={message.receivedAt}>
+        {fullTime(message.receivedAt)}
+      </time>
+      <div className="message-block">
+        <div
+          className={onCollapse ? 'message-head collapsible' : 'message-head'}
+          {...(onCollapse && {
+            role: 'button',
+            tabIndex: 0,
+            'aria-expanded': true,
+            title: 'Collapse',
+            onClick: (e: React.MouseEvent) => {
+              // Leave selecting text in the header alone.
+              if (!window.getSelection()?.isCollapsed) return;
+              if ((e.target as Element).closest('a, button')) return;
+              onCollapse();
+            },
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+              e.preventDefault();
+              onCollapse();
+            },
+          })}
+        >
+          <div className="who">
+            <span className="name-line">
+              <span className="name" title={message.from.email}>
+                {message.from.name || message.from.email}
               </span>
-            )}
-          </span>
-          <span className="meta">
-            To {recipients(message, me.name, myEmails)}
-            {message.cc.length > 0 && `, cc ${message.cc.map((a) => a.name || a.email).join(', ')}`}
-          </span>
+              {acc && (
+                <span className="acc-chip" title={acc.displayName}>
+                  <span className="acc-dot" style={{ background: acc.color }} />
+                  <span className="acc-name">{acc.displayName}</span>
+                </span>
+              )}
+            </span>
+            <span className="meta">
+              To {recipients(message, me.name, myEmails)}
+              {message.cc.length > 0 && `, cc ${message.cc.map((a) => a.name || a.email).join(', ')}`}
+            </span>
+          </div>
+          <MessageActionIcons actions={actions} disabled={actionsDisabled} />
         </div>
-        <span className="message-time">{fullTime(message.receivedAt)}</span>
-        <MessageActionIcons actions={actions} disabled={actionsDisabled} />
-      </div>
-      {message.remoteImagesBlocked && (
-        <div className="images-bar">
-          {/* With images on, only Junk blocks them. */}
-          <span>{settings.remoteImages === 'ask' ? 'Remote images blocked' : 'Images are hidden in Junk'}</span>
-          <button type="button" className="link-button" onClick={async () => onChanged(await api.showRemoteImagesOnce(message.id))}>
-            Show images
-          </button>
+        {message.remoteImagesBlocked && (
+          <div className="images-bar">
+            {/* With images on, only Junk blocks them. */}
+            <span>{settings.remoteImages === 'ask' ? 'Remote images blocked' : 'Images are hidden in Junk'}</span>
+            <button type="button" className="link-button" onClick={async () => onChanged(await api.showRemoteImagesOnce(message.id))}>
+              Show images
+            </button>
+            <button
+              type="button"
+              className="link-button"
+              onClick={async () => {
+                await api.allowRemoteImages(message.from.email);
+                onChanged(await api.showRemoteImagesOnce(message.id));
+              }}
+            >
+              Always show from {message.from.name || message.from.email}
+            </button>
+          </div>
+        )}
+        {message.meeting && <MeetingCard message={message} onChanged={onChanged} />}
+        <AttachmentList message={message} />
+        <MessageBody html={showQuoted ? message.bodyHtml : split.main} cacheKey={showQuoted || !split.hasQuote ? message.id : `${message.id}:new`} />
+        {split.hasQuote && (
           <button
             type="button"
-            className="link-button"
-            onClick={async () => {
-              await api.allowRemoteImages(message.from.email);
-              onChanged(await api.showRemoteImagesOnce(message.id));
-            }}
+            className="quote-toggle"
+            aria-expanded={showQuoted}
+            title={showQuoted ? 'Hide quoted text' : 'Show quoted text'}
+            onClick={() => setShowQuoted((v) => !v)}
           >
-            Always show from {message.from.name || message.from.email}
+            {showQuoted ? 'Hide quoted text' : '•••'}
           </button>
-        </div>
-      )}
-      {message.meeting && <MeetingCard message={message} onChanged={onChanged} />}
-      <AttachmentList message={message} />
-      <MessageBody html={showQuoted ? message.bodyHtml : split.main} cacheKey={showQuoted || !split.hasQuote ? message.id : `${message.id}:new`} />
-      {split.hasQuote && (
-        <button
-          type="button"
-          className="quote-toggle"
-          aria-expanded={showQuoted}
-          title={showQuoted ? 'Hide quoted text' : 'Show quoted text'}
-          onClick={() => setShowQuoted((v) => !v)}
-        >
-          {showQuoted ? 'Hide quoted text' : '•••'}
-        </button>
-      )}
+        )}
+      </div>
     </div>
   );
 }

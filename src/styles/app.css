@@ -1321,10 +1321,17 @@ h3 {
   display: none;
 }
 
-.message-time {
-  font-size: var(--fs-meta);
+/* An expanded message: when it arrived, on the canvas just above its card. */
+.message-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.message-timestamp {
+  padding-left: 4px;
+  font-size: var(--fs-small);
   color: var(--text-muted);
-  white-space: nowrap;
 }
 
 .message-actions {
