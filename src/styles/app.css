@@ -1286,14 +1286,17 @@ h3 {
 
 /* ---------- Inline draft ---------- */
 
-/* A reply sits in the thread as its own section, ruled off from the
-   messages below, rather than as a floating card. */
+/* A reply sits at the top of the thread as a card, like the messages below it,
+   with the draft border colour to mark it as something being written. */
 .draft-section {
   display: flex;
   flex-direction: column;
   overflow: visible;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 4px;
+  padding: 12px 20px 6px;
+  background: var(--message-card);
+  border: 1px solid var(--draft-border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
 }
 
 .draft-section-header {
@@ -2816,6 +2819,10 @@ h3 {
 
   .message-block {
     padding: 16px;
+  }
+
+  .draft-section {
+    padding: 10px 16px 4px;
   }
 
   .collapsed-message {
