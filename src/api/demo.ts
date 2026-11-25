@@ -918,7 +918,7 @@ export const demoApi: MailApi = {
     if (hasWindow) window.open(url, '_blank', 'noopener');
   },
 
-  // The preview can't update itself. `?update=ready` shows the update banner and settings as
+  // The preview can't update itself. `?update=ready` shows the top-bar button and settings as
   // they look once a new version has downloaded.
   async updateStatus() {
     return demoUpdate();
