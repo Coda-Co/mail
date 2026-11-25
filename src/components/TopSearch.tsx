@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, X } from 'lucide-react';
+import { ChevronDown, Search, X } from 'lucide-react';
 import { useCommand } from '../lib/commands';
 import { keyLabel } from '../lib/platform';
 import { useSearchSlot } from './TopBar';
 import { Menu, type Anchor } from './ui';
 
-/** An optional picker at the left of the box for what the text is matched against. */
+/** An optional picker, outside the box on its left, for what the text is matched against. */
 export interface FieldPicker<F extends string> {
   labels: Record<F, string>;
   value: F;
@@ -49,14 +49,9 @@ export function TopSearch<F extends string>({
   });
 
   if (!slot) return null;
-  return createPortal(
+  const box = (
     <div className="search-box quiet">
       <Search size={15} />
-      {field && (
-        <button type="button" className="scope-chip field-chip" aria-haspopup="menu" aria-label={`Search in: ${field.labels[field.value]}`} onClick={(e) => setMenu(menu ? null : e.currentTarget)}>
-          {field.labels[field.value]} ▾
-        </button>
-      )}
       <input ref={input} aria-label={placeholder} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
       {active ? (
         <button
@@ -87,7 +82,20 @@ export function TopSearch<F extends string>({
           }))}
         />
       )}
-    </div>,
+    </div>
+  );
+  return createPortal(
+    field ? (
+      <div className="search-row quiet">
+        <button type="button" className="search-scope" aria-haspopup="menu" aria-label={`Search in: ${field.labels[field.value]}`} title={`Search in: ${field.labels[field.value]}`} onClick={(e) => setMenu(menu ? null : e.currentTarget)}>
+          <span className="label">{field.labels[field.value]}</span>
+          <ChevronDown size={14} />
+        </button>
+        {box}
+      </div>
+    ) : (
+      box
+    ),
     slot,
   );
 }

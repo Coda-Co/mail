@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, X } from 'lucide-react';
+import { ChevronDown, Search, X } from 'lucide-react';
 import { api } from '../api';
 import type { DateFilter, Person, SearchField, SearchQuery } from '../api/types';
 import { useApp } from '../state/app';
@@ -94,7 +94,7 @@ export function SearchHeader({
   inputRef: React.RefObject<HTMLInputElement>;
 }) {
   const { graphAccounts, accountById } = useApp();
-  const [open, setOpen] = useState<null | { kind: 'from' | 'to' | 'date' | 'account' | 'scope' | 'field'; anchor: HTMLElement }>(null);
+  const [open, setOpen] = useState<null | { kind: 'from' | 'to' | 'date' | 'account' | 'field'; anchor: HTMLElement }>(null);
   const q = state.query;
   const field = q.field ?? 'all';
   const set = (patch: Partial<SearchQuery>, names?: Partial<SearchState>) => onChange({ ...state, ...names, query: { ...q, ...patch } });
@@ -109,12 +109,16 @@ export function SearchHeader({
   const chip = (active: boolean) => `chip${active ? ' active' : ''}`;
   const toggle = (kind: NonNullable<typeof open>['kind']) => (e: React.MouseEvent<HTMLButtonElement>) => setOpen(open?.kind === kind ? null : { kind, anchor: e.currentTarget });
 
+  // Like Outlook: what to search (From, Subject…) sits outside the box, to its left. In the
+  // top bar the search is offset by the same width, so the text box doesn't move when search opens.
   const box = (
+    <div className="search-row">
+      <button type="button" className="search-scope" title={`Search in: ${FIELD_LABELS[field]}`} aria-label={`Search in: ${FIELD_LABELS[field]}`} aria-haspopup="menu" onClick={toggle('field')}>
+        <span className="label">{FIELD_LABELS[field]}</span>
+        <ChevronDown size={14} />
+      </button>
       <div className="search-box">
         <Search size={16} />
-        <button type="button" className="scope-chip field-chip" aria-label={`Search in: ${FIELD_LABELS[field]}`} aria-haspopup="menu" onClick={toggle('field')}>
-          {FIELD_LABELS[field]} ▾
-        </button>
         <input
           ref={ref}
           aria-label={`Search ${FIELD_LABELS[field].toLowerCase()}, ${scopeLabel}`}
@@ -128,13 +132,11 @@ export function SearchHeader({
             }
           }}
         />
-        <button type="button" className="scope-chip" onClick={toggle('scope')}>
-          In: {q.allFolders ? `All folders${q.accountId || q.scope.accountId ? '' : ', all accounts'}` : scopeLabel} ▾
-        </button>
         <button type="button" className="clear-search" aria-label="Clear search" onClick={onClose}>
           <X size={16} />
         </button>
       </div>
+    </div>
   );
 
   return (
@@ -221,17 +223,6 @@ export function SearchHeader({
               setTimeout(() => ref.current?.focus(), 0);
             },
           }))}
-        />
-      )}
-      {open?.kind === 'scope' && (
-        <Menu
-          anchor={open.anchor}
-          align="end"
-          onClose={() => setOpen(null)}
-          items={[
-            { label: scopeLabel, checked: !q.allFolders, onSelect: () => set({ allFolders: false }) },
-            { label: 'All folders', checked: q.allFolders, onSelect: () => set({ allFolders: true }) },
-          ]}
         />
       )}
     </div>

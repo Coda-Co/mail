@@ -14,7 +14,7 @@ function srcdoc(html: string, theme: FrameTheme): string {
   const font = new URL(fontUrl, window.location.href).href;
   const dark = theme === 'dark';
   const paper = theme === 'paper';
-  const text = dark ? '#E6E8EB' : '#1F2328';
+  const text = dark ? '#EAE9E7' : '#262421';
   const link = dark ? '#5A98E8' : '#0B5CC4';
   const csp = "default-src 'none'; img-src data: cid: https: http:; style-src 'unsafe-inline'; font-src 'self' data: " + new URL(font).origin;
   return `<!doctype html><html><head><meta charset="utf-8">
@@ -29,9 +29,9 @@ body{font-family:Geist,system-ui,sans-serif;font-size:15px;line-height:1.4;color
 body>:last-child{margin-bottom:0}
 img{max-width:100%;height:auto}
 a{color:${link}}
-blockquote{margin:0 0 1em;padding-left:12px;border-left:3px solid #DDE1E6;color:#4A5260}
+blockquote{margin:0 0 1em;padding-left:12px;border-left:3px solid #E4E2DF;color:#5C564E}
 table{max-width:100%}
-hr{border:none;border-top:1px solid #E4E7EB;margin:16px 0}
+hr{border:none;border-top:1px solid #EAE8E5;margin:16px 0}
 </style></head><body>${html}</body></html>`;
 }
 
