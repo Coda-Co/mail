@@ -1,5 +1,5 @@
 import { useEffect, useState, type MouseEvent } from 'react';
-import { Calendar, Inbox, Settings as Gear, Users } from 'lucide-react';
+import { Archive, Calendar, FileText, Folder as FolderIcon, Inbox, Send, Settings as Gear, Trash2, Users, type LucideIcon } from 'lucide-react';
 import { api } from '../api';
 import type { Account, CalendarInfo, Folder, FolderRole } from '../api/types';
 import { useApp } from '../state/app';
@@ -10,16 +10,12 @@ import { webCalendarNote } from '../lib/webCalendar';
 import { now } from '../lib/clock';
 import { useTick } from '../lib/useTick';
 
-const ROLE_ORDER: FolderRole[] = ['inbox', 'drafts', 'sent', 'archive', 'deleted', 'junk'];
-const UNIFIED_ROLES: { role: FolderRole; name: string }[] = [
-  { role: 'drafts', name: 'Drafts' },
-  { role: 'sent', name: 'Sent' },
-  { role: 'archive', name: 'Archive' },
-  { role: 'deleted', name: 'Deleted' },
-];
+// Order of an account's folders in its sidebar group; user folders follow, by name.
+const GROUP_ORDER: FolderRole[] = ['inbox', 'sent', 'drafts', 'archive', 'deleted', 'junk'];
+const ROLE_ICONS: Partial<Record<FolderRole, LucideIcon>> = { sent: Send, drafts: FileText, archive: Archive, deleted: Trash2 };
 
-function sortFolders(folders: Folder[]): { folder: Folder; depth: number }[] {
-  const roleIndex = (f: Folder) => (f.role ? ROLE_ORDER.indexOf(f.role) : 99);
+function sortFolders(folders: Folder[], order: FolderRole[]): { folder: Folder; depth: number }[] {
+  const roleIndex = (f: Folder) => (f.role ? order.indexOf(f.role) : 99);
   const children = (parentId?: string) =>
     folders
       .filter((f) => (f.parentId ?? undefined) === parentId)
@@ -46,8 +42,8 @@ export function Sidebar() {
   const [approval, setApproval] = useState<AddAccountResult | null>(null);
 
   useEffect(() => {
-    api.listFolders(scope.accountId).then(setFolders);
-  }, [scope.accountId, mailVersion, accounts]);
+    api.listFolders(undefined).then(setFolders);
+  }, [mailVersion, accounts]);
 
   useEffect(() => {
     if (route.view === 'calendar') api.listCalendars().then(setCalendars);
@@ -165,112 +161,131 @@ export function Sidebar() {
     );
   };
 
-  const folderSection = () => {
-    if (scope.accountId) {
-      const list = sortFolders(folders.filter((f) => f.role !== 'inbox'));
-      return list.map(({ folder: f, depth }) => {
-        const selected = inMail && 'id' in scope.folder ? scope.folder.id === f.id : inMail && f.role !== null && isRole(f.role);
-        const count = f.role === 'drafts' ? f.total : f.unread;
-        return (
-          <button
-            key={f.id}
-            type="button"
-            className={`nav-item folder${selected ? ' selected' : ''}`}
-            style={{ paddingLeft: 10 + depth * 14 }}
-            onClick={() => openMail(scope.accountId, f.role ? { role: f.role } : { id: f.id })}
-          >
-            <span className="label">{f.name}</span>
-            {count > 0 && <span className="count">{count}</span>}
-          </button>
-        );
-      });
-    }
-    return UNIFIED_ROLES.map(({ role, name }) => {
-      const matching = folders.filter((f) => f.role === role);
-      const count = role === 'drafts' ? matching.reduce((n, f) => n + f.total, 0) : matching.reduce((n, f) => n + f.unread, 0);
-      const selected = inMail && isRole(role);
-      return (
-        <button key={role} type="button" className={`nav-item folder${selected ? ' selected' : ''}`} onClick={() => openMail(undefined, { role })}>
-          <span className="label">{name}</span>
-          {count > 0 && <span className="count">{count}</span>}
-        </button>
-      );
-    });
-  };
+  const single = graphAccounts.length === 1;
+  const webAccounts = accounts.filter((a) => a.kind === 'web');
 
-  const scopeAccount = scope.accountId ? accounts.find((a) => a.id === scope.accountId) : undefined;
+  // With one mail account, the unified scope (no account) shows the same mail, so it highlights that account's rows too.
+  const inAccount = (id: string) => scope.accountId === id || (single && !scope.accountId);
+
+  const accountTitle = (a: Account) => (a.syncState === 'needsAuth' ? `Sign-in needed${a.syncError ? `: ${a.syncError}` : ''}` : a.syncState === 'error' ? a.syncError : a.email);
+
+  const signInTag = (a: Account) =>
+    a.syncState === 'needsAuth' && (
+      <span
+        role="button"
+        tabIndex={0}
+        className="web-tag sign-in-tag"
+        title="Sign in again"
+        onClick={(e) => {
+          e.stopPropagation();
+          signInAgain(a);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            signInAgain(a);
+          }
+        }}
+      >
+        sign in
+      </span>
+    );
+
+  const calendarItem = (
+    <button type="button" className={`nav-item${route.view === 'calendar' ? ' selected' : ''}`} onClick={() => app.navigate({ view: 'calendar' })}>
+      <Calendar size={16} />
+      <span className="label">Calendar</span>
+    </button>
+  );
+  const peopleItem = (
+    <button type="button" className={`nav-item${route.view === 'people' ? ' selected' : ''}`} onClick={() => app.navigate({ view: 'people' })}>
+      <Users size={16} />
+      <span className="label">People</span>
+    </button>
+  );
+
+  // One mail account's group: its name, then Inbox, (Calendar, People), Sent, Drafts, Archive, Deleted and its own folders.
+  const accountGroup = (a: Account) => {
+    const own = folders.filter((f) => f.accountId === a.id);
+    const list = sortFolders(own.filter((f) => f.role !== 'inbox'), GROUP_ORDER);
+    const inboxSelected = inMail && inAccount(a.id) && isRole('inbox');
+    return (
+      <div key={a.id} className="acc-group">
+        <div className="nav-section acc-head" onContextMenu={(e) => accountMenu(e, a)} title={accountTitle(a)}>
+          <span className="acc-square" style={{ background: a.color }} />
+          <span className="grow">{a.displayName}</span>
+          {signInTag(a)}
+        </div>
+        <button type="button" className={`nav-item${inboxSelected ? ' selected' : ''}`} onClick={() => openMail(a.id, { role: 'inbox' })} onContextMenu={(e) => accountMenu(e, a)}>
+          <Inbox size={16} />
+          <span className="label">Inbox</span>
+          {a.unread === null ? <span className="neutral-dot" aria-label="Unread count unavailable" /> : a.unread > 0 && <span className="count">{a.unread}</span>}
+        </button>
+        {single && calendarItem}
+        {single && peopleItem}
+        {list.map(({ folder: f, depth }) => {
+          const selected = inMail && inAccount(a.id) && ('id' in scope.folder ? scope.folder.id === f.id : f.role !== null && isRole(f.role));
+          const count = f.role === 'drafts' ? f.total : f.unread;
+          const Icon = (f.role && ROLE_ICONS[f.role]) || FolderIcon;
+          return (
+            <button
+              key={f.id}
+              type="button"
+              className={`nav-item${selected ? ' selected' : ''}`}
+              style={{ paddingLeft: 10 + depth * 14 }}
+              onClick={() => openMail(a.id, f.role ? { role: f.role } : { id: f.id })}
+            >
+              <Icon size={16} />
+              <span className="label">{f.name}</span>
+              {count > 0 && <span className="count">{count}</span>}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <nav className="sidebar" aria-label="Sidebar">
       <div className="sidebar-scroll">
-        <button type="button" className={`nav-item${inMail && !scope.accountId && isRole('inbox') ? ' selected' : ''}`} onClick={() => openMail(undefined, { role: 'inbox' })}>
-          <Inbox size={16} />
-          <span className="label">Inbox</span>
-          {inboxUnread > 0 && <span className="count">{inboxUnread}</span>}
-        </button>
-        <button type="button" className={`nav-item${route.view === 'calendar' ? ' selected' : ''}`} onClick={() => app.navigate({ view: 'calendar' })}>
-          <Calendar size={16} />
-          <span className="label">Calendar</span>
-        </button>
-        <button type="button" className={`nav-item${route.view === 'people' ? ' selected' : ''}`} onClick={() => app.navigate({ view: 'people' })}>
-          <Users size={16} />
-          <span className="label">People</span>
-        </button>
-
-        {route.view === 'calendar' ? (
-          calendarSection()
-        ) : (
+        {!single && (
           <>
-            <div className="nav-section">
-              <span className="grow">Accounts</span>
-              <button type="button" aria-label="Add account" title="Add account" onClick={() => app.openSettings('accounts')}>
-                +
-              </button>
-            </div>
-            {accounts.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                className={`nav-item${accountSelected(a) ? ' selected' : ''}`}
-                onClick={() => (a.kind === 'web' ? app.navigate({ view: 'web', param: a.id }) : openMail(a.id, { role: 'inbox' }))}
-                onContextMenu={(e) => accountMenu(e, a)}
-                title={a.syncState === 'needsAuth' ? `Sign-in needed${a.syncError ? `: ${a.syncError}` : ''}` : a.syncState === 'error' ? a.syncError : a.email}
-              >
-                <span className="acc-square" style={{ background: a.color }} />
-                <span className="label">{a.displayName}</span>
-                {a.kind === 'web' && <span className="web-tag">web</span>}
-                {a.syncState === 'needsAuth' && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    className="web-tag sign-in-tag"
-                    title="Sign in again"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      signInAgain(a);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        signInAgain(a);
-                      }
-                    }}
-                  >
-                    sign in
-                  </span>
-                )}
-                {a.unread === null ? <span className="neutral-dot" aria-label="Unread count unavailable" /> : a.unread > 0 && <span className="count">{a.unread}</span>}
-              </button>
-            ))}
-            {inMail && (
-              <>
-                <div className="nav-section">{scopeAccount ? `Folders · ${scopeAccount.displayName}` : 'Folders'}</div>
-                {folderSection()}
-              </>
-            )}
+            <button type="button" className={`nav-item${inMail && !scope.accountId && isRole('inbox') ? ' selected' : ''}`} onClick={() => openMail(undefined, { role: 'inbox' })}>
+              <Inbox size={16} />
+              <span className="label">{graphAccounts.length > 1 ? 'All inboxes' : 'Inbox'}</span>
+              {inboxUnread > 0 && <span className="count">{inboxUnread}</span>}
+            </button>
+            {calendarItem}
+            {peopleItem}
           </>
         )}
+
+        {graphAccounts.map(accountGroup)}
+
+        {route.view === 'calendar' && calendarSection()}
+
+        <div className="nav-section">
+          <span className="grow">{graphAccounts.length > 0 ? 'Other accounts' : 'Accounts'}</span>
+          <button type="button" aria-label="Add account" title="Add account" onClick={() => app.openSettings('accounts')}>
+            +
+          </button>
+        </div>
+        {webAccounts.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            className={`nav-item${accountSelected(a) ? ' selected' : ''}`}
+            onClick={() => app.navigate({ view: 'web', param: a.id })}
+            onContextMenu={(e) => accountMenu(e, a)}
+            title={accountTitle(a)}
+          >
+            <span className="acc-square" style={{ background: a.color }} />
+            <span className="label">{a.displayName}</span>
+            <span className="web-tag">web</span>
+            {a.unread === null ? <span className="neutral-dot" aria-label="Unread count unavailable" /> : a.unread > 0 && <span className="count">{a.unread}</span>}
+          </button>
+        ))}
       </div>
 
       <div className="sidebar-footer">

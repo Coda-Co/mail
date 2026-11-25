@@ -64,7 +64,7 @@ Each account has one of two backends. The interface treats them the same where i
 ### 3.1 Mail
 
 - **Unified inbox** across Graph accounts, each message marked by its account's colour. Tabs: All accounts, Unread, Flagged.
-- **Sidebar**: Inbox, Calendar, People; Accounts (with unread counts; Web accounts tagged "web"); Folders for the selected scope (Drafts, Sent, Archive, Deleted, plus user folders).
+- **Sidebar**: grouped by account. Each mail account has its own group: its name, then Inbox, Sent, Drafts, Archive, Deleted and its user folders. With one mail account, Calendar and People sit in its group after Inbox; with several, "All inboxes", Calendar and People sit above the groups. Web accounts (tagged "web") follow under "Other accounts", with the add-account button.
 - **Reading pane** with actions: Reply, Reply all, Forward, Archive, Delete, Open in new window.
 - **Replies draft at the top of the conversation**, above the message being answered, with From, To, Cc, Bcc, Send, Attach, Discard and Pop out. Drafts save to the server's Drafts folder automatically.
 - **Pop out**: any message, reply or new message can open in its own window, and dock back.
