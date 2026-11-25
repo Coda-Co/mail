@@ -217,6 +217,13 @@ pub struct AccountDb {
     pub account_id: String,
 }
 
+/// The one list of event columns, shared by `EVENT_COLS` and `EVENT_VIEW_COLS` so they can't drift.
+macro_rules! event_cols {
+    () => {
+        "id, calendar_id, subject, start_at, end_at, is_all_day, location, body_html, organizer_json, attendees_json, my_response, is_online_meeting, online_meeting_url, reminder_minutes, is_cancelled"
+    };
+}
+
 const MSG_COLS: &str = "m.id, m.folder_id, m.conversation_id, m.from_name, m.from_email, m.to_json, m.subject, m.snippet, m.received_at, m.is_read, m.is_flagged, m.has_attachments, m.is_draft";
 
 impl AccountDb {
@@ -1130,12 +1137,13 @@ impl AccountDb {
         })
     }
 
-    const EVENT_COLS: &'static str =
-        "id, calendar_id, subject, start_at, end_at, is_all_day, location, body_html, organizer_json, attendees_json, my_response, is_online_meeting, online_meeting_url, reminder_minutes, is_cancelled";
+    /// Stored event columns, in the order `get_event_record` and `row_event` read them (indices 0..=14).
+    const EVENT_COLS: &'static str = event_cols!();
 
-    /// EVENT_COLS plus whether the event's calendar can be edited, for `row_event`.
-    const EVENT_VIEW_COLS: &'static str = "id, calendar_id, subject, start_at, end_at, is_all_day, location, body_html, organizer_json, attendees_json, my_response, is_online_meeting, online_meeting_url, reminder_minutes, is_cancelled,
-         COALESCE((SELECT c.can_edit FROM calendars c WHERE c.id = events.calendar_id), 1)";
+    /// EVENT_COLS plus whether the event's calendar can be edited (index 15). Every query mapped
+    /// with `row_event` must select exactly these.
+    const EVENT_VIEW_COLS: &'static str =
+        concat!(event_cols!(), ", COALESCE((SELECT c.can_edit FROM calendars c WHERE c.id = events.calendar_id), 1)");
 
     /// Events overlapping [start, end).
     pub fn list_events(&self, start: &str, end: &str, color: &str) -> Result<Vec<CalendarEvent>> {
@@ -1174,7 +1182,7 @@ impl AccountDb {
             args.push(b.to_string());
         }
         let limit = q.limit.unwrap_or(200).clamp(1, 500);
-        let sql = format!("SELECT {} FROM events WHERE {} ORDER BY start_at DESC LIMIT {limit}", Self::EVENT_COLS, wh.join(" AND "));
+        let sql = format!("SELECT {} FROM events WHERE {} ORDER BY start_at DESC LIMIT {limit}", Self::EVENT_VIEW_COLS, wh.join(" AND "));
         let mut st = self.conn.prepare(&sql)?;
         let rows = st.query_map(params_from_iter(args), |r| self.row_event(r, color))?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
