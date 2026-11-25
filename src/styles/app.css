@@ -765,13 +765,13 @@ h3 {
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--danger);
-  color: #ffffff;
+  background: var(--bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--tag-border);
   font-size: var(--fs-caption);
-  font-weight: 650;
-  line-height: 18px;
+  font-weight: 600;
+  line-height: 16px;
   text-align: center;
-  box-shadow: 0 0 0 2px var(--sidebar);
   font-variant-numeric: tabular-nums;
 }
 
