@@ -42,8 +42,15 @@ export function Sidebar() {
   const [approval, setApproval] = useState<AddAccountResult | null>(null);
 
   useEffect(() => {
-    api.listFolders(undefined).then(setFolders);
-  }, [mailVersion, accounts]);
+    // Ask per account: without an account the backend returns combined per-role totals, not each account's folders.
+    let live = true;
+    Promise.all(graphAccounts.map((a) => api.listFolders(a.id).catch(() => [] as Folder[]))).then((lists) => {
+      if (live) setFolders(lists.flat());
+    });
+    return () => {
+      live = false;
+    };
+  }, [mailVersion, graphAccounts]);
 
   useEffect(() => {
     if (route.view === 'calendar') api.listCalendars().then(setCalendars);
