@@ -267,15 +267,16 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
     <div className="field-row">
       <span className="field-label">To</span>
       <AddressField label="To" value={draft.to} onChange={(to) => update({ to })} autoFocus={autoFocus && draft.to.length === 0} />
+      {/* Out of the tab order, so Tab goes from To straight on to the next field. */}
       {(!showCc || !showBcc) && (
         <span className="cc-toggles">
           {!showCc && (
-            <button type="button" onClick={() => setShowCc(true)}>
+            <button type="button" tabIndex={-1} onClick={() => setShowCc(true)}>
               Cc
             </button>
           )}
           {!showBcc && (
-            <button type="button" onClick={() => setShowBcc(true)}>
+            <button type="button" tabIndex={-1} onClick={() => setShowBcc(true)}>
               Bcc
             </button>
           )}

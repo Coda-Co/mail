@@ -82,6 +82,16 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   return el.isContentEditable;
 }
 
+/**
+ * Keys the webview would otherwise act on itself (reload, hard reload), which
+ * throws away app state. Always swallowed, even when no handler is ready yet
+ * or focus is in a text field.
+ */
+export function isBrowserReserved(e: KeyLike, mac: boolean): boolean {
+  if (e.key === 'F5') return true;
+  return matches(e, 'Mod+R', mac) || matches(e, 'Mod+Shift+R', mac);
+}
+
 /** First shortcut matching the event, honouring the typing rule. */
 export function resolveShortcut(e: KeyLike, typing: boolean, mac: boolean): ShortcutId | null {
   for (const s of SHORTCUTS) {

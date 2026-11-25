@@ -10,6 +10,7 @@ import type {
   DraftMode,
   EventInput,
   Folder,
+  FolderRole,
   MailApi,
   Message,
   MessageSummary,
@@ -19,6 +20,7 @@ import type {
   SearchResult,
   Signature,
   SyncStatus,
+  UpdateStatus,
   ViewScope,
 } from './types';
 import { EVENTS } from './types';
@@ -30,6 +32,8 @@ import { escapeHtml, htmlToText } from '../lib/text';
 import { PALETTE, WEB_ONLY } from '../lib/colors';
 
 const STORAGE_KEY = 'mail-demo-state';
+// FolderRole::order in mail-core.
+const ROLE_ORDER: FolderRole[] = ['inbox', 'drafts', 'sent', 'archive', 'deleted', 'junk'];
 const hasWindow = typeof window !== 'undefined';
 
 let state: DemoState = load();
@@ -167,8 +171,13 @@ function view(m: Message): Message {
   const allowed = showByDefault || state.settings.remoteImageSenders.includes(m.from.email.toLowerCase()) || shownOnce.has(m.id);
   const hasRemote = REMOTE_IMG.test(m.bodyHtml);
   REMOTE_IMG.lastIndex = 0;
-  if (!hasRemote || allowed) return { ...clone(m), remoteImagesBlocked: false };
-  return { ...clone(m), bodyHtml: m.bodyHtml.replace(REMOTE_IMG, ''), remoteImagesBlocked: true };
+  const out: Message = !hasRemote || allowed ? { ...clone(m), remoteImagesBlocked: false } : { ...clone(m), bodyHtml: m.bodyHtml.replace(REMOTE_IMG, ''), remoteImagesBlocked: true };
+  // The calendar's copy of a meeting message's event, as the core does.
+  if (out.meeting?.eventId) {
+    const e = state.events.find((x) => x.id === out.meeting!.eventId);
+    out.meeting.event = e ? clone(e) : undefined;
+  }
+  return out;
 }
 
 function getMsg(id: string): Message {
@@ -470,7 +479,23 @@ export const demoApi: MailApi = {
   },
 
   async listFolders(accountId) {
-    return clone(state.folders.filter((f) => (accountId ? f.accountId === accountId : graphIds().includes(f.accountId))));
+    if (accountId) return clone(state.folders.filter((f) => f.accountId === accountId));
+    // Same shape as mail-core's list_folders: one summed folder per role across
+    // graph accounts, user folders left out, in sidebar role order.
+    const sums: Folder[] = [];
+    for (const id of graphIds()) {
+      for (const f of state.folders) {
+        if (f.accountId !== id || !f.role) continue;
+        const s = sums.find((x) => x.role === f.role);
+        if (s) {
+          s.unread += f.unread;
+          s.total += f.total;
+        } else {
+          sums.push({ id: `all:${f.role}`, accountId: '', name: f.name, role: f.role, unread: f.unread, total: f.total });
+        }
+      }
+    }
+    return sums.sort((a, b) => ROLE_ORDER.indexOf(a.role!) - ROLE_ORDER.indexOf(b.role!));
   },
   async listMessages(scope, limit, offset) {
     const isDrafts = !('id' in scope.folder) && scope.folder.role === 'drafts';
@@ -918,4 +943,19 @@ export const demoApi: MailApi = {
   async openExternal(url) {
     if (hasWindow) window.open(url, '_blank', 'noopener');
   },
+
+  // The preview can't update itself. `?update=ready` shows the top-bar button and settings as
+  // they look once a new version has downloaded.
+  async updateStatus() {
+    return demoUpdate();
+  },
+  async checkForUpdate() {
+    return demoUpdate();
+  },
+  async installUpdate() {},
 };
+
+function demoUpdate(): UpdateStatus {
+  const ready = hasWindow && new URLSearchParams(window.location.search).get('update') === 'ready';
+  return ready ? { state: 'ready', currentVersion: '0.1.0', version: '0.2.0', checkedAt: now().toISOString() } : { state: 'unavailable', currentVersion: '0.1.0' };
+}

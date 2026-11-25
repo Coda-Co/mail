@@ -16,6 +16,27 @@ describe('demo backend', () => {
     expect(list.map((m) => m.from.name)).toEqual(['Sarah Okafor', 'Tom Reid', 'Priya Nair', 'Linear', 'James Hart', 'Elena Marsh']);
   });
 
+  it('lists one summed folder per role when no account is given, like mail-core', async () => {
+    const accounts = await demoApi.listAccounts();
+    const graph = accounts.filter((a) => a.kind === 'graph');
+    const perAccount = (await Promise.all(graph.map((a) => demoApi.listFolders(a.id)))).flat();
+    const folders = await demoApi.listFolders();
+    const order = ['inbox', 'drafts', 'sent', 'archive', 'deleted', 'junk'];
+    const roles = order.filter((r) => perAccount.some((f) => f.role === r));
+    expect(folders.map((f) => f.role)).toEqual(roles);
+    for (const f of folders) {
+      expect(f.id).toBe(`all:${f.role}`);
+      expect(f.accountId).toBe('');
+      const same = perAccount.filter((x) => x.role === f.role);
+      expect(f.unread).toBe(same.reduce((n, x) => n + x.unread, 0));
+      expect(f.total).toBe(same.reduce((n, x) => n + x.total, 0));
+    }
+    // User folders exist per account but are left out of the unified list.
+    expect(perAccount.some((f) => f.role === null)).toBe(true);
+    // The unified inbox count matches the graph accounts' badges.
+    expect(folders.find((f) => f.role === 'inbox')?.unread).toBe(graph.reduce((n, a) => n + (a.unread ?? 0), 0));
+  });
+
   it('search filters the inbox and widens to all folders', async () => {
     const inInbox = await demoApi.search(q({ text: 'steering' }));
     expect(inInbox.messages.map((m) => m.subject)).toEqual(['Agenda for Thursday’s steering committee']);

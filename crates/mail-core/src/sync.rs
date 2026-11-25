@@ -375,6 +375,47 @@ impl<'a> Syncer<'a> {
         self.svc.store_messages(self.acc(), &[rec])
     }
 
+    /// Meeting requests, cancellations and responses: read the event the message is about,
+    /// once, so the reading pane can show when it is. The event also goes into the local
+    /// calendar if calendar sync hasn't brought it in (it can be beyond the synced range), so
+    /// the invitation can be answered from the message. True when something was stored.
+    pub async fn ensure_meeting(&self, raw_id: &str) -> Result<bool> {
+        let (known, stored) = self.db(|db| db.meeting_state(raw_id))?;
+        if stored {
+            return Ok(false);
+        }
+        let kind = match known {
+            Some(t) => t,
+            None => {
+                // Synced before meeting messages were recognised, or the delta item didn't say.
+                let v = self.graph.get(&format!("/me/messages/{}?$select=id", quote(raw_id))).await?;
+                let t = graph::meeting_type(&v).unwrap_or_default();
+                self.db(|db| db.set_meeting_type(raw_id, &t))?;
+                t
+            }
+        };
+        if kind.is_empty() {
+            return Ok(false);
+        }
+        let v = self
+            .graph
+            .get(&format!("/me/messages/{}?$expand=microsoft.graph.eventMessage/event($select={})", quote(raw_id), graph::EVENT_SELECT))
+            .await?;
+        let info = graph::meeting_info(&v);
+        let event = v.get("event").filter(|e| e.is_object());
+        self.db(|db| {
+            if let (Some(ev), Some(id)) = (event, &info.event_id) {
+                if !db.has_event(id)? {
+                    if let Some(cal) = db.default_calendar()? {
+                        db.upsert_event(&graph::event_record(ev, &cal))?;
+                    }
+                }
+            }
+            db.set_meeting(raw_id, &info)
+        })?;
+        Ok(true)
+    }
+
     /// Attachment metadata, and inline images small enough to show in the body.
     pub async fn ensure_attachments(&self, raw_id: &str) -> Result<bool> {
         let m = self.db(|db| db.get_message(raw_id))?;

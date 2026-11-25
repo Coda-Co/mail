@@ -477,6 +477,10 @@ impl MailService {
         m.remote_images_blocked = s.remote_images_blocked;
         // Inline images are shown in the body, not as attachment chips.
         m.attachments.retain(|a| !(a.is_inline && a.content_id.is_some()));
+        // The calendar's copy of a meeting message's event: current time and my response.
+        if let Some(meeting) = m.meeting.as_mut() {
+            meeting.event = meeting.event_id.as_deref().and_then(|id| self.get_event(id).ok());
+        }
         Ok(m)
     }
 

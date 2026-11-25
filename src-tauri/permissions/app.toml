@@ -63,6 +63,9 @@ permissions = [
   "allow-refresh-web-calendars",
   "allow-fetch-web-event-attendees",
   "allow-open-web-event",
+  "allow-update-status",
+  "allow-check-for-update",
+  "allow-install-update",
 ]
 
 [[set]]

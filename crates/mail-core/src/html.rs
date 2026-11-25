@@ -200,7 +200,14 @@ const SIG_OPEN: &str = "<div data-signature=\"";
 
 /// Wrap a signature for insertion into a draft body.
 pub fn signature_block(id: &str, html: &str) -> String {
-    format!("{SIG_OPEN}{}\">{}</div>", html_escape::encode_double_quoted_attribute(id), html)
+    format!("{SIG_OPEN}{}\">{}</div>", html_escape::encode_double_quoted_attribute(id), paragraphs_to_lines(html))
+}
+
+/// Signature lines typed in the editor are paragraphs, which Outlook and most
+/// readers draw with a blank line's margin above and below. Send them as plain
+/// lines; a deliberately empty line (`<p><br></p>`) stays a blank line.
+fn paragraphs_to_lines(html: &str) -> String {
+    html.replace("<p>", "<div>").replace("<p ", "<div ").replace("</p>", "</div>")
 }
 
 /// Find the byte range of the signature block, matching nested divs.
@@ -361,6 +368,12 @@ mod tests {
         assert!(s.contains("color:#0B5CC4"));
         assert!(s.contains("data:image/png"));
         assert!(!s.contains("script"));
+    }
+
+    #[test]
+    fn signature_paragraphs_become_lines() {
+        let block = signature_block("s1", "<p><b>Miles</b></p><p style=\"color:red\">Coda</p><p><br></p><p>x</p>");
+        assert_eq!(block, "<div data-signature=\"s1\"><div><b>Miles</b></div><div style=\"color:red\">Coda</div><div><br></div><div>x</div></div>");
     }
 
     #[test]

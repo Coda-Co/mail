@@ -65,6 +65,9 @@ const COMMANDS: &[&str] = &[
     "fetch_web_event_attendees",
     "open_web_event",
     "refresh_web_calendars",
+    "update_status",
+    "check_for_update",
+    "install_update",
 ];
 
 fn main() {

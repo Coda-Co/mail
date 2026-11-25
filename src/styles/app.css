@@ -21,31 +21,31 @@
   --heading-ls: -0.02em;
   --reading-lh: 1.65;
 
-  --text: #1f2328;
-  --text-secondary: #3d4450;
-  --text-muted: #4a5260;
-  --placeholder: #5e6673;
+  --text: #262421;
+  --text-secondary: #4c4841;
+  --text-muted: #5c564e;
+  --placeholder: #6f6a62;
   --bg: #ffffff;
-  --sidebar: #f4f6f8;
-  --panel-muted: #fafbfc;
-  --border: #e4e7eb;
-  --border-subtle: #eef0f2;
-  --input-border: #dde1e6;
-  --tag-border: #cfd5dc;
-  --nav-selected: #dfe5ec;
+  --sidebar: #f7f6f5;
+  --panel-muted: #fcfbfa;
+  --border: #eae8e5;
+  --border-subtle: #f1f0ef;
+  --input-border: #e4e2df;
+  --tag-border: #d9d6d2;
+  --nav-selected: #e9e6e2;
   --row-selected: #e2ebf6;
-  --row-hover: #f4f6f8;
-  --chip-neutral: #eef1f4;
+  --row-hover: #f7f6f5;
+  --chip-neutral: #f3f1ef;
   --accent: #0b5cc4;
   --accent-hover: #084a9e;
   --on-accent: #ffffff;
-  --chip-active-bg: #1f2328;
+  --chip-active-bg: #262421;
   --chip-active-text: #ffffff;
   --success: #1f883d;
   --success-bg: #eaf6ee;
   --success-text: #1a6e32;
   --warning: #e16f24;
-  --status-offline: #9aa3ad;
+  --status-offline: #a9a59e;
   --warning-bg: #fff8e5;
   --warning-border: #f0d68a;
   --danger: #cf222e;
@@ -58,12 +58,12 @@
   --draft-border: #c9d6e8;
   --draft-header: #f6f9fd;
   --draft-header-border: #e4e9f1;
-  --avatar: #e6eaf0;
-  --avatar-me: #c9d3de;
+  --avatar: #eeece8;
+  --avatar-me: #dad5cd;
   --today-col: #fafcff;
-  --logo-bg: #1f2328;
+  --logo-bg: #262421;
   --logo-text: #ffffff;
-  --overlay: rgba(31, 35, 40, 0.28);
+  --overlay: rgba(38, 36, 33, 0.28);
 
   --r-chip: 15px;
   --r-button: 8px;
@@ -78,56 +78,64 @@
   --agenda-w: 264px;
   --hour-h: 56px;
 
-  --shadow-draft: 0 2px 8px rgba(31, 35, 40, 0.06);
-  --shadow-popover: 0 24px 60px rgba(31, 35, 40, 0.22), 0 2px 6px rgba(31, 35, 40, 0.08);
-  --shadow-menu: 0 8px 24px rgba(31, 35, 40, 0.14), 0 1px 3px rgba(31, 35, 40, 0.08);
+  --reading-canvas: #f6f5f4;
+  --message-card: #ffffff;
+  --shadow-card: 0 1px 2px rgba(38, 36, 33, 0.06), 0 2px 8px rgba(38, 36, 33, 0.05);
+  --shadow-card-hover: 0 1px 3px rgba(38, 36, 33, 0.08), 0 4px 12px rgba(38, 36, 33, 0.07);
+  --shadow-draft: 0 2px 8px rgba(38, 36, 33, 0.06);
+  --shadow-popover: 0 24px 60px rgba(38, 36, 33, 0.22), 0 2px 6px rgba(38, 36, 33, 0.08);
+  --shadow-menu: 0 8px 24px rgba(38, 36, 33, 0.14), 0 1px 3px rgba(38, 36, 33, 0.08);
   color-scheme: light;
 }
 
 :root[data-theme='dark'] {
-  --text: #e6e8eb;
-  --text-secondary: #c5cad1;
-  --text-muted: #9aa3ae;
+  --text: #eae9e7;
+  --text-secondary: #cfccc7;
+  --text-muted: #aaa59e;
   --file-pdf: #f26d63;
   --file-slides: #f0884f;
   --file-sheet: #4cc27a;
   --file-doc: #6aa5f0;
   --file-image: #b392f0;
   --file-media: #e07fc4;
-  --placeholder: #8b949e;
-  --bg: #16191d;
-  --sidebar: #1d2126;
-  --panel-muted: #1a1e22;
-  --border: #2d333b;
-  --border-subtle: #252a31;
-  --input-border: #353c45;
-  --tag-border: #444c56;
-  --nav-selected: #2b323b;
+  --placeholder: #9a968f;
+  --bg: #1c1a17;
+  --sidebar: #24221f;
+  --panel-muted: #201e1c;
+  --border: #383530;
+  --border-subtle: #2f2c27;
+  --input-border: #423e38;
+  --tag-border: #524e48;
+  --nav-selected: #38342e;
   --row-selected: #253550;
-  --row-hover: #20252b;
-  --chip-neutral: #2a3038;
+  --row-hover: #292622;
+  --chip-neutral: #35322d;
   --accent: #3b82e0;
   --accent-hover: #5a98e8;
   --on-accent: #ffffff;
-  --chip-active-bg: #e6e8eb;
-  --chip-active-text: #16191d;
+  --chip-active-bg: #eae9e7;
+  --chip-active-text: #1c1a17;
   --success: #3fb950;
   --success-bg: #183222;
   --success-text: #56d364;
   --warning: #f0883e;
-  --status-offline: #6e7681;
+  --status-offline: #7d7972;
   --warning-bg: #2d2610;
   --warning-border: #6b5a1d;
   --danger: #f85149;
   --draft-border: #33445c;
   --draft-header: #1c2430;
   --draft-header-border: #2a3646;
-  --avatar: #2b323b;
-  --avatar-me: #3a434e;
+  --avatar: #38342e;
+  --avatar-me: #4a453e;
   --today-col: #1a2029;
-  --logo-bg: #e6e8eb;
-  --logo-text: #16191d;
+  --logo-bg: #eae9e7;
+  --logo-text: #1c1a17;
   --overlay: rgba(0, 0, 0, 0.5);
+  --reading-canvas: #151412;
+  --message-card: #22201d;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-card-hover: 0 1px 3px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.35);
   --shadow-draft: 0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-popover: 0 24px 60px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
   --shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.45);
@@ -218,9 +226,80 @@ h3 {
   background: var(--bg);
 }
 
+:root {
+  /* Width of the search field picker (From, Subject…), which sits outside the search box on its left. */
+  --search-scope-w: 148px;
+}
+
+/* Offset by the field picker's width, so opening search grows the box leftwards
+   (picker first, like Outlook) while the text field stays where it was. */
 .topbar-search {
   flex: 0 1 640px;
   min-width: 0;
+  margin-left: var(--search-scope-w);
+}
+
+.search-row {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.topbar .search-row {
+  margin-left: calc(-1 * var(--search-scope-w));
+}
+
+.search-scope {
+  flex: 0 0 var(--search-scope-w);
+  width: var(--search-scope-w);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 12px;
+  /* Shares the search box's outline, so the two read as one control. */
+  border: 2px solid var(--accent);
+  border-right: 1px solid var(--input-border);
+  border-radius: var(--r-card) 0 0 var(--r-card);
+  background: var(--panel-muted);
+  color: var(--text);
+  font-size: var(--fs-meta);
+  cursor: pointer;
+  text-align: left;
+}
+
+.search-scope:hover {
+  background: var(--row-hover);
+}
+
+.search-scope .label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-scope svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.search-row .search-box {
+  flex: 1;
+  min-width: 0;
+  border-left: none;
+  border-radius: 0 var(--r-card) var(--r-card) 0;
+}
+
+/* Always-there search (Calendar): quiet until focused, like its box. */
+.search-row.quiet .search-scope {
+  border: 1px solid var(--input-border);
+}
+
+.search-row.quiet:focus-within .search-scope {
+  border-color: var(--accent);
+  border-right-color: var(--input-border);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .search-trigger {
@@ -450,6 +529,7 @@ h3 {
   flex: 1;
 }
 
+
 /* ---------- Buttons ---------- */
 
 .btn {
@@ -579,6 +659,7 @@ h3 {
   text-align: left;
   cursor: pointer;
   font-size: var(--fs-body);
+  font-weight: 460;
   min-height: 32px;
 }
 
@@ -589,7 +670,7 @@ h3 {
 
 .nav-item.selected {
   background: var(--nav-selected);
-  font-weight: 500;
+  font-weight: 580;
 }
 
 .nav-item .label {
@@ -603,7 +684,7 @@ h3 {
 .nav-item .count {
   font-size: var(--fs-small);
   color: var(--text-muted);
-  font-weight: 400;
+  font-weight: 460;
 }
 
 .nav-item.folder {
@@ -746,7 +827,7 @@ h3 {
 }
 
 .footer-text .name {
-  font-weight: 500;
+  font-weight: 580;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1071,13 +1152,36 @@ h3 {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  background: var(--reading-canvas);
 }
 
 .reading-content {
   padding: 24px 32px 48px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
+}
+
+.thread-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.thread-header .thread-subject {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Closes the open thread; on narrow layouts Back does this instead. */
+.thread-close {
+  flex-shrink: 0;
+  margin: -1px -6px 0 0;
+  color: var(--text-muted);
+}
+
+.thread-close:hover {
+  color: var(--text);
 }
 
 .thread-subject {
@@ -1087,16 +1191,25 @@ h3 {
   line-height: 1.25;
 }
 
+/* Each message in a thread is a card on the shaded reading canvas. */
 .message-block {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding-top: 4px;
+  padding: 18px 20px 20px;
+  background: var(--message-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
 }
 
-.message-block + .message-block {
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 18px;
+.message-block.collapsed {
+  padding: 0;
+  transition: box-shadow 0.12s ease;
+}
+
+.message-block.collapsed:hover {
+  box-shadow: var(--shadow-card-hover);
 }
 
 .message-head {
@@ -1113,8 +1226,73 @@ h3 {
   min-width: 0;
 }
 
+.message-head .who .name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The sender's name keeps its width; the account chip gives way first. */
 .message-head .who .name {
   font-weight: 600;
+  flex-shrink: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-head .who .acc-chip {
+  padding: 1px 6px;
+  min-width: 0;
+}
+
+.message-head .who .acc-chip .acc-dot {
+  flex-shrink: 0;
+}
+
+.message-head .who .acc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Names in the header show their address on hover; Ctrl/Cmd+C copies it. */
+.message-block .addr {
+  border-radius: 3px;
+  cursor: default;
+}
+
+.message-block .addr:hover {
+  color: var(--text);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+/* Clicking a name focuses it (rather than expanding or collapsing the card),
+   ready for Ctrl/Cmd+C. */
+.message-block .addr:focus {
+  outline: none;
+  background: var(--row-selected);
+  color: var(--text);
+}
+
+.message-block .collapsed-sender {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.message-block .addr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.message-head .more-recipients {
+  font-size: inherit;
+}
+
+.message-head .who .meta.all {
+  white-space: normal;
 }
 
 .message-head .who .meta {
@@ -1141,7 +1319,8 @@ h3 {
   text-align: left;
   border: none;
   background: none;
-  padding: 0;
+  padding: 13px 20px;
+  border-radius: inherit;
   cursor: pointer;
   color: var(--text-muted);
   font-size: var(--fs-meta);
@@ -1219,14 +1398,18 @@ h3 {
 .attachment-chip .file-video { color: var(--file-media); }
 
 .attachment-chip .name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* The size never wraps; the file name truncates instead. */
 .attachment-chip .size {
   color: var(--text-muted);
   font-size: var(--fs-small);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .attachment-chip .remove {
@@ -1265,6 +1448,40 @@ h3 {
   display: none;
 }
 
+/* With actions on each message card, the reading toolbar only exists for Back on narrow layouts. */
+.reading-toolbar.back-only {
+  display: none;
+}
+
+/* An expanded message: when it arrived, on the canvas just above its card. */
+.message-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.message-timestamp {
+  padding-left: 4px;
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
+
+.message-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: -6px;
+  color: var(--text-muted);
+}
+
+.message-actions .btn-icon {
+  color: inherit;
+}
+
+.message-actions .btn-icon:hover:not(:disabled) {
+  color: var(--text);
+}
+
 /* ---------- Dropping files onto a draft ---------- */
 
 .draft-section,
@@ -1274,14 +1491,14 @@ h3 {
 
 .drop-hint {
   position: absolute;
-  inset: -6px;
+  inset: 0;
   z-index: 5;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   border: 2px dashed var(--accent);
-  border-radius: 8px;
+  border-radius: inherit;
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   color: var(--accent);
   font-weight: 600;
@@ -1291,14 +1508,17 @@ h3 {
 
 /* ---------- Inline draft ---------- */
 
-/* A reply sits in the thread as its own section, ruled off from the
-   messages below, rather than as a floating card. */
+/* A reply sits at the top of the thread as a card, like the messages below it,
+   with the draft border colour to mark it as something being written. */
 .draft-section {
   display: flex;
   flex-direction: column;
   overflow: visible;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 4px;
+  padding: 12px 20px 6px;
+  background: var(--message-card);
+  border: 1px solid var(--draft-border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
 }
 
 .draft-section-header {
@@ -1463,6 +1683,7 @@ h3 {
 
 .rich-editor [data-signature] {
   color: var(--text-secondary);
+  line-height: 1.35;
 }
 
 .rich-editor img {
@@ -1712,21 +1933,6 @@ h3 {
   min-width: 0;
   background: transparent;
   color: var(--text);
-}
-
-.scope-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  border: none;
-  border-radius: var(--r-nav);
-  background: var(--sidebar);
-  color: var(--text);
-  font-size: var(--fs-meta);
-  cursor: pointer;
-  white-space: nowrap;
 }
 
 .clear-search {
@@ -2191,7 +2397,7 @@ h3 {
   padding: 10px 12px;
   min-height: 120px;
   outline: none;
-  line-height: 1.5;
+  line-height: 1.35;
 }
 
 .signature-editor .rich-editor p {
@@ -2786,6 +2992,10 @@ h3 {
     display: none;
   }
 
+  :root {
+    --search-scope-w: 128px;
+  }
+
   .mail-panes {
     position: relative;
   }
@@ -2810,12 +3020,34 @@ h3 {
     display: inline-flex;
   }
 
+  .thread-close {
+    display: none;
+  }
+
+  .reading-toolbar.back-only {
+    display: flex;
+    min-height: 0;
+    padding: 8px 16px;
+  }
+
   .reading-toolbar {
     padding: 14px 16px;
   }
 
   .reading-content {
-    padding: 20px 20px 40px;
+    padding: 20px 16px 40px;
+  }
+
+  .message-block {
+    padding: 16px;
+  }
+
+  .draft-section {
+    padding: 10px 16px 4px;
+  }
+
+  .collapsed-message {
+    padding: 12px 16px;
   }
 
   .people-list {
@@ -2867,7 +3099,189 @@ h3 {
   border-radius: 6px;
 }
 
+.collapsed-message:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 2px;
+}
+
 .message-head.collapsible:focus-visible {
   outline: 2px solid var(--accent, currentColor);
   outline-offset: 4px;
+}
+
+/* Meeting messages: when and where, Going / Maybe / No, and that part of the day across calendars. */
+.meeting-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--panel-muted);
+}
+
+.meeting-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.meeting-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--text-muted);
+}
+
+.meeting-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.meeting-when {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.meeting-card.cancelled .meeting-when {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.meeting-where {
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+}
+
+.meeting-status {
+  font-size: var(--fs-small);
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--chip-neutral);
+  color: var(--text-secondary);
+}
+
+.meeting-status.accepted {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.meeting-status.cancelled,
+.meeting-status.declined {
+  color: var(--danger);
+}
+
+.meeting-open {
+  font-size: var(--fs-meta);
+}
+
+.meeting-rsvp {
+  max-width: 360px;
+}
+
+.meeting-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+}
+
+.meeting-preview.loading {
+  min-height: 90px;
+}
+
+.meeting-preview-allday {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: 48px;
+}
+
+.meeting-preview-grid {
+  position: relative;
+}
+
+.meeting-preview-hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.meeting-preview-hour span {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.meeting-preview-events {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 48px;
+  right: 0;
+}
+
+.meeting-preview-event {
+  box-sizing: border-box;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 6px;
+  border: none;
+  border-left: 4px solid;
+  border-radius: 2px;
+  font: inherit;
+  font-size: var(--fs-small);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  min-height: 20px;
+}
+
+.meeting-preview-events .meeting-preview-event {
+  position: absolute;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.meeting-preview-event .title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meeting-preview-event .acc {
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The invitation itself: dashed outline, like Outlook's preview. */
+.meeting-preview-event.invite {
+  outline: 1.5px dashed var(--text);
+  outline-offset: -1.5px;
+  z-index: 1;
+}
+
+.meeting-preview-event.tentative {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 255, 255, 0.45) 6px 9px);
+}
+
+.meeting-preview-event.declined .title {
+  text-decoration: line-through;
+  opacity: 0.7;
 }

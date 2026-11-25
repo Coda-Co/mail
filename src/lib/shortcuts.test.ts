@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matches, resolveShortcut } from './shortcuts';
+import { isBrowserReserved, matches, resolveShortcut } from './shortcuts';
 
 const key = (k: string, mods: Partial<{ ctrl: boolean; meta: boolean; shift: boolean; alt: boolean }> = {}) => ({
   key: k,
@@ -50,5 +50,14 @@ describe('shortcut matching', () => {
     expect(resolveShortcut(key('z', { meta: true }), false, true)).toBe('undo');
     expect(resolveShortcut(key('z', { ctrl: true }), true, false)).toBe(null);
     expect(resolveShortcut(key('Z', { ctrl: true, shift: true }), false, false)).toBe(null);
+  });
+
+  it('reserves the webview reload keys', () => {
+    expect(isBrowserReserved(key('R', { ctrl: true, shift: true }), false)).toBe(true);
+    expect(isBrowserReserved(key('r', { ctrl: true }), false)).toBe(true);
+    expect(isBrowserReserved(key('R', { meta: true, shift: true }), true)).toBe(true);
+    expect(isBrowserReserved(key('F5'), false)).toBe(true);
+    expect(isBrowserReserved(key('r'), false)).toBe(false);
+    expect(isBrowserReserved(key('e', { ctrl: true }), false)).toBe(false);
   });
 });
