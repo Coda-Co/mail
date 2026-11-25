@@ -226,9 +226,69 @@ h3 {
   background: var(--bg);
 }
 
+:root {
+  /* Width of the search scope dropdown, which sits outside the search box on its left. */
+  --search-scope-w: 168px;
+}
+
+/* Offset by the scope dropdown's width, so opening search grows the box leftwards
+   (scope first, like Outlook) while the text field stays where it was. */
 .topbar-search {
   flex: 0 1 640px;
   min-width: 0;
+  margin-left: var(--search-scope-w);
+}
+
+.search-row {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.topbar .search-row {
+  margin-left: calc(-1 * var(--search-scope-w));
+}
+
+.search-scope {
+  flex: 0 0 var(--search-scope-w);
+  width: var(--search-scope-w);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 12px;
+  /* Shares the search box's outline, so the two read as one control. */
+  border: 2px solid var(--accent);
+  border-right: 1px solid var(--input-border);
+  border-radius: var(--r-card) 0 0 var(--r-card);
+  background: var(--panel-muted);
+  color: var(--text);
+  font-size: var(--fs-meta);
+  cursor: pointer;
+  text-align: left;
+}
+
+.search-scope:hover {
+  background: var(--row-hover);
+}
+
+.search-scope .label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-scope svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.search-row .search-box {
+  flex: 1;
+  min-width: 0;
+  border-left: none;
+  border-radius: 0 var(--r-card) var(--r-card) 0;
 }
 
 .search-trigger {
@@ -2909,6 +2969,10 @@ h3 {
 
   .search-trigger .kbd-hint {
     display: none;
+  }
+
+  :root {
+    --search-scope-w: 132px;
   }
 
   .mail-panes {

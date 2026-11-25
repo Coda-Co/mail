@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, X } from 'lucide-react';
+import { ChevronDown, Search, X } from 'lucide-react';
 import { api } from '../api';
 import type { DateFilter, Person, SearchField, SearchQuery } from '../api/types';
 import { useApp } from '../state/app';
@@ -109,7 +109,15 @@ export function SearchHeader({
   const chip = (active: boolean) => `chip${active ? ' active' : ''}`;
   const toggle = (kind: NonNullable<typeof open>['kind']) => (e: React.MouseEvent<HTMLButtonElement>) => setOpen(open?.kind === kind ? null : { kind, anchor: e.currentTarget });
 
+  const scopeText = q.allFolders ? `All folders${q.accountId || q.scope.accountId ? '' : ', all accounts'}` : scopeLabel;
+  // Like Outlook: where to search sits outside the box, to its left. In the top bar the
+  // search is offset by the same width, so the text box doesn't move when search opens.
   const box = (
+    <div className="search-row">
+      <button type="button" className="search-scope" title={`Search in: ${scopeText}`} aria-label={`Search in: ${scopeText}`} aria-haspopup="menu" onClick={toggle('scope')}>
+        <span className="label">{scopeText}</span>
+        <ChevronDown size={14} />
+      </button>
       <div className="search-box">
         <Search size={16} />
         <button type="button" className="scope-chip field-chip" aria-label={`Search in: ${FIELD_LABELS[field]}`} aria-haspopup="menu" onClick={toggle('field')}>
@@ -128,13 +136,11 @@ export function SearchHeader({
             }
           }}
         />
-        <button type="button" className="scope-chip" onClick={toggle('scope')}>
-          In: {q.allFolders ? `All folders${q.accountId || q.scope.accountId ? '' : ', all accounts'}` : scopeLabel} ▾
-        </button>
         <button type="button" className="clear-search" aria-label="Clear search" onClick={onClose}>
           <X size={16} />
         </button>
       </div>
+    </div>
   );
 
   return (
