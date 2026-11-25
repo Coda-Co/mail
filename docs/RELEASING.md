@@ -34,7 +34,7 @@ pnpm tauri signer generate -w ~/.tauri/mail-updater.key
 
 Then:
 
-1. Put the public key in `src-tauri/tauri.updater.conf.json` (`plugins.updater.pubkey`), with the endpoint of the private release channel. The endpoint can be any HTTPS host that serves the `latest.json` Tauri produces, such as an S3 or R2 bucket behind access control. A private GitHub repository's releases won't work, because the updater can't authenticate.
+1. Put the public key in `src-tauri/tauri.updater.conf.json` (`plugins.updater.pubkey`). The endpoint is this public repository's latest release (`https://github.com/Coda-Co/mail/releases/latest/download/latest.json`), which `tauri-action` uploads. Releases are created as drafts; clients only see an update once the draft is published. The private key lives at `~/.tauri/mail-updater.key` on the release machine.
 2. Store the private key and its password in CI as `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 3. Release builds use:
 
