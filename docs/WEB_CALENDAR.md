@@ -30,7 +30,7 @@ These tenants block third-party apps on purpose. Copying their calendar data int
 | Window | 14 days back to 42 days forward from today (constants in one place). Events outside it are pruned on each refresh. |
 | Refresh | When the toggle is turned on, when the web view finishes loading, every 10 minutes after that, and when the user opens the Calendar view (at most once a minute). |
 | Read-only | No Going / Maybe / No, Edit or Delete in the event panel. Web calendars never appear in the new-event account or calendar picker. |
-| Look | Events use the account's colour (web accounts are neutral grey) and a small "web" tag, like the sidebar. The event panel shows "From Outlook on the web · updated 4 min ago" and an **Open in Outlook on the web** button that switches to that account's web view. |
+| Look | Events use the account's colour (web accounts are neutral grey) and a small "web" tag, like the sidebar. The event panel shows "From Outlook on the web · updated 4 min ago" and an **Open event in Outlook on the web** button that switches to that account's web view and opens the event's own page there (`open_web_event` → `https://<host>/calendar/item/<id>`). |
 | Visibility | The web calendar appears in the calendar list with its toggle like any other calendar (`calendar_visibility`). |
 | Staleness | If the last good refresh is older than 1 hour, the calendar list shows "Not updated since 10:42" next to it. If the page is signed out or the fetch fails, keep the last good data and show the error there. Never wipe data on a failed fetch. |
 | Agenda | Web events show in the agenda panel the same way (it reads `list_events`). |
@@ -207,3 +207,8 @@ Decisions taken where the spec left room:
 - The core re-sends the account list after a good refresh if the last one it sent is over 30 minutes old, so "updated N min ago" and the one-hour stale note stay true without emitting on every refresh.
 - Opening Calendar calls a new main-window command, `refresh_web_calendars` (in `app-windows`, not in `web-account-reporting`).
 - A page load counts once the Outlook page itself finishes loading (`on_page_load`, Outlook hosts only), and the first request waits 15 seconds for the app to start.
+
+### Opening one event, and attendees (25 Nov 2026, not yet checked live)
+
+- **Open event:** `open_web_event` navigates the account's web view to `https://<current Outlook host>/calendar/item/<percent-encoded item id>`, Outlook's own link to a calendar item, using the `ItemId.Id` from GetCalendarView. This reloads the page (a few seconds) and lands on Outlook's event view, with attendees and tracking. If Outlook stops honouring that path it just opens the calendar.
+- **Attendees:** the GetItem call for attendees was never confirmed against a real session. The script now tries `FieldURI: "RequiredAttendees"` (the plain form Outlook's JSON uses), then `"calendar:RequiredAttendees"` (the EWS form), then `BaseShape: "Default"`, keeping the first non-error answer. A failure is logged by the app as `web event attendees for <account>: page reported <code>`; `server_<ResponseCode>` codes come from the server's own error.

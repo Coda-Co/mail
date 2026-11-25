@@ -119,10 +119,12 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
             className="btn"
             onClick={() => {
               onClose();
+              // Open this event's own page in Outlook on the web (attendees, tracking), not just the inbox.
+              api.openWebEvent(event.accountId, event.id).catch((e) => toast(`Couldn’t open the event: ${e instanceof Error ? e.message : e}`));
               navigate({ view: 'web', param: event.accountId });
             }}
           >
-            Open in Outlook on the web
+            Open event in Outlook on the web
           </button>
         ) : actions.edit || actions.delete ? (
           <>

@@ -382,6 +382,8 @@ export interface MailApi {
    * Returns an empty list if the page can't answer (signed out, timed out); never throws.
    */
   fetchWebEventAttendees(accountId: string, eventId: string): Promise<Attendee[]>;
+  /** Point the account's Outlook on the web view at one event's own page (the caller shows the view). */
+  openWebEvent(accountId: string, eventId: string): Promise<void>;
 
   /** Open a link in the system browser (message links, admin consent URL). */
   openExternal(url: string): Promise<void>;

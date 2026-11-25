@@ -257,6 +257,45 @@ pub async fn reload_web_account(app: AppHandle, account_id: String) -> Result<()
     Ok(())
 }
 
+/// Longest event id we'll put in a link (Outlook item ids are a few hundred characters).
+const MAX_EVENT_ID: usize = 1024;
+
+/// Outlook on the web's own link to one calendar item, on the same Outlook host as `base`:
+/// `https://<host>/calendar/item/<id>`, with the item id fully percent-encoded (ids are base64,
+/// so `+`, `/` and `=` must not reach the path as they are). None for a non-Outlook base or an
+/// empty or oversized id.
+fn event_url(base: &tauri::Url, event_id: &str) -> Option<tauri::Url> {
+    if !is_outlook(base) || event_id.is_empty() || event_id.len() > MAX_EVENT_ID {
+        return None;
+    }
+    let mut id = String::with_capacity(event_id.len() * 3);
+    for b in event_id.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+            id.push(b as char);
+        } else {
+            id.push_str(&format!("%{b:02X}"));
+        }
+    }
+    tauri::Url::parse(&format!("https://{}/calendar/item/{id}", base.host_str()?)).ok()
+}
+
+/// Open one web-calendar event in the account's Outlook on the web view (the event's own page,
+/// with its attendees and tracking), instead of just the account's start page. Navigates the
+/// account's web view; the interface shows that view itself.
+#[tauri::command]
+pub async fn open_web_event(app: AppHandle, s: tauri::State<'_, AppState>, account_id: String, event_id: String) -> Result<(), Error> {
+    if s.demo {
+        return Ok(());
+    }
+    let a = s.svc.get_account(&account_id)?;
+    let view = ensure(&app, &a).ok_or_else(|| Error::Other("Couldn't open Outlook on the web".into()))?;
+    // Stay on the host the page is already signed in on (outlook.cloud.microsoft or office.com).
+    let base = view.url().ok().filter(is_outlook).map_or_else(|| url_for(&a), Ok)?;
+    let url = event_url(&base, &event_id).ok_or_else(|| Error::Invalid("Not an Outlook on the web event".into()))?;
+    view.navigate(url).map_err(|e| Error::Other(e.to_string()))?;
+    Ok(())
+}
+
 fn account_of_label(label: &str) -> Option<&str> {
     label.strip_prefix("web-").filter(|id| !id.is_empty())
 }
@@ -597,6 +636,11 @@ pub async fn fetch_web_event_attendees(app: AppHandle, s: tauri::State<'_, AppSt
     match tokio::time::timeout(ATTENDEE_TIMEOUT, rx).await {
         Ok(Ok(Ok(list))) => Ok(mail_core::webcal::parse_attendees(&list)),
         // Page reported an error, the sender was dropped, or we timed out: no attendees, no fuss.
+        // The page's short error code is logged so a change on Outlook's side can be spotted.
+        Ok(Ok(Err(code))) => {
+            tracing::info!("web event attendees for {account_id}: page reported {code}");
+            Ok(Vec::new())
+        }
         _ => {
             cal.drop_attendees(&request_id);
             Ok(Vec::new())
@@ -678,6 +722,16 @@ mod tests {
         cal.page_loaded("a", t4);
         assert!(cal.begin("a", t4, "S", "E").is_none());
         assert!(cal.begin("a", t4 + CAL_AFTER_LOAD, "S", "E").is_some());
+    }
+
+    #[test]
+    fn event_links_stay_on_the_outlook_host() {
+        let base = tauri::Url::parse("https://outlook.cloud.microsoft/mail/inbox").unwrap();
+        let u = event_url(&base, "AAMkAD+a/b=").unwrap();
+        assert_eq!(u.as_str(), "https://outlook.cloud.microsoft/calendar/item/AAMkAD%2Ba%2Fb%3D");
+        assert!(event_url(&base, "").is_none());
+        assert!(event_url(&base, &"a".repeat(MAX_EVENT_ID + 1)).is_none());
+        assert!(event_url(&tauri::Url::parse("https://evil.example/").unwrap(), "x").is_none());
     }
 
     #[test]

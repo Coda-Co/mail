@@ -71,6 +71,7 @@ export const tauriApi: MailApi = {
   reloadWebAccount: (accountId) => call('reload_web_account', { accountId }),
   refreshWebCalendars: () => call('refresh_web_calendars'),
   fetchWebEventAttendees: (accountId, eventId) => call('fetch_web_event_attendees', { accountId, eventId }),
+  openWebEvent: (accountId, eventId) => call('open_web_event', { accountId, eventId }),
 
   openExternal: (url) => call('open_external', { url }),
 };

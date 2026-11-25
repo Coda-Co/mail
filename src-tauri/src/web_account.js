@@ -198,10 +198,19 @@
     return items;
   }
 
-  // The attendees for one event: the calendar view doesn't carry them, so ask GetItem for just
-  // the attendee lists and organizer (docs/WEB_CALENDAR.md §8). Only done when an event is opened.
-  async function fetchEventAttendees(id, token, signal) {
-    const body = {
+  // The attendees for one event: the calendar view doesn't carry them, so ask GetItem for them
+  // (docs/WEB_CALENDAR.md §8). Only done when an event is opened. Outlook's JSON form of the
+  // property names isn't confirmed, so try the plain names Outlook itself uses ("RequiredAttendees"),
+  // then the EWS form ("calendar:RequiredAttendees"), then the default calendar item shape, and keep
+  // the first answer that isn't an error. Only names, emails and responses are kept.
+  const ATTENDEE_FIELDS = ['RequiredAttendees', 'OptionalAttendees', 'Resources', 'Organizer'];
+  const ATTENDEE_SHAPES = [
+    { BaseShape: 'IdOnly', fields: ATTENDEE_FIELDS },
+    { BaseShape: 'IdOnly', fields: ATTENDEE_FIELDS.map((f) => 'calendar:' + f) },
+    { BaseShape: 'Default', fields: [] },
+  ];
+  function getItemBody(id, shape) {
+    return {
       __type: 'GetItemJsonRequest:#Exchange',
       Header: {
         __type: 'JsonRequestHeaders:#Exchange',
@@ -212,29 +221,50 @@
         __type: 'GetItemRequest:#Exchange',
         ItemShape: {
           __type: 'ItemResponseShape:#Exchange',
-          BaseShape: 'IdOnly',
-          AdditionalProperties: [
-            { __type: 'PropertyUri:#Exchange', FieldURI: 'calendar:RequiredAttendees' },
-            { __type: 'PropertyUri:#Exchange', FieldURI: 'calendar:OptionalAttendees' },
-            { __type: 'PropertyUri:#Exchange', FieldURI: 'calendar:Resources' },
-            { __type: 'PropertyUri:#Exchange', FieldURI: 'calendar:Organizer' },
-          ],
+          BaseShape: shape.BaseShape,
+          AdditionalProperties: shape.fields.map((f) => ({ __type: 'PropertyUri:#Exchange', FieldURI: f })),
         },
         ItemIds: [{ __type: 'ItemId:#Exchange', Id: id }],
       },
     };
-    const items = findItems(await serviceCall('GetItem', body, token, signal));
-    const it = Array.isArray(items) && items[0];
-    if (!it) throw fail('unsupported');
-    const list = [];
-    const add = (arr, type) => {
-      if (!Array.isArray(arr)) return;
-      for (const a of arr) list.push({ ...person(a), type, response: response(get(a, 'ResponseType', 'Status')) });
-    };
-    add(get(it, 'RequiredAttendees'), 'required');
-    add(get(it, 'OptionalAttendees'), 'optional');
-    add(get(it, 'Resources'), 'resource');
-    return list;
+  }
+  // The response message's error, if the server answered with one (EWS: ResponseClass "Error").
+  function responseError(data) {
+    const m = get(get(get(data, 'Body') || data, 'ResponseMessages'), 'Items');
+    const first = Array.isArray(m) && m[0];
+    if (first && /^error$/i.test(text(get(first, 'ResponseClass')))) return text(get(first, 'ResponseCode')) || 'error';
+    return '';
+  }
+  async function fetchEventAttendees(id, token, signal) {
+    let lastError = fail('unsupported');
+    for (const shape of ATTENDEE_SHAPES) {
+      let data;
+      try {
+        data = await serviceCall('GetItem', getItemBody(id, shape), token, signal);
+      } catch (e) {
+        // Signed out / timed out won't get better with another shape.
+        if (e instanceof CalError && /^(signed_out|timeout|network|http_401)$/.test(e.message)) throw e;
+        lastError = e;
+        continue;
+      }
+      const err = responseError(data);
+      const items = !err && findItems(data);
+      const it = Array.isArray(items) && items[0];
+      if (!it) {
+        lastError = fail(err ? 'server_' + err.replace(/[^A-Za-z0-9]/g, '').slice(0, 60) : 'unsupported');
+        continue;
+      }
+      const list = [];
+      const add = (arr, type) => {
+        if (!Array.isArray(arr)) return;
+        for (const a of arr) list.push({ ...person(a), type, response: response(get(a, 'ResponseType', 'Status')) });
+      };
+      add(get(it, 'RequiredAttendees'), 'required');
+      add(get(it, 'OptionalAttendees'), 'optional');
+      add(get(it, 'Resources'), 'resource');
+      return list;
+    }
+    throw lastError;
   }
 
   function findItems(data) {

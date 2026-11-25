@@ -61,6 +61,7 @@ permissions = [
   "allow-reload-web-account",
   "allow-refresh-web-calendars",
   "allow-fetch-web-event-attendees",
+  "allow-open-web-event",
 ]
 
 [[set]]
