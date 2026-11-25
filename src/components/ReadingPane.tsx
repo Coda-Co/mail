@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Copy, ExternalLink, Forward, MoreHorizontal, Reply, ReplyAll } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
-import type { Draft, DraftMode, Folder, Message, Thread } from '../api/types';
+import type { Address, Draft, DraftMode, Folder, Message, Thread } from '../api/types';
 import { useApp } from '../state/app';
 import { useCommand } from '../lib/commands';
 import { isMac } from '../lib/platform';
@@ -16,10 +16,77 @@ import { ClosedDraft, Compose, PoppedOutDraft } from './Compose';
 
 export type Selection = { kind: 'message' | 'draft'; id: string };
 
-function recipients(m: Message, meName: string, myEmails: string[]): string {
-  const names = m.to.map((a) => (myEmails.includes(a.email.toLowerCase()) ? meName : a.name || a.email));
-  if (names.length <= 2) return names.join(', ');
-  return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+/**
+ * A name in the message header: hover shows the address, and Ctrl/Cmd+C while hovering
+ * (or with the name focused) copies it, unless some text is selected.
+ */
+function AddressName({ address, label, onActive, className }: { address: Address; label: string; onActive: (a: Address | null) => void; className?: string }) {
+  return (
+    <span
+      className={className ? `addr ${className}` : 'addr'}
+      tabIndex={0}
+      title={address.email}
+      onMouseEnter={() => onActive(address)}
+      onMouseLeave={() => onActive(null)}
+      onFocus={() => onActive(address)}
+      onBlur={() => onActive(null)}
+    >
+      {label}
+    </span>
+  );
+}
+
+function useCopyHoveredAddress() {
+  const toast = useToast();
+  const [active, setActive] = useState<Address | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'c') return;
+      if (!window.getSelection()?.isCollapsed) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void navigator.clipboard
+        .writeText(active.email)
+        .then(() => toast(`Copied ${active.email}`))
+        .catch(() => toast("Couldn't copy the address"));
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [active, toast]);
+  return setActive;
+}
+
+/** To, then cc and bcc; long To lists fold to two names and "N more" until clicked. */
+function RecipientLine({ message, onActive }: { message: Message; onActive: (a: Address | null) => void }) {
+  const { me, accounts } = useApp();
+  const myEmails = accounts.map((a) => a.email.toLowerCase());
+  const [all, setAll] = useState(false);
+  const label = (a: Address) => (myEmails.includes(a.email.toLowerCase()) ? me.name : a.name || a.email);
+  const list = (addrs: Address[]) =>
+    addrs.map((a, i) => (
+      <Fragment key={`${a.email}-${i}`}>
+        {i > 0 && ', '}
+        <AddressName address={a} label={label(a)} onActive={onActive} />
+      </Fragment>
+    ));
+  const folded = !all && message.to.length > 2;
+  return (
+    <span className={all ? 'meta all' : 'meta'}>
+      To {list(folded ? message.to.slice(0, 2) : message.to)}
+      {folded && (
+        <>
+          {' and '}
+          <button type="button" className="link-button more-recipients" onClick={() => setAll(true)}>
+            {message.to.length - 2} more
+          </button>
+        </>
+      )}
+      {message.cc.length > 0 && <>, cc {list(message.cc)}</>}
+      {message.bcc.length > 0 && <>, bcc {list(message.bcc)}</>}
+    </span>
+  );
 }
 
 /** Click selects (Ctrl/Cmd+click adds), Ctrl/Cmd+C copies the files, double-click or Enter opens. */
@@ -137,17 +204,22 @@ function MessageView({
   actions: MessageActions;
   actionsDisabled: boolean;
 }) {
-  const { accountById, me, accounts, settings } = useApp();
+  const { accountById, settings } = useApp();
   const acc = accountById(message.accountId);
-  const myEmails = accounts.map((a) => a.email.toLowerCase());
+  const setActiveAddress = useCopyHoveredAddress();
   const split = useMemo(() => splitQuoted(message.bodyHtml), [message.bodyHtml]);
   const [showQuoted, setShowQuoted] = useState(false);
   if (!expanded) {
     return (
-      <div className="message-block collapsed">
-        <button type="button" className="collapsed-message" onClick={onExpand}>
-          <b style={{ color: 'var(--text)', fontWeight: 600 }}>{message.from.name || message.from.email}</b> · {fullTime(message.receivedAt)} · {message.snippet}
-        </button>
+      <div className="message-entry">
+        <time className="message-timestamp" dateTime={message.receivedAt}>
+          {fullTime(message.receivedAt)}
+        </time>
+        <div className="message-block collapsed">
+          <button type="button" className="collapsed-message" onClick={onExpand}>
+            <b style={{ color: 'var(--text)', fontWeight: 600 }}>{message.from.name || message.from.email}</b> · {message.snippet}
+          </button>
+        </div>
       </div>
     );
   }
@@ -179,9 +251,7 @@ function MessageView({
         >
           <div className="who">
             <span className="name-line">
-              <span className="name" title={message.from.email}>
-                {message.from.name || message.from.email}
-              </span>
+              <AddressName className="name" address={message.from} label={message.from.name || message.from.email} onActive={setActiveAddress} />
               {acc && (
                 <span className="acc-chip" title={acc.displayName}>
                   <span className="acc-dot" style={{ background: acc.color }} />
@@ -189,10 +259,7 @@ function MessageView({
                 </span>
               )}
             </span>
-            <span className="meta">
-              To {recipients(message, me.name, myEmails)}
-              {message.cc.length > 0 && `, cc ${message.cc.map((a) => a.name || a.email).join(', ')}`}
-            </span>
+            <RecipientLine message={message} onActive={setActiveAddress} />
           </div>
           <MessageActionIcons actions={actions} disabled={actionsDisabled} />
         </div>
