@@ -654,24 +654,6 @@ h3 {
   justify-content: center;
 }
 
-/* Selection pill on the left edge, like a tab marker. */
-.rail-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  width: 4px;
-  height: 0;
-  border-radius: 0 3px 3px 0;
-  background: var(--text);
-  transform: translateY(-50%);
-  transition: height 0.12s ease;
-}
-
-.rail-item.selected::before {
-  height: 24px;
-}
-
 .rail-button {
   position: relative;
   width: 40px;
@@ -755,7 +737,7 @@ h3 {
 
 .rail-item.selected .rail-glyph {
   opacity: 1;
-  box-shadow: 0 0 0 2px var(--sidebar), 0 0 0 4px var(--text);
+  box-shadow: 0 0 0 2px var(--sidebar), 0 0 0 4px var(--accent);
 }
 
 .rail-badge {
