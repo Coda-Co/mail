@@ -10,6 +10,7 @@ use tauri::{AppHandle, Manager};
 const TRAY_ID: &str = "mail-tray";
 
 /// The tray's update item, kept so its label can follow the update status.
+#[cfg_attr(not(feature = "updater"), allow(dead_code))]
 struct UpdateItem(MenuItem<tauri::Wry>);
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
@@ -91,6 +92,7 @@ fn on_update_clicked(app: &AppHandle) {
 }
 
 /// Keep the tray's update item in step with the update status.
+#[cfg_attr(not(feature = "updater"), allow(dead_code))]
 pub fn set_update(app: &AppHandle, s: &UpdateStatus) {
     let Some(item) = app.try_state::<UpdateItem>() else { return };
     let (text, enabled) = match s.state {

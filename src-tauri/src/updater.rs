@@ -4,6 +4,8 @@
 //! Only release builds with the `updater` feature can update (see docs/RELEASING.md). Other
 //! builds still register the commands, so the interface works the same and reports updates as
 //! unavailable.
+// Without the updater, the status only ever reads "unavailable" and nothing changes it.
+#![cfg_attr(not(feature = "updater"), allow(dead_code, unused_imports))]
 
 use serde::Serialize;
 use std::sync::Mutex;
@@ -116,6 +118,7 @@ impl Updates {
 
 /// Check now. `manual` means the user asked (Settings or the tray): report the outcome to them
 /// even when there's nothing new, and check even if a background check ran recently.
+#[allow(clippy::needless_return)] // the early `return` ends the updater build's block
 pub async fn check(app: &AppHandle, manual: bool) -> UpdateStatus {
     let Some(u) = app.try_state::<Updates>() else { return unavailable(app) };
     #[cfg(feature = "updater")]
