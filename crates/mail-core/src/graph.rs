@@ -16,7 +16,7 @@ pub const MESSAGE_SELECT: &str =
     "id,conversationId,internetMessageId,subject,bodyPreview,body,from,toRecipients,ccRecipients,bccRecipients,replyTo,receivedDateTime,isRead,flag,hasAttachments,isDraft,webLink,parentFolderId";
 /// An event as the reading pane needs it, for a meeting message's expanded event.
 pub const EVENT_SELECT: &str =
-    "id,subject,start,end,isAllDay,location,body,organizer,attendees,responseStatus,isOnlineMeeting,onlineMeeting,isReminderOn,reminderMinutesBeforeStart,isCancelled";
+    "id,subject,start,end,isAllDay,location,body,organizer,attendees,responseStatus,isOrganizer,isOnlineMeeting,onlineMeeting,isReminderOn,reminderMinutesBeforeStart,isCancelled";
 pub const HEADER_SELECT: &str =
     "id,conversationId,internetMessageId,subject,bodyPreview,from,toRecipients,ccRecipients,bccRecipients,replyTo,receivedDateTime,isRead,flag,hasAttachments,isDraft,webLink,parentFolderId";
 
@@ -315,7 +315,7 @@ pub fn event_record_over(v: &Value, calendar_id: &str, base: Option<&EventRecord
         body_html: if has("body") { n.body_html } else { b.body_html.clone() },
         organizer: if has("organizer") { n.organizer } else { b.organizer.clone() },
         attendees: if has("attendees") { n.attendees } else { b.attendees.clone() },
-        my_response: if has("responseStatus") { n.my_response } else { b.my_response },
+        my_response: if has("responseStatus") || has("isOrganizer") { n.my_response } else { b.my_response },
         is_online_meeting: if has("isOnlineMeeting") { n.is_online_meeting } else { b.is_online_meeting },
         online_meeting_url: if has("onlineMeeting") { n.online_meeting_url } else { b.online_meeting_url.clone() },
         reminder_minutes: if has("isReminderOn") || has("reminderMinutesBeforeStart") { n.reminder_minutes } else { b.reminder_minutes },
@@ -360,7 +360,12 @@ fn event_record_full(v: &Value, calendar_id: &str) -> EventRecord {
         body_html: s(v, "/body/content"),
         organizer: v.get("organizer").map(address).unwrap_or_default(),
         attendees,
-        my_response: ResponseStatus::from_graph(&s(v, "/responseStatus/response")),
+        // Graph often says "none" for events you made with no invitees; isOrganizer is reliable.
+        my_response: if v.get("isOrganizer").and_then(|x| x.as_bool()) == Some(true) {
+            ResponseStatus::Organizer
+        } else {
+            ResponseStatus::from_graph(&s(v, "/responseStatus/response"))
+        },
         is_online_meeting: v.get("isOnlineMeeting").and_then(|x| x.as_bool()).unwrap_or(false),
         online_meeting_url: if join.is_empty() { None } else { Some(join) },
         reminder_minutes: if reminder_on { v.get("reminderMinutesBeforeStart").and_then(|x| x.as_i64()) } else { None },
@@ -452,6 +457,19 @@ mod tests {
         let p = event_payload(&e);
         assert_eq!(p["start"]["dateTime"], "2026-11-26T10:00:00");
         assert_eq!(p["start"]["timeZone"], "UTC");
+    }
+
+    #[test]
+    fn is_organizer_overrides_none_response() {
+        let v = json!({
+            "id": "ev2", "subject": "Firewood",
+            "start": {"dateTime": "2026-11-27T12:00:00.0000000", "timeZone": "UTC"},
+            "end": {"dateTime": "2026-11-27T13:30:00.0000000", "timeZone": "UTC"},
+            "responseStatus": {"response": "none"}, "isOrganizer": true
+        });
+        assert_eq!(event_record(&v, "cal1").my_response, ResponseStatus::Organizer);
+        let v = json!({"id": "ev3", "responseStatus": {"response": "none"}, "isOrganizer": false});
+        assert_eq!(event_record(&v, "cal1").my_response, ResponseStatus::None);
     }
 
     #[test]

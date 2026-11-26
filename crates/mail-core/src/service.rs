@@ -1140,6 +1140,7 @@ impl MailService {
             for mut e in evs {
                 if self.app().calendar_visible(&e.calendar_id)? && !e.is_cancelled {
                     e.read_only |= web;
+                    mark_own(&mut e, &a);
                     out.push(e);
                 }
             }
@@ -1154,8 +1155,9 @@ impl MailService {
         let before = q.before.as_deref().map(normalize_time).transpose()?;
         let mut out = vec![];
         for a in self.graph_accounts()? {
-            for e in self.with_account(&a.id, |db| db.search_events(q, after.as_deref(), before.as_deref(), &a.color))? {
+            for mut e in self.with_account(&a.id, |db| db.search_events(q, after.as_deref(), before.as_deref(), &a.color))? {
                 if self.app().calendar_visible(&e.calendar_id)? {
+                    mark_own(&mut e, &a);
                     out.push(e);
                 }
             }
@@ -1201,6 +1203,7 @@ impl MailService {
         let a = self.app().get_account(acc)?;
         let mut e = self.with_account(acc, |db| db.get_event(raw, &a.color))?;
         e.read_only |= a.kind == AccountKind::Web;
+        mark_own(&mut e, &a);
         Ok(e)
     }
 
@@ -1498,5 +1501,13 @@ pub fn guess_mime(name: &str) -> &'static str {
         "zip" => "application/zip",
         "ics" => "text/calendar",
         _ => "application/octet-stream",
+    }
+}
+
+/// An event you organised that Graph stored as "none" (no invitees, synced before isOrganizer was
+/// read): it's yours when the organiser is this account.
+fn mark_own(e: &mut CalendarEvent, a: &Account) {
+    if a.kind != AccountKind::Web && e.my_response == ResponseStatus::None && !a.email.is_empty() && e.organizer.email.eq_ignore_ascii_case(&a.email) {
+        e.my_response = ResponseStatus::Organizer;
     }
 }

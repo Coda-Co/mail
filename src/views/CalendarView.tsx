@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, LoaderCircle } from 'lucide-react';
 import { api } from '../api';
-import type { CalendarEvent, EventField, ResponseStatus } from '../api/types';
+import type { CalendarEvent, EventField, EventInput, ResponseStatus } from '../api/types';
 import { useApp } from '../state/app';
 import { addDays, dayShort, hhmm, longDate, monthName, rangeTitle, sameDay, shortDate, startOfDay, startOfWeek } from '../lib/dates';
 import { now } from '../lib/clock';
@@ -16,6 +16,7 @@ import { CalendarSidebar } from '../components/CalendarSidebar';
 import { Resizer } from '../components/Resizer';
 import { RsvpButtons, type Rsvp, type RsvpOptions } from '../components/RsvpButtons';
 import { eventActions, webEventSource } from '../lib/webCalendar';
+import { durationLabel } from '../lib/timeEntry';
 
 type Mode = 'day' | 'week' | 'month';
 const HOUR = 56;
@@ -168,6 +169,81 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
           </>
         )}
         {event.bodyHtml && <div className="description" dangerouslySetInnerHTML={{ __html: event.bodyHtml.replace(/<script[\s\S]*?<\/script>/gi, '') }} />}
+      </div>
+    </Modal>
+  );
+}
+
+type DragKind = 'move' | 'start' | 'end';
+/** An event being dragged, or dropped and waiting for the change to be confirmed. */
+type Reschedule = { event: CalendarEvent; start: Date; end: Date };
+
+/** Minutes after midnight on day, by the clock (so DST days come out right). */
+function atMinute(day: Date, m: number): Date {
+  const d = new Date(day);
+  d.setHours(0, m, 0, 0);
+  return d;
+}
+
+/** Asks before a dragged or resized event is saved. */
+function RescheduleModal({ change, onCancel, onSaved }: { change: Reschedule; onCancel: () => void; onSaved: (e: CalendarEvent) => void }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const { event, start, end } = change;
+  const oldStart = new Date(event.start);
+  const oldEnd = new Date(event.end);
+  const invitees = event.attendees.filter((a) => a.response !== 'organizer').map((a) => a.address);
+  const when = (s: Date, e: Date) => `${longDate(s)}, ${hhmm(s)} – ${hhmm(e)} (${durationLabel(Math.round((e.getTime() - s.getTime()) / 60000))})`;
+  const save = async () => {
+    const input: EventInput = {
+      accountId: event.accountId,
+      subject: event.subject,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      isAllDay: false,
+      location: event.location,
+      bodyHtml: event.bodyHtml,
+      attendees: invitees,
+      isOnlineMeeting: event.isOnlineMeeting,
+      reminderMinutes: event.reminderMinutes,
+    };
+    setBusy(true);
+    try {
+      onSaved(await api.updateEvent(event.id, input));
+    } catch (e) {
+      toast(`Couldn’t change the event: ${e instanceof Error ? e.message : e}`);
+      onCancel();
+    }
+  };
+  return (
+    <Modal
+      className="reschedule-modal"
+      title={oldStart.getTime() !== start.getTime() && oldEnd.getTime() !== end.getTime() ? 'Move event?' : 'Change event time?'}
+      onClose={onCancel}
+      footer={
+        <>
+          <span className="hint" style={{ marginRight: 'auto' }}>
+            {invitees.length > 0 ? 'Attendees get an update.' : ''}
+          </span>
+          <button type="button" className="btn" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-primary" autoFocus onClick={save} disabled={busy}>
+            {invitees.length > 0 ? 'Send update' : 'Save'}
+          </button>
+        </>
+      }
+    >
+      <div className="modal-body reschedule">
+        <div className="reschedule-title">{eventTitle(event)}</div>
+        <div className="reschedule-row">
+          <span className="form-label">From</span>
+          <span className="muted">{when(oldStart, oldEnd)}</span>
+        </div>
+        <div className="reschedule-row">
+          <span className="form-label">To</span>
+          <span>{when(start, end)}</span>
+        </div>
       </div>
     </Modal>
   );
@@ -337,6 +413,11 @@ export function CalendarView() {
     }
   };
   const scroller = useRef<HTMLDivElement>(null);
+  // Dragging an event to move it, or its top or bottom edge to change when it starts or ends.
+  const [drag, setDrag] = useState<Reschedule | null>(null);
+  const [confirm, setConfirm] = useState<Reschedule | null>(null);
+  // The click that ends a drag mustn't also open the event or start a new one.
+  const dragged = useRef(false);
   const dark = document.documentElement.dataset.theme === 'dark';
 
   useEffect(() => {
@@ -396,7 +477,64 @@ export function CalendarView() {
 
   // Outlook shows the location under the title; online meetings without one read as Teams.
   const eventLocation = (e: CalendarEvent) => e.location || (e.isOnlineMeeting ? 'Microsoft Teams Meeting' : '');
-  const dayEvents = (d: Date) => events.filter((e) => new Date(e.start) < addDays(d, 1) && new Date(e.end) > d);
+  // A dragged event is drawn where it would go, and stays there while the change is confirmed.
+  const moving = drag ?? confirm;
+  const shownEvents = moving ? events.map((e) => (e.id === moving.event.id ? { ...e, start: moving.start.toISOString(), end: moving.end.toISOString() } : e)) : events;
+  // Your own timed events within one day, in an account the app can write to.
+  const canDrag = (e: CalendarEvent) => {
+    if (e.isAllDay || !eventActions(e).edit || app.accountById(e.accountId)?.kind === 'web') return false;
+    return sameDay(new Date(e.start), new Date(new Date(e.end).getTime() - 1));
+  };
+  const beginDrag = (ev: React.PointerEvent<HTMLElement>, e: CalendarEvent, kind: DragKind) => {
+    if (ev.button !== 0 || !canDrag(e) || confirm) return;
+    ev.stopPropagation();
+    ev.preventDefault();
+    const cols = Array.from(scroller.current?.querySelectorAll<HTMLElement>('.day-column') ?? []).map((c) => c.getBoundingClientRect());
+    const colAt = (x: number) => {
+      const i = cols.findIndex((r) => x >= r.left && x < r.right);
+      if (i >= 0) return i;
+      return cols.length && x < cols[0].left ? 0 : cols.length - 1;
+    };
+    const s0 = new Date(e.start);
+    const e0 = new Date(e.end);
+    const sMin = s0.getHours() * 60 + s0.getMinutes();
+    const eMin = sameDay(s0, e0) ? e0.getHours() * 60 + e0.getMinutes() : 24 * 60;
+    const len = eMin - sMin;
+    const col0 = days.findIndex((d) => sameDay(d, s0));
+    const x0 = ev.clientX;
+    const y0 = ev.clientY;
+    let moved = false;
+    let cur: Reschedule = { event: e, start: s0, end: e0 };
+    const onMove = (m: PointerEvent) => {
+      if (!moved && Math.hypot(m.clientX - x0, m.clientY - y0) < 4) return;
+      moved = true;
+      const dMin = Math.round((m.clientY - y0) / (HOUR / 4)) * 15;
+      if (kind === 'move') {
+        const day = days[col0 < 0 ? 0 : Math.max(0, Math.min(days.length - 1, colAt(m.clientX)))] ?? s0;
+        const st = Math.max(0, Math.min(24 * 60 - len, sMin + dMin));
+        cur = { event: e, start: atMinute(day, st), end: atMinute(day, st + len) };
+      } else if (kind === 'start') {
+        cur = { event: e, start: atMinute(s0, Math.max(0, Math.min(eMin - 15, sMin + dMin))), end: e0 };
+      } else {
+        cur = { event: e, start: s0, end: atMinute(s0, Math.min(24 * 60, Math.max(sMin + 15, eMin + dMin))) };
+      }
+      setDrag(cur);
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      setDrag(null);
+      if (!moved) return;
+      dragged.current = true;
+      setTimeout(() => (dragged.current = false), 0);
+      if (cur.start.getTime() !== s0.getTime() || cur.end.getTime() !== e0.getTime()) setConfirm(cur);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+  const dayEvents = (d: Date) => shownEvents.filter((e) => new Date(e.start) < addDays(d, 1) && new Date(e.end) > d);
   const webTag = (e: CalendarEvent) =>
     app.accountById(e.accountId)?.kind === 'web' ? (
       <>
@@ -422,7 +560,7 @@ export function CalendarView() {
           </button>
         ))}
       </div>
-      {events.some((e) => e.isAllDay) && (
+      {shownEvents.some((e) => e.isAllDay) && (
         <div className="all-day-row">
           {days.map((d) => (
             <div
@@ -461,7 +599,7 @@ export function CalendarView() {
                 style={{ height: 24 * HOUR }}
                 onClick={(ev) => {
                   // Click an empty slot: a new half-hour event starting at the quarter hour clicked.
-                  if (ev.target !== ev.currentTarget) return;
+                  if (ev.target !== ev.currentTarget || dragged.current) return;
                   const start = new Date(d);
                   start.setMinutes(slotAt(ev));
                   newEvent({ start });
@@ -491,11 +629,13 @@ export function CalendarView() {
                   const height = Math.max(22, ((endMin - startMin) / 60) * HOUR - 1);
                   const width = 100 / lanes;
                   const short = endMin - startMin <= 30;
+                  const draggable = canDrag(e);
+                  const isMoving = moving?.event.id === e.id;
                   return (
                     <button
                       key={e.id}
                       type="button"
-                      className={`cal-event${e.myResponse === 'declined' ? ' declined' : ''}${e.myResponse === 'tentative' ? ' tentative' : ''}`}
+                      className={`cal-event${e.myResponse === 'declined' ? ' declined' : ''}${e.myResponse === 'tentative' ? ' tentative' : ''}${draggable ? ' draggable' : ''}${isMoving ? ' moving' : ''}`}
                       style={{
                         ...style(e, e.id === selectedId),
                         top: (startMin / 60) * HOUR,
@@ -504,10 +644,14 @@ export function CalendarView() {
                         width: `calc(${width}% - 1px)`,
                         padding: short ? '3px 8px' : undefined,
                       }}
-                      onClick={() => setSelectedId(e.id)}
+                      onPointerDown={draggable ? (ev) => beginDrag(ev, e, 'move') : undefined}
+                      onClick={() => !dragged.current && setSelectedId(e.id)}
                       onDoubleClick={() => eventActions(e).edit && setForm({ event: e })}
                       title={`${eventTitle(e)} · ${hhmm(s)} – ${hhmm(en)}${eventWhere(e) ? ' · ' + eventWhere(e) : ''}`}
                     >
+                      {draggable && <span className="cal-event-handle top" aria-hidden onPointerDown={(ev) => beginDrag(ev, e, 'start')} />}
+                      {draggable && <span className="cal-event-handle bottom" aria-hidden onPointerDown={(ev) => beginDrag(ev, e, 'end')} />}
+                      {isMoving && <span className="cal-event-time">{`${hhmm(s)} – ${hhmm(en)}`}</span>}
                       <span className="title">
                         {eventTitle(e)}
                         {webTag(e)}
@@ -638,6 +782,18 @@ export function CalendarView() {
           }}
           onDeleted={() => {
             setSelectedId(null);
+            setVersion((v) => v + 1);
+          }}
+        />
+      )}
+      {confirm && (
+        <RescheduleModal
+          key={confirm.event.id}
+          change={confirm}
+          onCancel={() => setConfirm(null)}
+          onSaved={(e) => {
+            setConfirm(null);
+            setEvents((list) => list.map((x) => (x.id === e.id ? e : x)));
             setVersion((v) => v + 1);
           }}
         />

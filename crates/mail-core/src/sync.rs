@@ -705,7 +705,7 @@ impl<'a> Syncer<'a> {
             let fetched = self
                 .graph
                 .get(&format!(
-                    "/me/events/{}?$select=subject,isAllDay,location,body,organizer,attendees,responseStatus,isOnlineMeeting,onlineMeeting,isReminderOn,reminderMinutesBeforeStart,isCancelled",
+                    "/me/events/{}?$select=subject,isAllDay,location,body,organizer,attendees,responseStatus,isOrganizer,isOnlineMeeting,onlineMeeting,isReminderOn,reminderMinutesBeforeStart,isCancelled",
                     quote(&master_id)
                 ))
                 .await;
