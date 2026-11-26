@@ -90,6 +90,16 @@ export function MailView() {
     if (sel) openByScope.set(scopeKey(scope), sel);
     else openByScope.delete(scopeKey(scope));
   };
+  // Unread view: messages opened here stay in the list, now read, until you leave the view,
+  // so the one you're reading doesn't vanish from under you.
+  const keptInUnread = useRef<Map<string, MessageSummary>>(new Map());
+  // How many of the listed messages are kept ones, not from the server's page (paging skips them).
+  const extra = useRef(0);
+  const keptFor = useRef(scopeKey(scope));
+  if (keptFor.current !== scopeKey(scope)) {
+    keptFor.current = scopeKey(scope);
+    keptInUnread.current = new Map();
+  }
   const [folders, setFolders] = useState<Folder[]>([]);
   const [search, setSearch] = useState<SearchState>(() => ({ query: { text: '', field: lastSearchField(), scope, allFolders: false } }));
   const [result, setResult] = useState<SearchResult | null>(null);
@@ -114,10 +124,26 @@ export function MailView() {
   // Normal list.
   useEffect(() => {
     let cancelled = false;
-    api.listMessages(scope, PAGE, 0).then((list) => {
+    const kept = keptInUnread.current;
+    api.listMessages(scope, PAGE, 0).then(async (fresh) => {
+      let list = fresh;
+      const missing = [...kept.keys()].filter((id) => !fresh.some((m) => m.id === id));
+      if (scope.tab === 'unread' && missing.length > 0) {
+        // Put back the ones that are only missing because they've been read; drop any moved or deleted.
+        const back = await Promise.all(missing.map((id) => api.getMessage(id).catch(() => null)));
+        const readAgain: MessageSummary[] = [];
+        back.forEach((m, i) => {
+          const was = kept.get(missing[i])!;
+          if (m && m.folderId === was.folderId) readAgain.push({ ...was, isRead: m.isRead, isFlagged: m.isFlagged });
+          else kept.delete(missing[i]);
+        });
+        const oldest = fresh.length === PAGE ? fresh[fresh.length - 1].receivedAt : '';
+        list = [...fresh, ...readAgain.filter((m) => m.receivedAt >= oldest)].sort((a, b) => (a.receivedAt < b.receivedAt ? 1 : a.receivedAt > b.receivedAt ? -1 : 0));
+      }
       if (cancelled) return;
+      extra.current = list.length - fresh.length;
       setMessages(list);
-      setHasMore(list.length === PAGE);
+      setHasMore(fresh.length === PAGE);
       // A reopened message that has since moved or been deleted: don't reopen it.
       if (restored.current && !list.some((m) => m.id === restored.current)) {
         openByScope.delete(scopeKey(scope));
@@ -196,13 +222,16 @@ export function MailView() {
   const loadMore = useCallback(() => {
     if (!hasMore || searchActive || !messages) return;
     setHasMore(false);
-    api.listMessages(scope, PAGE, messages.length).then((more) => {
-      setMessages((m) => [...(m ?? []), ...more]);
+    api.listMessages(scope, PAGE, messages.length - extra.current).then((more) => {
+      setMessages((m) => [...(m ?? []), ...more.filter((x) => !m?.some((y) => y.id === x.id))]);
       setHasMore(more.length === PAGE);
     });
   }, [hasMore, searchActive, messages, scope]);
 
-  const select = (m: MessageSummary) => setSelection({ kind: m.isDraft ? 'draft' : 'message', id: m.id });
+  const select = (m: MessageSummary) => {
+    if (scope.tab === 'unread' && !m.isDraft) keptInUnread.current.set(m.id, m);
+    setSelection({ kind: m.isDraft ? 'draft' : 'message', id: m.id });
+  };
 
   const move = (delta: number) => {
     if (!list.length) return;
