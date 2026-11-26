@@ -49,7 +49,7 @@ export const tauriApi: MailApi = {
   searchServer: (query) => call('search_server', { query }),
   listPeople: (query, limit) => call('list_people', { query, limit }),
   getPerson: (email) => call('get_person', { email }),
-  personMail: (email, limit) => call('person_mail', { email, limit }),
+  personMail: (email, accountId, limit) => call('person_mail', { email, accountId: accountId ?? null, limit }),
 
   listCalendars: () => call('list_calendars'),
   setCalendarVisible: (calendarId, visible) => call('set_calendar_visible', { calendarId, visible }),

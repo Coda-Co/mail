@@ -34,7 +34,12 @@ export function MailboxTabs() {
   const [approval, setApproval] = useState<AddAccountResult | null>(null);
   const nav = useRef<HTMLElement>(null);
   const [overflow, setOverflow] = useState({ over: false, atEnd: false });
-  const visible = route.view === 'mail' || route.view === 'web';
+  // In People the tabs pick whose contacts to show (accounts with mail here; not web ones).
+  const inPeople = route.view === 'people';
+  const visible = route.view === 'mail' || route.view === 'web' || inPeople;
+  const shown = inPeople ? accounts.filter((a) => a.kind !== 'web') : accounts;
+  // People shows the mailbox's account, or the first with mail here (as PeopleView does).
+  const peopleAccount = shown.find((a) => a.id === scope.accountId)?.id ?? shown[0]?.id;
 
   // Fade the right edge only when there are more tabs than fit, and not once scrolled to the end.
   useEffect(() => {
@@ -99,7 +104,13 @@ export function MailboxTabs() {
     setMenu({ anchor: { x: e.clientX, y: e.clientY }, items });
   };
 
-  const isSelected = (a: Account) => (a.kind === 'web' ? route.view === 'web' && route.param === a.id : route.view === 'mail' && scope.accountId === a.id);
+  const isSelected = (a: Account) =>
+    a.kind === 'web' ? route.view === 'web' && route.param === a.id : inPeople ? peopleAccount === a.id : route.view === 'mail' && scope.accountId === a.id;
+  // In People: switch account without leaving People. The same choice is Mail's mailbox.
+  const pick = (a: Account) => {
+    if (!inPeople) return openMailbox(a);
+    if (scope.accountId !== a.id) app.setScope({ accountId: a.id, folder: { role: 'inbox' }, tab: 'all' });
+  };
 
   const tooltip = (a: Account, i: number) => {
     const lines = [a.displayName, a.email];
@@ -125,7 +136,8 @@ export function MailboxTabs() {
   return (
     <>
       <nav ref={nav} className={`mailbox-tabs${overflow.over ? ' overflowing' : ''}${overflow.atEnd ? ' at-end' : ''}`} aria-label="Mailboxes">
-        {accounts.map((a, i) => {
+        {shown.map((a) => {
+          const i = accounts.indexOf(a);
           const selected = isSelected(a);
           const attention = a.syncState === 'needsAuth' ? 'auth' : a.syncState === 'error' ? 'error' : null;
           return (
@@ -137,7 +149,7 @@ export function MailboxTabs() {
               aria-current={selected ? 'page' : undefined}
               ref={selected ? (el) => el?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) : undefined}
               title={tooltip(a, i)}
-              onClick={() => openMailbox(a)}
+              onClick={() => pick(a)}
               onContextMenu={(e) => accountMenu(e, a)}
             >
               <span className="dot" aria-hidden />

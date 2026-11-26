@@ -817,11 +817,11 @@ export const demoApi: MailApi = {
   async getPerson(email) {
     return people().find((p) => p.email.toLowerCase() === email.toLowerCase()) ?? null;
   },
-  async personMail(email, limit) {
+  async personMail(email, accountId, limit) {
     const e = email.toLowerCase();
     const has = (list: Message['to']) => list.some((a) => a.email.toLowerCase() === e);
     return state.messages
-      .filter((m) => !m.isDraft && (m.from.email.toLowerCase() === e || has(m.to) || has(m.cc)))
+      .filter((m) => !m.isDraft && (!accountId || m.accountId === accountId) && (m.from.email.toLowerCase() === e || has(m.to) || has(m.cc)))
       .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt))
       .slice(0, limit)
       .map(summary);

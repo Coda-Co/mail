@@ -485,8 +485,10 @@ fn mail_with_a_person_from_them_or_to_them() {
         ],
     )
     .unwrap();
-    let got: Vec<String> = svc.person_mail(&jr.email, 30).unwrap().into_iter().map(|m| m.subject).collect();
+    let got: Vec<String> = svc.person_mail(&jr.email, None, 30).unwrap().into_iter().map(|m| m.subject).collect();
     assert_eq!(got, vec!["cc-only", "from-him"], "cc'd counts (any case), newest first, drafts left out");
+    assert_eq!(svc.person_mail(&jr.email, Some(&ids.coda), 30).unwrap().len(), 2, "within the account");
+    assert!(svc.person_mail(&jr.email, Some(&ids.harbour), 30).unwrap().is_empty(), "not in another account");
 }
 
 #[test]

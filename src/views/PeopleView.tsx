@@ -17,7 +17,10 @@ export function PeopleView() {
   const app = useApp();
   const toast = useToast();
   const [q, setQ] = useState('');
-  const [people, setPeople] = useState<Person[] | null>(null);
+  const [allPeople, setPeople] = useState<Person[] | null>(null);
+  // The account picked in the top bar's tabs (shared with Mail); web accounts have no contacts here.
+  const account = app.graphAccounts.find((a) => a.id === app.scope.accountId)?.id ?? app.graphAccounts[0]?.id;
+  const people = allPeople && account ? allPeople.filter((p) => p.accountIds.includes(account)) : allPeople;
   const selectedEmail = app.route.param ?? null;
   const [person, setPerson] = useState<Person | null>(null);
   // Recent mail with the selected person; null while loading.
@@ -57,7 +60,7 @@ export function PeopleView() {
     // Its own query, not two searches: a search started meanwhile used to cancel one of them,
     // and then this showed no mail at all.
     // One more than shown, to know whether there's more.
-    api.personMail(selectedEmail, limit + 1).then(
+    api.personMail(selectedEmail, account, limit + 1).then(
       (list) => {
         if (cancelled) return;
         setRecentFailed(false);
@@ -73,12 +76,18 @@ export function PeopleView() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEmail, app.mailVersion, limit, retry]);
+  }, [selectedEmail, account, app.mailVersion, limit, retry]);
+
+  // Switching account: a person who isn't in it is put down.
+  useEffect(() => {
+    if (selectedEmail && people && !people.some((p) => p.email.toLowerCase() === selectedEmail.toLowerCase())) app.navigate({ view: 'people' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account, allPeople]);
 
   const select = (email: string | null) => app.navigate(email ? { view: 'people', param: email } : { view: 'people' });
 
   const email = async (p: Person) => {
-    const d = await api.createDraft({ mode: 'new', accountId: p.accountIds[0] });
+    const d = await api.createDraft({ mode: 'new', accountId: account && p.accountIds.includes(account) ? account : p.accountIds[0] });
     await api.updateDraft({ ...d, to: [{ name: p.name, email: p.email }] });
     await api.popOut('draft', d.id);
   };

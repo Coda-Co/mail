@@ -372,8 +372,8 @@ export interface MailApi {
   searchServer(query: SearchQuery): Promise<SearchResult>;
   listPeople(query: string, limit: number): Promise<Person[]>;
   getPerson(email: string): Promise<Person | null>;
-  /** Recent mail from or to someone, across accounts and folders, newest first. */
-  personMail(email: string, limit: number): Promise<MessageSummary[]>;
+  /** Recent mail from or to someone, across folders (in one account, or all), newest first. */
+  personMail(email: string, accountId: string | undefined, limit: number): Promise<MessageSummary[]>;
 
   listCalendars(): Promise<CalendarInfo[]>;
   setCalendarVisible(calendarId: string, visible: boolean): Promise<void>;
