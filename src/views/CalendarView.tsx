@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, LoaderCircle } from 'lucide-react';
+import { Check, Clock, LoaderCircle, MapPin, Video } from 'lucide-react';
 import { api } from '../api';
 import type { CalendarEvent, EventField, EventInput, ResponseStatus } from '../api/types';
 import { useApp } from '../state/app';
@@ -17,6 +17,7 @@ import { Resizer } from '../components/Resizer';
 import { RsvpButtons, type Rsvp, type RsvpOptions } from '../components/RsvpButtons';
 import { eventActions, webEventSource } from '../lib/webCalendar';
 import { durationLabel } from '../lib/timeEntry';
+import { isBlankHtml, stripMeetingBlock } from '../lib/meetingBody';
 
 type Mode = 'day' | 'week' | 'month';
 const HOUR = 56;
@@ -67,6 +68,22 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
       live = false;
     };
   }, [event.id, event.accountId, event.attendees, event.isOnlineMeeting, fromWeb]);
+  // The join button stands in for Teams' own "Join: https://…" block and its location line.
+  const description = useMemo(() => {
+    const html = event.bodyHtml.replace(/<script[\s\S]*?<\/script>/gi, '');
+    const out = event.onlineMeetingUrl ? stripMeetingBlock(html) : html;
+    return isBlankHtml(out) ? '' : out;
+  }, [event.bodyHtml, event.onlineMeetingUrl]);
+  const showLocation = !!event.location && !(event.onlineMeetingUrl && /^microsoft teams meeting$/i.test(event.location.trim()));
+  const minutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  const oneDay = sameDay(start, new Date(end.getTime() - 1));
+  const when = event.isAllDay
+    ? oneDay
+      ? `${longDate(start)} · All day`
+      : `${longDate(start)} – ${longDate(addDays(end, -1))} · All day`
+    : oneDay
+      ? `${longDate(start)} · ${hhmm(start)} – ${hhmm(end)}`
+      : `${longDate(start)} ${hhmm(start)} – ${longDate(end)} ${hhmm(end)}`;
   const attendees = [...webAttendees].sort((a, b) => (a.response === 'organizer' ? -1 : b.response === 'organizer' ? 1 : 0));
   const shown = showAll ? attendees : attendees.slice(0, 3);
   const respond = async (r: Rsvp, o: RsvpOptions) => {
@@ -124,16 +141,32 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
         </span>
         {fromWeb && <span className="event-source">{webEventSource(acc, now())}</span>}
         <div className="facts">
-          <span>{longDate(start)}</span>
-          <span>{event.isAllDay ? 'All day' : `${hhmm(start)} – ${hhmm(end)}`}</span>
-          {event.location && <span>{event.location}</span>}
-          {!actions.respond && event.readOnly && RESPONSE_TEXT[event.myResponse] && <span>{RESPONSE_TEXT[event.myResponse]}</span>}
-          {event.isOnlineMeeting && event.onlineMeetingUrl && (
-            <button type="button" className="link-button" style={{ alignSelf: 'flex-start', display: 'inline-flex', gap: 6, alignItems: 'center' }} onClick={() => api.openExternal(event.onlineMeetingUrl!)}>
-              {joinLabel(event.onlineMeetingUrl)} <ExternalLink size={13} />
-            </button>
+          <div className="fact">
+            <Clock size={16} aria-hidden />
+            <span>
+              {when}
+              {!event.isAllDay && oneDay && <span className="muted"> · {durationLabel(minutes)}</span>}
+            </span>
+          </div>
+          {showLocation && (
+            <div className="fact">
+              <MapPin size={16} aria-hidden />
+              <span>{event.location}</span>
+            </div>
+          )}
+          {!actions.respond && event.readOnly && RESPONSE_TEXT[event.myResponse] && (
+            <div className="fact">
+              <Check size={16} aria-hidden />
+              <span>{RESPONSE_TEXT[event.myResponse]}</span>
+            </div>
           )}
         </div>
+        {event.isOnlineMeeting && event.onlineMeetingUrl && (
+          <button type="button" className="btn btn-primary join-meeting" onClick={() => api.openExternal(event.onlineMeetingUrl!)}>
+            <Video size={16} aria-hidden />
+            {joinLabel(event.onlineMeetingUrl)}
+          </button>
+        )}
         {actions.respond && <RsvpButtons current={event.myResponse} onRespond={respond} />}
         {loadingAttendees && attendees.length === 0 && (
           <>
@@ -168,7 +201,7 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
             </div>
           </>
         )}
-        {event.bodyHtml && <div className="description" dangerouslySetInnerHTML={{ __html: event.bodyHtml.replace(/<script[\s\S]*?<\/script>/gi, '') }} />}
+        {description && <div className="description" dangerouslySetInnerHTML={{ __html: description }} />}
       </div>
     </Modal>
   );
@@ -185,31 +218,41 @@ function atMinute(day: Date, m: number): Date {
   return d;
 }
 
-/** Asks before a dragged or resized event is saved. */
+/** People other than you on an event: the ones a change of time would notify. */
+function otherAttendees(e: CalendarEvent) {
+  const me = e.organizer.email.toLowerCase();
+  return e.attendees.filter((a) => a.response !== 'organizer' && (!me || a.address.email.toLowerCase() !== me));
+}
+
+/** The event as it is, at new times. */
+function retimed(event: CalendarEvent, start: Date, end: Date): EventInput {
+  return {
+    accountId: event.accountId,
+    subject: event.subject,
+    start: start.toISOString(),
+    end: end.toISOString(),
+    isAllDay: false,
+    location: event.location,
+    bodyHtml: event.bodyHtml,
+    attendees: event.attendees.filter((a) => a.response !== 'organizer').map((a) => a.address),
+    isOnlineMeeting: event.isOnlineMeeting,
+    reminderMinutes: event.reminderMinutes,
+  };
+}
+
+/** Asks before a dragged or resized meeting is saved, since its attendees hear about it. */
 function RescheduleModal({ change, onCancel, onSaved }: { change: Reschedule; onCancel: () => void; onSaved: (e: CalendarEvent) => void }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const { event, start, end } = change;
   const oldStart = new Date(event.start);
   const oldEnd = new Date(event.end);
-  const invitees = event.attendees.filter((a) => a.response !== 'organizer').map((a) => a.address);
+  const invitees = otherAttendees(event);
   const when = (s: Date, e: Date) => `${longDate(s)}, ${hhmm(s)} – ${hhmm(e)} (${durationLabel(Math.round((e.getTime() - s.getTime()) / 60000))})`;
   const save = async () => {
-    const input: EventInput = {
-      accountId: event.accountId,
-      subject: event.subject,
-      start: start.toISOString(),
-      end: end.toISOString(),
-      isAllDay: false,
-      location: event.location,
-      bodyHtml: event.bodyHtml,
-      attendees: invitees,
-      isOnlineMeeting: event.isOnlineMeeting,
-      reminderMinutes: event.reminderMinutes,
-    };
     setBusy(true);
     try {
-      onSaved(await api.updateEvent(event.id, input));
+      onSaved(await api.updateEvent(event.id, retimed(event, start, end)));
     } catch (e) {
       toast(`Couldn’t change the event: ${e instanceof Error ? e.message : e}`);
       onCancel();
@@ -386,6 +429,7 @@ function EventResults({
 
 export function CalendarView() {
   const app = useApp();
+  const toast = useToast();
   const [mode, setMode] = useState<Mode>('week');
   const [anchor, setAnchor] = useState<Date>(() => (app.calendarFocus ? new Date(app.calendarFocus.date) : now()));
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -528,11 +572,32 @@ export function CalendarView() {
       if (!moved) return;
       dragged.current = true;
       setTimeout(() => (dragged.current = false), 0);
-      if (cur.start.getTime() !== s0.getTime() || cur.end.getTime() !== e0.getTime()) setConfirm(cur);
+      if (cur.start.getTime() === s0.getTime() && cur.end.getTime() === e0.getTime()) return;
+      // Only meetings ask first; an event that's just in your diary moves straight away.
+      if (otherAttendees(e).length > 0) setConfirm(cur);
+      else void moveNow(e, cur.start, cur.end, true);
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
+  };
+  // Saves new times at once, drawn there before the server answers. Offers an undo.
+  const moveNow = async (e: CalendarEvent, start: Date, end: Date, undoable: boolean) => {
+    const was = { start: e.start, end: e.end };
+    const set = (t: { start: string; end: string }) => setEvents((list) => list.map((x) => (x.id === e.id ? { ...x, ...t } : x)));
+    set({ start: start.toISOString(), end: end.toISOString() });
+    try {
+      const saved = await api.updateEvent(e.id, retimed(e, start, end));
+      setEvents((list) => list.map((x) => (x.id === saved.id ? saved : x)));
+      setVersion((v) => v + 1);
+      if (undoable) {
+        const sameLength = end.getTime() - start.getTime() === new Date(was.end).getTime() - new Date(was.start).getTime();
+        toast(sameLength ? 'Event moved' : 'Event time changed', { label: 'Undo', run: () => void moveNow(saved, new Date(was.start), new Date(was.end), false) });
+      }
+    } catch (err) {
+      set(was);
+      toast(`Couldn’t change the event: ${err instanceof Error ? err.message : err}`);
+    }
   };
   const dayEvents = (d: Date) => shownEvents.filter((e) => new Date(e.start) < addDays(d, 1) && new Date(e.end) > d);
   const webTag = (e: CalendarEvent) =>
@@ -635,7 +700,7 @@ export function CalendarView() {
                     <button
                       key={e.id}
                       type="button"
-                      className={`cal-event${e.myResponse === 'declined' ? ' declined' : ''}${e.myResponse === 'tentative' ? ' tentative' : ''}${draggable ? ' draggable' : ''}${isMoving ? ' moving' : ''}`}
+                      className={`cal-event${e.myResponse === 'declined' ? ' declined' : ''}${e.myResponse === 'tentative' ? ' tentative' : ''}${draggable ? ' draggable' : ''}${isMoving ? ' moving' : ''}${short ? ' short' : ''}`}
                       style={{
                         ...style(e, e.id === selectedId),
                         top: (startMin / 60) * HOUR,
@@ -655,6 +720,8 @@ export function CalendarView() {
                       <span className="title">
                         {eventTitle(e)}
                         {webTag(e)}
+                        {/* No room for a second line: the location follows the title. */}
+                        {short && eventLocation(e) && <span className="location-inline">, {/^microsoft teams meeting$/i.test(eventLocation(e).trim()) ? 'Teams' : eventLocation(e)}</span>}
                       </span>
                       {!short && eventLocation(e) && <span className="location">{eventLocation(e)}</span>}
                     </button>

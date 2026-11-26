@@ -245,7 +245,7 @@ export function buildDemoState(now: Date): DemoState {
       end: e.toISOString(),
       isAllDay: false,
       location,
-      bodyHtml: '',
+      bodyHtml: opts.online ? teamsBody(subject) : '',
       organizer,
       attendees,
       myResponse: isMine ? 'organizer' : (opts.response ?? 'none'),
@@ -256,6 +256,11 @@ export function buildDemoState(now: Date): DemoState {
       color: COLORS[acc],
       readOnly: false,
     };
+  };
+  // The block Teams puts in every invitation, under the organiser's own note.
+  const teamsBody = (subject: string) => {
+    const rule = '<div style="width:100%"><span style="white-space:nowrap;color:#5F5F5F;opacity:.36">________________________________________________________________________________</span></div>';
+    return `<p>Agenda for ${subject}: quick round of updates, then decisions.</p>${rule}<div class="me-email-text"><div style="margin-bottom:24px"><span style="font-size:24px;font-weight:700">Microsoft Teams meeting</span></div><div><span style="font-size:20px">Join: </span><a href="https://teams.example/meet/123" style="font-size:20px">https://teams.example/meet/123?p=rdBnCmNugvFQFhxj00</a></div><div>Meeting ID: 347 497 567 667 899</div></div>${rule}`;
   };
   const ALDGATE_ME: Address = { name: 'Miles Rowland', email: 'miles.rowland@aldgatecapital.example' };
   const ana: Address = { name: 'Ana Silva', email: 'ana.silva@aldgatecapital.example' };
