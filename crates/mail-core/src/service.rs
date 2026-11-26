@@ -76,6 +76,9 @@ pub struct MailService {
     events: Mutex<Arc<dyn EventSink>>,
     online: std::sync::atomic::AtomicBool,
     in_memory: bool,
+    /// Held while queued changes are replayed against the server, so the outbox loop and a
+    /// full sync never replay at once (a message must never be sent twice).
+    pub(crate) replay_lock: tokio::sync::Mutex<()>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -104,6 +107,7 @@ impl MailService {
             events: Mutex::new(Arc::new(NoEvents)),
             online: std::sync::atomic::AtomicBool::new(true),
             in_memory,
+            replay_lock: tokio::sync::Mutex::new(()),
         }
     }
 

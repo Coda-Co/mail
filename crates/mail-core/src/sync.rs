@@ -128,6 +128,39 @@ impl<'a> Syncer<'a> {
         Ok(report)
     }
 
+    /// Just the queued changes, straight away: what the outbox loop runs when something is
+    /// sent or changed, so it doesn't wait for a full sync. After a send, Sent is refreshed so
+    /// the sent copy shows. Offline is reported, not raised.
+    pub async fn run_outbox(&self) -> Result<SyncReport> {
+        let mut report = SyncReport::default();
+        if self.db(|db| db.due_ops(&now_iso()))?.is_empty() {
+            return Ok(report);
+        }
+        let sends_before = self.db(|db| Ok(db.due_ops(&now_iso())?.iter().filter(|o| o.kind == "send").count()))?;
+        self.replay_ops(&mut report).await?;
+        if report.offline {
+            self.svc.set_online(false);
+            self.svc.events().sync_status();
+            return Ok(report);
+        }
+        self.svc.set_online(true);
+        if sends_before > 0 && report.ops_done > 0 {
+            let ready = self.db(|db| db.kv_get("initialSyncDone"))?.is_some();
+            let sent = self.db(|db| db.folder_ids())?.into_iter().find(|(_, role)| *role == Some(FolderRole::Sent));
+            if let (true, Some((folder, role))) = (ready, sent) {
+                match self.sync_folder(&folder, role, false, &mut report).await {
+                    Err(e) if !e.is_network() => tracing::warn!("refreshing Sent: {e}"),
+                    _ => {}
+                }
+            }
+        }
+        if report.ops_done > 0 || report.messages_changed > 0 {
+            self.svc.events().mail_changed(std::slice::from_ref(&self.account.id));
+        }
+        self.svc.events().sync_status();
+        Ok(report)
+    }
+
     async fn run_inner(&self, report: &mut SyncReport) -> Result<()> {
         self.replay_ops(report).await?;
         if report.offline {
@@ -706,6 +739,7 @@ impl<'a> Syncer<'a> {
     // ------------------------------------------------------------ pending operations
 
     pub async fn replay_ops(&self, report: &mut SyncReport) -> Result<()> {
+        let _one_at_a_time = self.svc.replay_lock.lock().await;
         let ops = self.db(|db| db.due_ops(&now_iso()))?;
         for op in ops {
             let parsed: Op = match serde_json::from_value(op.payload.clone()) {
@@ -1149,6 +1183,34 @@ pub type ClientFactory = Arc<dyn Fn(&Account) -> Result<GraphClient> + Send + Sy
 
 /// Run sync for every Graph account, forever: the inbox every `inbox_every`, and a full
 /// cycle every `full_every` or straight away when woken (focus, after an action).
+/// Replay queued changes (sends above all) as soon as they're made, for every Graph account,
+/// rather than waiting for the next full sync. Woken by `outbox`; also looks every 30 seconds
+/// for retries that have come due.
+pub async fn outbox_loop(svc: Arc<MailService>, clients: ClientFactory, outbox: Arc<tokio::sync::Notify>) {
+    loop {
+        tokio::select! {
+            _ = outbox.notified() => {}
+            _ = tokio::time::sleep(std::time::Duration::from_secs(30)) => {}
+        }
+        for a in svc.graph_accounts().unwrap_or_default() {
+            if a.sync_state == SyncState::NeedsAuth {
+                continue;
+            }
+            match clients(&a) {
+                Ok(client) => match Syncer::new(&svc, &client, a.clone()).run_outbox().await {
+                    Err(Error::Auth(m)) => {
+                        let _ = svc.app().set_sync_state(&a.id, SyncState::NeedsAuth, Some(&m));
+                        svc.events().accounts_changed();
+                    }
+                    Err(e) => tracing::warn!("outbox {}: {e}", a.email),
+                    Ok(_) => {}
+                },
+                Err(e) => tracing::warn!("no client for {}: {e}", a.email),
+            }
+        }
+    }
+}
+
 pub async fn run_loop(svc: Arc<MailService>, clients: ClientFactory, wake: Arc<tokio::sync::Notify>, inbox_every: std::time::Duration, full_every: std::time::Duration) {
     let mut full = true;
     let mut last_full = tokio::time::Instant::now();

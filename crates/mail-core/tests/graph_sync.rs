@@ -186,6 +186,64 @@ async fn reply_is_created_saved_and_sent() {
     assert_eq!(svc.sync_status().unwrap().outbox_held, 0);
 }
 
+async fn mount_reply_and_send(server: &MockServer, sends: u64) {
+    Mock::given(method("POST")).and(path("/me/messages/M1/createReply")).respond_with(ResponseTemplate::new(201).set_body_json(json!({"id": "D1"}))).mount(server).await;
+    Mock::given(method("PATCH")).and(path("/me/messages/D1")).respond_with(ResponseTemplate::new(200).set_body_json(json!({}))).mount(server).await;
+    Mock::given(method("GET")).and(path("/me/messages/D1/attachments")).respond_with(ResponseTemplate::new(200).set_body_json(json!({"value": []}))).mount(server).await;
+    Mock::given(method("POST")).and(path("/me/messages/D1/send")).respond_with(ResponseTemplate::new(202)).expect(sends).mount(server).await;
+}
+
+#[tokio::test]
+async fn the_outbox_sends_without_waiting_for_a_full_sync() {
+    let (server, svc, acc, _) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    mount_reply_and_send(&server, 1).await;
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None }).unwrap();
+    svc.send_draft(&d.id).unwrap();
+    let before = server.received_requests().await.unwrap().len();
+    let r = Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run_outbox().await.unwrap();
+    assert_eq!(r.ops_done, 2, "save then send");
+    assert!(svc.get_draft(&d.id).is_err(), "sent: gone from Drafts and the Outbox");
+    let drafts = svc.list_folders(Some(&acc.id)).unwrap().into_iter().find(|f| f.role == Some(FolderRole::Drafts)).unwrap();
+    assert_eq!(drafts.outbox, 0);
+    // Only the send and a refresh of Sent: no inbox, folders or calendar.
+    let paths: Vec<String> = server.received_requests().await.unwrap()[before..].iter().map(|r| r.url.path().to_string()).collect();
+    assert!(paths.last().is_some_and(|p| p.contains("delta")), "Sent refreshed after the send: {paths:?}");
+    assert!(!paths.iter().any(|p| p.contains("calendar")), "no full sync: {paths:?}");
+    // Nothing queued: nothing to do.
+    let r = Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run_outbox().await.unwrap();
+    assert_eq!(r.ops_done, 0);
+}
+
+#[tokio::test]
+async fn taken_back_to_edit_it_is_not_sent() {
+    let (server, svc, acc, _) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    mount_reply_and_send(&server, 0).await;
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None }).unwrap();
+    svc.send_draft(&d.id).unwrap();
+    svc.cancel_send(&d.id).unwrap();
+    Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run_outbox().await.unwrap();
+    assert_eq!(svc.get_draft(&d.id).unwrap().status, DraftStatus::Editing);
+}
+
+#[tokio::test]
+async fn a_send_cut_off_by_a_quit_is_held_not_repeated() {
+    let (server, svc, acc, _) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    mount_reply_and_send(&server, 0).await;
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None }).unwrap();
+    svc.send_draft(&d.id).unwrap();
+    let (_, raw) = mail_core::ids::split(&d.id).unwrap();
+    svc.with_account(&acc.id, |db| db.set_draft_status(raw, DraftStatus::Sending, None)).unwrap();
+    Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run_outbox().await.unwrap();
+    assert_eq!(svc.get_draft(&d.id).unwrap().status, DraftStatus::Unknown);
+    assert_eq!(svc.sync_status().unwrap().outbox_held, 1);
+}
+
 #[tokio::test]
 async fn sending_deletes_dropped_copies() {
     let (server, svc, acc, _) = setup().await;
