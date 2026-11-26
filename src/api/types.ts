@@ -364,6 +364,11 @@ export interface MailApi {
   addAttachment(draftId: string): Promise<Draft>;
   /** Attach a file dropped onto the draft (from Explorer, Finder or the desktop). */
   addAttachmentFile(draftId: string, file: File): Promise<Draft>;
+  /**
+   * Attach the files on the system clipboard (copied in Explorer or Finder, or from a message).
+   * Null when the clipboard holds no files; the caller then uses what the paste event carried.
+   */
+  pasteAttachments(draftId: string): Promise<Draft | null>;
   removeAttachment(draftId: string, attachmentId: string): Promise<Draft>;
   discardDraft(draftId: string): Promise<void>;
   sendDraft(draftId: string): Promise<Draft>;
