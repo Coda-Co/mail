@@ -347,6 +347,134 @@ h3 {
   flex: 1;
 }
 
+/* ---------- Mailbox tabs (top bar, while Mail is open) ---------- */
+
+.mailbox-tabs {
+  flex: 0 1 auto;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  margin-left: -8px;
+  margin-right: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.mailbox-tab {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-meta);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mailbox-tab:hover {
+  color: var(--text);
+}
+
+.mailbox-tab .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mailbox-color);
+  flex-shrink: 0;
+}
+
+.mailbox-tab .web {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.mailbox-tab .count {
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mailbox-tab .status {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.mailbox-tab .status.auth {
+  background: var(--warning);
+}
+
+.mailbox-tab .status.error {
+  background: var(--danger);
+}
+
+/* The open mailbox: bold, underlined in its own colour along the top bar's bottom edge. */
+.mailbox-tab.selected {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.mailbox-tab.selected::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--mailbox-color);
+}
+
+.mailbox-tab.add {
+  padding: 0 10px;
+  color: var(--text-muted);
+}
+
+/* While searching, leave room for the field picker, which opens out to the left of the search box. */
+.topbar:has(.search-scope) .mailbox-tabs {
+  margin-right: var(--search-scope-w);
+}
+
+/* More tabs than fit: they scroll sideways and fade out at the right edge. */
+.mailbox-tabs.overflowing {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+
+.mailbox-tabs.overflowing.at-end {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+/* With tabs on the left, search moves to the right, beside sync and New email. */
+.mailbox-tabs ~ .topbar-search {
+  flex-basis: 480px;
+  /* Search gives up space before the tabs do. */
+  flex-shrink: 6;
+  min-width: 220px;
+  margin-left: auto;
+}
+
+.mailbox-tabs ~ .spacer {
+  flex: 0 0 4px;
+}
+
 .sync-indicator {
   display: inline-flex;
   align-items: center;
@@ -659,13 +787,6 @@ h3 {
   justify-content: center;
 }
 
-/* Mailbox glyphs carry a selection ring and corner badges, so they need
-   more room between them than the plain icons above the divider. */
-.rail-mailbox + .rail-mailbox,
-.rail-mailbox + .rail-item {
-  margin-top: 6px;
-}
-
 .rail-button {
   position: relative;
   width: 40px;
@@ -690,8 +811,7 @@ h3 {
   justify-content: center;
 }
 
-.rail-button:hover .rail-icon,
-.rail-add:hover {
+.rail-button:hover .rail-icon {
   background: var(--nav-selected);
   color: var(--text);
 }
@@ -699,70 +819,6 @@ h3 {
 .rail-item.selected .rail-icon {
   background: var(--nav-selected);
   color: var(--text);
-}
-
-.rail-add {
-  border: 1px dashed var(--tag-border);
-  border-radius: 50%;
-}
-
-.rail-divider {
-  width: 28px;
-  height: 1px;
-  background: var(--border);
-  margin: 2px 0;
-  flex-shrink: 0;
-}
-
-.rail-glyph {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-weight: 650;
-  line-height: 1;
-  user-select: none;
-  opacity: 0.82;
-  transition: opacity 0.12s ease, border-radius 0.12s ease;
-}
-
-.rail-glyph .letters {
-  display: flex;
-  align-items: baseline;
-  /* Centre on the capitals, not the line box, so the letter sits in the
-     optical middle. Ignored where unsupported; the fallback nudge below is close. */
-  text-box: trim-both cap alphabetic;
-}
-
-@supports not (text-box: trim-both cap alphabetic) {
-  .rail-glyph .letters {
-    transform: translateY(0.06em);
-  }
-}
-
-.rail-glyph .org {
-  font-size: 18px;
-  letter-spacing: -0.02em;
-}
-
-/* The mailbox's own initial, when there's more than one mailbox in the organisation. */
-.rail-glyph .mailbox {
-  font-size: 12px;
-  font-weight: 600;
-  margin-left: 1px;
-  opacity: 0.92;
-}
-
-.rail-button:hover .rail-glyph {
-  opacity: 1;
-}
-
-.rail-item.selected .rail-glyph {
-  opacity: 1;
-  box-shadow: 0 0 0 2px var(--sidebar), 0 0 0 4px var(--accent);
 }
 
 .rail-badge {
@@ -781,37 +837,6 @@ h3 {
   line-height: 16px;
   text-align: center;
   font-variant-numeric: tabular-nums;
-}
-
-.rail-status {
-  position: absolute;
-  bottom: -2px;
-  right: -3px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 750;
-  line-height: 1;
-  color: #ffffff;
-  box-shadow: 0 0 0 2px var(--sidebar);
-}
-
-.rail-status.auth {
-  background: var(--warning);
-}
-
-.rail-status.error {
-  background: var(--danger);
-}
-
-.rail-status.web {
-  background: var(--bg);
-  color: var(--text-muted);
-  border: 1px solid var(--tag-border);
 }
 
 .rail-footer {

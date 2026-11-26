@@ -64,7 +64,8 @@ Each account has one of two backends. The interface treats them the same where i
 ### 3.1 Mail
 
 - **One mailbox at a time.** Each mailbox is its own space, like a separate app; there is no combined inbox. Mail opens the mailbox used last.
-- **Rail** down the left: Calendar and People (shared across mailboxes), a divider, then one glyph per mailbox (Graph and Web), then + to add an account; Settings and your avatar at the bottom. A glyph is the organisation's initial on the account colour; with more than one mailbox in the same organisation (same tenant or domain) it adds the mailbox's initial (Cm, Cs). Badges: unread count; orange ! for sign-in needed; red ! for a sync error; a globe for Web accounts. Right-click a glyph for Sign in again, Sync now, Account settings, Remove.
+- **Rail** down the left: Mail (total unread), Calendar and People; Settings and your avatar at the bottom. Mail returns to the mailbox last open.
+- **Mailbox tabs** in the top bar while Mail is open: one per mailbox (Graph and Web), then + to add an account. A tab shows the account colour, its name (plus the mailbox when two share a name), the unread count, a globe for Web accounts, and an orange ! for sign-in needed or a red ! for a sync error. The open mailbox is bold and underlined in its colour. Right-click a tab for Sign in again, Sync now, Account settings, Remove. Search sits on the right of the bar.
 - **Folder icons** above the message list: Inbox, Unread (the inbox's unread mail), Drafts, Sent, Archive, Deleted, Junk, then a folder menu with the user's own folders.
 - **Calendar** has its own sidebar listing each account's calendars to show or hide.
 - **Reading pane** with actions: Reply, Reply all, Forward, Archive, Delete, Open in new window.
@@ -120,7 +121,7 @@ Each account has one of two backends. The interface treats them the same where i
 - Keyboard shortcuts identical on both platforms (Ctrl on Windows, Cmd on Mac):
   - Ctrl+N new message, Ctrl+R reply, Ctrl+Shift+R reply all, Ctrl+F forward (to confirm: clashes with find)
   - E archive, Delete delete, Ctrl+Z undo (archive, delete, move), Ctrl+Enter send, Ctrl+E search, Esc close or clear (closes a draft: an unchanged reply or forward, or a new message with no content, is discarded; anything else is saved. Closes a pop-out window)
-  - Ctrl+1 calendar, Ctrl+2 people, Ctrl+3 to Ctrl+9 the mailboxes in rail order
+  - Ctrl+1 calendar, Ctrl+2 people, Ctrl+3 to Ctrl+9 the mailboxes in tab order
 - Narrow windows: agenda panel folds away first, then the reading pane stacks.
 
 ## 5. Architecture

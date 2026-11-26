@@ -42,7 +42,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'send', combo: 'Mod+Enter', allowInInput: true },
   { id: 'search', combo: 'Mod+E', allowInInput: true },
   { id: 'escape', combo: 'Escape', allowInInput: true },
-  // Mod+1..9 follow the rail top to bottom: Calendar, People, then each mailbox.
+  // Mod+1 Calendar, Mod+2 People, Mod+3..9 each mailbox in tab order.
   { id: 'goCalendar', combo: 'Mod+1', allowInInput: true },
   { id: 'goPeople', combo: 'Mod+2', allowInInput: true },
   ...([1, 2, 3, 4, 5, 6, 7] as MailboxSlot[]).map((n): Shortcut => ({ id: `goMailbox${n}`, combo: `Mod+${n + 2}`, allowInInput: true })),
