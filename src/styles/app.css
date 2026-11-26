@@ -518,12 +518,17 @@ h3 {
   background: radial-gradient(circle at 100% 0, transparent 9.5px, var(--reading-canvas) 10px);
 }
 
+/* Centred on the tab labels (tabs are 40px tall at the bottom of the bar), not the bar. */
 .mailbox-tab.add {
-  align-self: center;
-  height: 32px;
+  height: 28px;
+  margin: 0 0 6px 2px;
+  padding: 0 7px;
   border-radius: var(--r-button);
-  padding: 0 10px;
   color: var(--text-muted);
+}
+
+.mailbox-tab.add:hover {
+  background: color-mix(in srgb, var(--reading-canvas) 55%, transparent);
 }
 
 /* While searching, leave room for the field picker, which opens out to the left of the search box. */
