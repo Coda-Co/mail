@@ -2856,22 +2856,52 @@ h3 {
   gap: 8px;
 }
 
-.rsvp button {
+.rsvp-split {
   flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+  display: flex;
   height: 32px;
   border: 1px solid var(--input-border);
   border-radius: var(--r-button);
   background: var(--bg);
-  font-size: var(--fs-meta);
-  cursor: pointer;
+  overflow: hidden;
 }
 
-.rsvp button svg {
-  color: var(--text-muted);
+.rsvp-split button {
+  border: none;
+  background: none;
+  font-size: var(--fs-meta);
+  cursor: pointer;
+  color: inherit;
+}
+
+.rsvp-split button:hover:not(:disabled) {
+  background: var(--row-hover);
+}
+
+.rsvp-main {
+  flex: 1;
+}
+
+/* The chevron: the alternatives to sending straight away. */
+.rsvp-more {
+  flex: 0 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid var(--input-border) !important;
+  color: var(--text-muted) !important;
+}
+
+.rsvp-split.on {
+  border-color: var(--success);
+  background: var(--success-bg);
+  color: var(--success-text);
+  font-weight: 500;
+}
+
+.rsvp-split.on .rsvp-more {
+  border-left-color: var(--success) !important;
+  color: var(--success-text) !important;
 }
 
 .rsvp-block {
@@ -2895,13 +2925,6 @@ h3 {
 .rsvp-edit-actions {
   display: flex;
   gap: 6px;
-}
-
-.rsvp button.on {
-  border-color: var(--success);
-  background: var(--success-bg);
-  color: var(--success-text);
-  font-weight: 500;
 }
 
 .attendees {

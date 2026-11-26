@@ -75,7 +75,7 @@ Each account has one of two backends. The interface treats them the same where i
 - **Signatures** (v1): rich formatting (bold, italic, links, colour, line breaks, an inline logo image). One or more per account, with a default for new messages and a default for replies and forwards. Inserted when a draft opens and swapped when From changes; the signature menu in compose adds, swaps or removes one on any draft. Edited in Settings with a small rich-text editor. Stored locally on each device; syncing signatures between devices is out of scope for v1.
 - HTML mail rendered in a sandboxed view. Remote images shown by default, except in Junk; a setting switches to "ask before showing", and senders can be always allowed.
 - Attachments in the offline window are downloaded during sync and cached locally; older ones download on demand. Cached files are removed once their mail leaves the window or is deleted.
-- **Meeting invitations** show a card above the body: date, time and location, Accept / Tentative / Decline (each can send the response now, with a note, or not at all), and the hours around the meeting from every visible calendar (all accounts, web calendars included), with the invitation outlined. Cancellations and replies show the time with their status. Open in Calendar jumps to the event.
+- **Meeting invitations** show a card above the body: date, time and location, Accept / Tentative / Decline (sends the response straight away; a chevron offers adding a note first or not sending one), and the hours around the meeting from every visible calendar (all accounts, web calendars included), with the invitation outlined. Cancellations and replies show the time with their status. Open in Calendar jumps to the event.
 
 ### 3.2 Search
 
@@ -94,7 +94,7 @@ Each account has one of two backends. The interface treats them the same where i
 ### 3.4 Calendar
 
 - Day, work week and month views. All Graph accounts' calendars overlaid, each in its account colour, each toggleable.
-- Event panel: details, attendees, Accept / Tentative / Decline (send now, edit first, or don’t send a response).
+- Event panel: details, attendees, Accept / Tentative / Decline (sends straight away; the chevron offers edit first or don’t send).
 - Create and edit events, with invitations sent through the server.
 - **Agenda panel** on the right of the mail view: Today, Tomorrow, then by weekday; time, account colour bar, title, location. Click through to the calendar.
 - Reminders as desktop notifications.

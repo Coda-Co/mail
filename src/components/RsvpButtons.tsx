@@ -18,8 +18,8 @@ const CHOICES: [Rsvp, string][] = [
 ];
 
 /**
- * Accept / Tentative / Decline, each with Outlook's choices: send the response now,
- * edit it first (a note to the organiser), or don't send one.
+ * Accept / Tentative / Decline. Clicking one sends the response straight away; the chevron
+ * beside it offers Outlook's alternatives: edit it first (a note to the organiser), or don't send one.
  */
 export function RsvpButtons({ current, onRespond, className }: { current: ResponseStatus; onRespond: (r: Rsvp, o: RsvpOptions) => Promise<void> | void; className?: string }) {
   const [menu, setMenu] = useState<{ anchor: HTMLElement; response: Rsvp } | null>(null);
@@ -44,18 +44,28 @@ export function RsvpButtons({ current, onRespond, className }: { current: Respon
     <div className={className ? `rsvp-block ${className}` : 'rsvp-block'}>
       <div className="rsvp" role="group" aria-label="Respond">
         {CHOICES.map(([r, label]) => (
-          <button
-            key={r}
-            type="button"
-            className={current === r ? 'on' : ''}
-            aria-pressed={current === r}
-            aria-haspopup="menu"
-            disabled={busy}
-            onClick={(e) => setMenu({ anchor: e.currentTarget, response: r })}
-          >
-            {label}
-            <ChevronDown size={13} aria-hidden />
-          </button>
+          <div key={r} className={current === r ? 'rsvp-split on' : 'rsvp-split'}>
+            <button
+              type="button"
+              className="rsvp-main"
+              aria-pressed={current === r}
+              title={`${label} and notify the organiser`}
+              disabled={busy}
+              onClick={() => void go(r, { sendResponse: true })}
+            >
+              {label}
+            </button>
+            <button
+              type="button"
+              className="rsvp-more"
+              aria-label={`More ${label.toLowerCase()} options`}
+              aria-haspopup="menu"
+              disabled={busy}
+              onClick={(e) => setMenu({ anchor: e.currentTarget.parentElement!, response: r })}
+            >
+              <ChevronDown size={14} aria-hidden />
+            </button>
+          </div>
         ))}
       </div>
       {editing && (
@@ -100,7 +110,6 @@ export function RsvpButtons({ current, onRespond, className }: { current: Respon
           align="start"
           onClose={() => setMenu(null)}
           items={[
-            { label: 'Send the response now', onSelect: () => void go(menu.response, { sendResponse: true }) },
             {
               label: 'Edit the response before sending',
               onSelect: () => {
