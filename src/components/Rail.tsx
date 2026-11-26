@@ -17,18 +17,20 @@ function badgeText(n: number): string {
 function RailItem({
   label,
   selected,
+  className,
   onClick,
   onContextMenu,
   children,
 }: {
   label: string;
   selected: boolean;
+  className?: string;
   onClick: () => void;
   onContextMenu?: (e: MouseEvent) => void;
   children: ReactNode;
 }) {
   return (
-    <div className={`rail-item${selected ? ' selected' : ''}`}>
+    <div className={`rail-item${className ? ` ${className}` : ''}${selected ? ' selected' : ''}`}>
       <button type="button" className="rail-button" aria-label={label} aria-current={selected ? 'page' : undefined} title={label} onClick={onClick} onContextMenu={onContextMenu}>
         {children}
       </button>
@@ -126,7 +128,7 @@ export function Rail() {
           const { org, mailbox } = glyphLetters(a, accounts);
           const attention = a.syncState === 'needsAuth' ? 'auth' : a.syncState === 'error' ? 'error' : null;
           return (
-            <RailItem key={a.id} label={mailboxLabel(a, i)} selected={isSelected(a)} onClick={() => openMailbox(a)} onContextMenu={(e) => accountMenu(e, a)}>
+            <RailItem key={a.id} className="rail-mailbox" label={mailboxLabel(a, i)} selected={isSelected(a)} onClick={() => openMailbox(a)} onContextMenu={(e) => accountMenu(e, a)}>
               <span className={`rail-glyph${a.kind === 'web' ? ' web' : ''}`} style={{ background: a.color }}>
                 <span className="letters">
                   <span className="org">{org}</span>

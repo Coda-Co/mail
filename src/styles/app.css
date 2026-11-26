@@ -655,6 +655,13 @@ h3 {
   justify-content: center;
 }
 
+/* Mailbox glyphs carry a selection ring and corner badges, so they need
+   more room between them than the plain icons above the divider. */
+.rail-mailbox + .rail-mailbox,
+.rail-mailbox + .rail-item {
+  margin-top: 6px;
+}
+
 .rail-button {
   position: relative;
   width: 40px;
