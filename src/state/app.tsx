@@ -63,7 +63,7 @@ function lastMailbox(): string | undefined {
   }
 }
 
-const DEFAULT_SETTINGS: Settings = { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show' };
+const DEFAULT_SETTINGS: Settings = { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show', workStart: 9 * 60, workEnd: 18 * 60 };
 const DEFAULT_UPDATE: UpdateStatus = { state: 'unavailable', currentVersion: '' };
 const DEFAULT_SYNC: SyncStatus = { online: true, syncing: false, label: 'Loading…', outboxHeld: 0 };
 

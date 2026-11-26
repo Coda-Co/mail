@@ -251,6 +251,14 @@ impl AppDb {
             }
             s.remote_images = v.clone();
         }
+        let (start, end) = (p.work_start.unwrap_or(s.work_start), p.work_end.unwrap_or(s.work_end));
+        if p.work_start.is_some() || p.work_end.is_some() {
+            if start % 15 != 0 || end % 15 != 0 || end > 24 * 60 || start >= end {
+                return Err(Error::Invalid("Working hours must start before they end, on the quarter hour".into()));
+            }
+            s.work_start = start;
+            s.work_end = end;
+        }
         self.conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('app', ?1)", [to_json(&s)])?;
         Ok(s)
     }
@@ -387,5 +395,20 @@ mod tests {
     fn rejects_unknown_theme() {
         let db = db();
         assert!(db.update_settings(&SettingsPatch { theme: Some("neon".into()), ..Default::default() }).is_err());
+    }
+
+    #[test]
+    fn working_hours_default_and_validate() {
+        let db = db();
+        let s = db.settings().unwrap();
+        assert_eq!((s.work_start, s.work_end), (9 * 60, 18 * 60));
+        let s = db.update_settings(&SettingsPatch { work_start: Some(8 * 60 + 30), ..Default::default() }).unwrap();
+        assert_eq!((s.work_start, s.work_end), (510, 1080));
+        assert!(db.update_settings(&SettingsPatch { work_end: Some(8 * 60), ..Default::default() }).is_err(), "end before start");
+        assert!(db.update_settings(&SettingsPatch { work_start: Some(9 * 60 + 5), ..Default::default() }).is_err(), "quarter hours only");
+        // Settings saved before working hours existed still load, with the defaults.
+        db.conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('app', ?1)", [r#"{"theme":"dark","notifications":true,"ctrlF":"forward","remoteImageSenders":[]}"#]).unwrap();
+        let s = db.settings().unwrap();
+        assert_eq!((s.theme.as_str(), s.work_start, s.work_end), ("dark", 540, 1080));
     }
 }

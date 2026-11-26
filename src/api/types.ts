@@ -286,6 +286,9 @@ export interface Settings {
   remoteImageSenders: string[];
   /** 'show': load remote images except in Junk; 'ask': block until shown or the sender is allowed. */
   remoteImages: 'show' | 'ask';
+  /** Working hours, in minutes after midnight (quarter hours). The calendar shades the rest. */
+  workStart: number;
+  workEnd: number;
 }
 
 export interface SyncStatus {

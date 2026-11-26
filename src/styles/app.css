@@ -3263,6 +3263,15 @@ h3 {
   background-color: var(--today-col);
 }
 
+/* Outside working hours: a soft grey wash, behind events and the pointer. */
+.off-hours {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  pointer-events: none;
+}
+
 /* Where a click would add an event: a faint half-hour block under the pointer. */
 .day-column,
 .all-day-row .cell,

@@ -934,7 +934,8 @@ export const demoApi: MailApi = {
   },
 
   async getSettings() {
-    return clone(state.settings);
+    // Demo data saved before working hours existed gets the defaults.
+    return clone({ ...state.settings, workStart: state.settings.workStart ?? 9 * 60, workEnd: state.settings.workEnd ?? 18 * 60 });
   },
   async updateSettings(patch) {
     Object.assign(state.settings, patch);
