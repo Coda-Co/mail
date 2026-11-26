@@ -163,6 +163,7 @@ pub fn run() {
             commands::search_server,
             commands::list_people,
             commands::get_person,
+            commands::person_mail,
             commands::list_calendars,
             commands::set_calendar_visible,
             commands::list_events,

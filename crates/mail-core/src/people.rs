@@ -1,7 +1,7 @@
 //! People built from mail headers across Graph accounts: de-duplicated by address,
 //! ranked by how recently and how often I correspond with them.
 
-use crate::model::{Address, Person};
+use crate::model::{Address, Person, PersonInAccount};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
@@ -21,6 +21,7 @@ pub fn build(rows: impl IntoIterator<Item = (Address, String, bool, String)>, me
         name: String,
         name_at: String,
         accounts: Vec<String>,
+        per_account: Vec<PersonInAccount>,
         count: i64,
         last: String,
         score: f64,
@@ -34,7 +35,7 @@ pub fn build(rows: impl IntoIterator<Item = (Address, String, bool, String)>, me
         }
         let age_days = DateTime::parse_from_rfc3339(&at).map(|t| (now - t.with_timezone(&Utc)).num_seconds().max(0) as f64 / 86400.0).unwrap_or(365.0);
         let w = (-age_days / DECAY_DAYS).exp() * if outgoing { OUTGOING_WEIGHT } else { 1.0 };
-        let e = map.entry(email.clone()).or_insert(Acc { name: String::new(), name_at: String::new(), accounts: vec![], count: 0, last: String::new(), score: 0.0 });
+        let e = map.entry(email.clone()).or_insert(Acc { name: String::new(), name_at: String::new(), accounts: vec![], per_account: vec![], count: 0, last: String::new(), score: 0.0 });
         e.count += 1;
         e.score += w;
         if at > e.last {
@@ -44,6 +45,15 @@ pub fn build(rows: impl IntoIterator<Item = (Address, String, bool, String)>, me
         if !name.is_empty() && !name.eq_ignore_ascii_case(&email) && at >= e.name_at {
             e.name = name.to_string();
             e.name_at = at.clone();
+        }
+        match e.per_account.iter_mut().find(|p| p.account_id == account) {
+            Some(p) => {
+                p.message_count += 1;
+                if at > p.last_contact_at {
+                    p.last_contact_at = at.clone();
+                }
+            }
+            None => e.per_account.push(PersonInAccount { account_id: account.clone(), message_count: 1, last_contact_at: at.clone() }),
         }
         if !e.accounts.contains(&account) {
             e.accounts.push(account);
@@ -58,6 +68,7 @@ pub fn build(rows: impl IntoIterator<Item = (Address, String, bool, String)>, me
             message_count: a.count,
             last_contact_at: a.last,
             score: (a.score * 1000.0).round() / 1000.0,
+            per_account: a.per_account,
         })
         .collect();
     people.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal).then_with(|| a.email.cmp(&b.email)));
@@ -92,6 +103,10 @@ mod tests {
         assert_eq!(people[0].name, "Sarah Okafor");
         assert_eq!(people[0].message_count, 2);
         assert_eq!(people[0].account_ids, vec!["h", "c"]);
+        // Each account's own count and last contact.
+        let per = |acc: &str| people[0].per_account.iter().find(|p| p.account_id == acc).map(|p| (p.message_count, p.last_contact_at.clone())).unwrap();
+        assert_eq!(per("h"), (1, "2026-11-23T09:42:00Z".to_string()));
+        assert_eq!(per("c"), (1, "2026-11-12T09:00:00Z".to_string()));
         assert_eq!(filter(&people, "oka").count(), 1);
         assert_eq!(filter(&people, "x.example").count(), 1);
     }

@@ -182,6 +182,8 @@ export interface Person {
   messageCount: number;
   lastContactAt: string;
   score: number;
+  /** The same counts within each account. */
+  perAccount?: { accountId: string; messageCount: number; lastContactAt: string }[];
 }
 
 export interface SearchResult {
@@ -286,6 +288,9 @@ export interface Settings {
   remoteImageSenders: string[];
   /** 'show': load remote images except in Junk; 'ask': block until shown or the sender is allowed. */
   remoteImages: 'show' | 'ask';
+  /** Working hours, in minutes after midnight (quarter hours). The calendar shades the rest. */
+  workStart: number;
+  workEnd: number;
 }
 
 export interface SyncStatus {
@@ -369,6 +374,8 @@ export interface MailApi {
   searchServer(query: SearchQuery): Promise<SearchResult>;
   listPeople(query: string, limit: number): Promise<Person[]>;
   getPerson(email: string): Promise<Person | null>;
+  /** Recent mail from or to someone, across folders (in one account, or all), newest first. */
+  personMail(email: string, accountId: string | undefined, limit: number): Promise<MessageSummary[]>;
 
   listCalendars(): Promise<CalendarInfo[]>;
   setCalendarVisible(calendarId: string, visible: boolean): Promise<void>;

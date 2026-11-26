@@ -76,6 +76,10 @@
   --sidebar-w: 232px;
   --list-w: 360px;
   --reading-max-w: 920px;
+  /* Space either side of the text in the reading pane. */
+  --reading-pad: 40px;
+  /* Widest the calendar grid gets, beside its list of calendars. */
+  --calendar-max-w: 1320px;
   /* Space left of the message list card, and above it (matches the reading column's top padding). */
   --list-gutter: 32px;
   --list-top: 24px;
@@ -183,6 +187,36 @@
 
 :hover::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb-hover);
+}
+
+/* Inside the mail card the scrollbars stay out of sight until you're over that pane, and
+   stop short of the card's rounded top corners. Chromium doesn't repaint a scrollbar when
+   only a :hover rule on it changes, but it does when the scroller's colour changes: so the
+   thumb is drawn in the scroller's text colour, which is transparent until hovered, and the
+   contents get their own colour back. */
+.mail-panes .message-rows,
+.mail-panes .reading-scroll {
+  color: transparent;
+  transition: color 0.15s ease;
+}
+
+.mail-panes .message-rows:hover,
+.mail-panes .reading-scroll:hover {
+  color: var(--scrollbar-thumb-hover);
+}
+
+.mail-panes .message-rows > *,
+.mail-panes .reading-scroll > * {
+  color: var(--text);
+}
+
+.mail-panes .message-rows::-webkit-scrollbar-thumb,
+.mail-panes .reading-scroll::-webkit-scrollbar-thumb {
+  background-color: currentColor;
+}
+
+.mail-panes .reading-scroll::-webkit-scrollbar-track {
+  margin-top: 14px;
 }
 
 ::-webkit-scrollbar-thumb:active {
@@ -412,7 +446,7 @@ h3 {
   align-self: stretch;
   display: flex;
   align-items: flex-end;
-  gap: 2px;
+  gap: 6px;
   /* Room each side for the open tab's curved feet. */
   padding: 0 10px;
   margin-left: -18px;
@@ -1188,6 +1222,7 @@ h3 {
   min-height: 0;
   display: flex;
   padding-left: max(var(--list-gutter), (100% - var(--list-w) - var(--reading-max-w)) / 2);
+  padding-right: var(--list-gutter);
   box-sizing: border-box;
 }
 
@@ -1195,26 +1230,41 @@ h3 {
   margin-left: 0;
 }
 
-/* The list is a card like the messages, but runs off the bottom of the window: square
-   bottom corners and no bottom border say it carries on. */
+/* The list and the reading pane are one card, split by a hairline. It runs off the bottom
+   of the window: square bottom corners and no bottom border say it carries on. Each half
+   keeps its own shadow, trimmed where they meet, so the pair casts one. */
 .list-pane {
   flex: 0 1 var(--list-w);
   min-width: 260px;
   margin-top: var(--list-top);
   background: var(--message-card);
   border: 1px solid var(--border-subtle);
+  border-right: none;
   border-bottom: none;
-  border-radius: var(--r-card) var(--r-card) 0 0;
+  border-radius: var(--r-card) 0 0 0;
   box-shadow: var(--shadow-card);
+  clip-path: inset(-24px 0 -24px -24px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
-/* The resize handle runs down the card's right edge, not above it. */
+/* The resize handle runs down the hairline between the halves, not above the card. */
 .mail-panes .list-resizer {
   margin-top: var(--list-top);
+}
+
+.mail-panes .reading-pane {
+  flex: 0 1 var(--reading-max-w);
+  margin-top: var(--list-top);
+  background: var(--message-card);
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+  border-radius: 0 var(--r-card) 0 0;
+  box-shadow: var(--shadow-card);
+  clip-path: inset(-24px -24px -24px 0);
+  overflow: hidden;
 }
 
 .list-header {
@@ -1499,7 +1549,7 @@ h3 {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  background: var(--reading-canvas);
+  background: var(--message-card);
 }
 
 .reading-content {
@@ -1508,16 +1558,17 @@ h3 {
   max-width: var(--reading-max-w);
   margin: 0 auto;
   box-sizing: border-box;
-  padding: 24px 32px 48px;
+  padding: 22px var(--reading-pad) 48px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
 }
 
 .thread-header {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  padding-bottom: 14px;
 }
 
 .thread-header .thread-subject {
@@ -1543,25 +1594,16 @@ h3 {
   line-height: 1.25;
 }
 
-/* Each message in a thread is a card on the shaded reading canvas. */
+/* Messages in a thread are sections of the reading card, split by hairlines. */
 .message-block {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 18px 20px 20px;
-  background: var(--message-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-card);
-  box-shadow: var(--shadow-card);
+  padding: 4px 0 6px;
 }
 
 .message-block.collapsed {
   padding: 0;
-  transition: box-shadow 0.12s ease;
-}
-
-.message-block.collapsed:hover {
-  box-shadow: var(--shadow-card-hover);
 }
 
 .message-head {
@@ -1671,7 +1713,7 @@ h3 {
   text-align: left;
   border: none;
   background: none;
-  padding: 13px 20px;
+  padding: 2px 0;
   border-radius: inherit;
   cursor: pointer;
   color: var(--text-muted);
@@ -1809,11 +1851,29 @@ h3 {
 .message-entry {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  padding: 0 0 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* The date line carries the space above it, so the header area clicks as one piece. */
+.message-entry > .message-timestamp {
+  padding: 12px 0 4px;
+}
+
+.collapsed-entry,
+.message-timestamp.collapsible {
+  cursor: pointer;
+}
+
+/* A collapsed message highlights edge to edge across the card on hover. */
+.message-entry:has(> .message-block.collapsed):hover {
+  background: var(--row-hover);
+  margin: 0 calc(-1 * var(--reading-pad));
+  padding-left: var(--reading-pad);
+  padding-right: var(--reading-pad);
 }
 
 .message-timestamp {
-  padding-left: 4px;
   font-size: var(--fs-small);
   color: var(--text-muted);
 }
@@ -1866,11 +1926,8 @@ h3 {
   display: flex;
   flex-direction: column;
   overflow: visible;
-  padding: 12px 20px 6px;
-  background: var(--message-card);
-  border: 1px solid var(--draft-border);
-  border-radius: var(--r-card);
-  box-shadow: var(--shadow-card);
+  padding: 12px 0 6px;
+  border-top: 1px solid var(--border);
 }
 
 .draft-section-header {
@@ -1905,7 +1962,8 @@ h3 {
 }
 
 .draft-section .draft-attachments {
-  padding: 0 0 12px;
+  padding: 10px 0 2px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .draft-section .draft-footer {
@@ -2085,7 +2143,8 @@ h3 {
 }
 
 .draft-attachments {
-  padding: 0 16px 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .draft-popped {
@@ -2111,7 +2170,7 @@ h3 {
   width: var(--agenda-w);
   /* No panel: the agenda sits on the canvas beside the mail, top aligned with the subject. */
   background: var(--reading-canvas);
-  padding: 24px 22px 24px 8px;
+  padding: 24px 22px 24px 4px;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -2161,6 +2220,10 @@ h3 {
   font-size: var(--fs-small);
   color: var(--text-muted);
   cursor: pointer;
+}
+
+.person-more {
+  margin: 12px 0 0;
 }
 
 .agenda-more:hover {
@@ -2602,11 +2665,7 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 18px 20px 20px;
-  background: var(--message-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-card);
-  box-shadow: var(--shadow-card);
+  padding: 4px 0 20px;
 }
 
 .outbox-status {
@@ -3045,6 +3104,63 @@ h3 {
   height: 100%;
 }
 
+/* ---------- Calendar and People: the same card as Mail ---------- */
+
+/* Centred on the canvas, one card split by a hairline, running off the bottom of the window. */
+.calendar-view,
+.people-view {
+  background: var(--reading-canvas);
+  box-sizing: border-box;
+  padding-right: var(--list-gutter);
+}
+
+.calendar-view {
+  padding-left: max(var(--list-gutter), (100% - var(--sidebar-w) - var(--calendar-max-w)) / 2);
+}
+
+.people-view {
+  padding-left: max(var(--list-gutter), (100% - var(--list-w) - var(--reading-max-w)) / 2);
+}
+
+/* Left half: the list. Each half keeps its own shadow, trimmed where they meet. */
+.calendar-view .cal-sidebar,
+.people-view .people-list {
+  margin-top: var(--list-top);
+  background: var(--message-card);
+  border: 1px solid var(--border-subtle);
+  border-right: none;
+  border-bottom: none;
+  border-radius: var(--r-card) 0 0 0;
+  box-shadow: var(--shadow-card);
+  clip-path: inset(-24px 0 -24px -24px);
+  overflow: hidden;
+}
+
+/* Right half: what the list opens; its left edge is the hairline. */
+.calendar-view .calendar-main,
+.people-view .person-detail {
+  margin-top: var(--list-top);
+  background: var(--message-card);
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+  border-radius: 0 var(--r-card) 0 0;
+  box-shadow: var(--shadow-card);
+  clip-path: inset(-24px -24px -24px 0);
+}
+
+.calendar-view .calendar-main {
+  max-width: var(--calendar-max-w);
+  overflow: hidden;
+}
+
+.people-view .person-detail {
+  flex: 0 1 var(--reading-max-w);
+}
+
+.calendar-view .sidebar-resizer {
+  margin-top: var(--list-top);
+}
+
 .week-pane {
   flex: 1;
   min-width: 0;
@@ -3151,6 +3267,15 @@ h3 {
 
 .day-column.today {
   background-color: var(--today-col);
+}
+
+/* Outside working hours: a soft grey wash, behind events and the pointer. */
+.off-hours {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  pointer-events: none;
 }
 
 /* Where a click would add an event: a faint half-hour block under the pointer. */
@@ -3618,7 +3743,6 @@ h3 {
   flex: 0 1 var(--list-w);
   max-width: var(--list-w);
   min-width: 280px;
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -3817,6 +3941,28 @@ h3 {
 
 
 @media (max-width: 959px) {
+  /* Calendar and People: flat, full width, like Mail. */
+  .calendar-view,
+  .people-view {
+    padding: 0;
+  }
+
+  .calendar-view .cal-sidebar,
+  .people-view .people-list,
+  .calendar-view .calendar-main,
+  .people-view .person-detail {
+    margin-top: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    clip-path: none;
+    max-width: none;
+  }
+
+  .calendar-view .cal-sidebar {
+    border-right: 1px solid var(--border);
+  }
+
   :root {
     --sidebar-w: 200px;
   }
@@ -3835,16 +3981,19 @@ h3 {
 
   .mail-panes {
     padding-left: 0;
+    padding-right: 0;
   }
 
   .list-pane,
-  .search-mode .list-pane {
+  .search-mode .list-pane,
+  .mail-panes .reading-pane {
     flex: 1;
     max-width: none;
     margin-top: 0;
     border: none;
     border-radius: 0;
     box-shadow: none;
+    clip-path: none;
   }
 
   .mail-panes.has-selection .list-pane,
@@ -3875,7 +4024,8 @@ h3 {
   }
 
   .reading-content {
-    padding: 20px 16px 40px;
+    --reading-pad: 16px;
+    padding: 20px var(--reading-pad) 40px;
   }
 
   .message-block {
@@ -3914,6 +4064,8 @@ h3 {
 .later-toggle {
   align-self: flex-start;
   font-size: var(--fs-meta);
+  /* Clear of the hairline beneath it. */
+  margin: -4px 0 14px;
 }
 
 .quote-toggle {

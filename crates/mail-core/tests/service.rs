@@ -461,6 +461,37 @@ fn sending_moves_a_draft_from_drafts_to_the_outbox() {
 }
 
 #[test]
+fn mail_with_a_person_from_them_or_to_them() {
+    let (svc, ids) = setup();
+    let jr = Address::new("Jarrishan Rajendran EXT", "jarrishan.rajendran.ext@mecsia.example");
+    let rec = |id: &str, at: &str, from: Address, cc: Vec<Address>, draft: bool| mail_core::db::account::MessageRecord {
+        id: id.into(),
+        folder_id: "inbox".into(),
+        conversation_id: format!("c-{id}"),
+        subject: id.into(),
+        received_at: at.into(),
+        from,
+        cc,
+        is_draft: draft,
+        ..Default::default()
+    };
+    svc.store_messages(
+        &ids.coda,
+        &[
+            rec("from-him", "2026-11-20T09:00:00Z", jr.clone(), vec![], false),
+            rec("cc-only", "2026-11-21T09:00:00Z", Address::new("Paul", "paul@coda.example"), vec![Address::new("JR", "Jarrishan.Rajendran.EXT@mecsia.example")], false),
+            rec("a-draft", "2026-11-22T09:00:00Z", Address::new("Paul", "paul@coda.example"), vec![jr.clone()], true),
+            rec("unrelated", "2026-11-23T09:00:00Z", Address::new("Paul", "paul@coda.example"), vec![], false),
+        ],
+    )
+    .unwrap();
+    let got: Vec<String> = svc.person_mail(&jr.email, None, 30).unwrap().into_iter().map(|m| m.subject).collect();
+    assert_eq!(got, vec!["cc-only", "from-him"], "cc'd counts (any case), newest first, drafts left out");
+    assert_eq!(svc.person_mail(&jr.email, Some(&ids.coda), 30).unwrap().len(), 2, "within the account");
+    assert!(svc.person_mail(&jr.email, Some(&ids.harbour), 30).unwrap().is_empty(), "not in another account");
+}
+
+#[test]
 fn a_drafts_server_copy_opens_that_draft_not_a_duplicate() {
     let (svc, ids) = setup();
     let src = format!("{}:m-agenda", ids.harbour);

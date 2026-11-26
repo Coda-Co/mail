@@ -22,8 +22,9 @@ function srcdoc(html: string, theme: FrameTheme): string {
 <meta name="color-scheme" content="${dark ? 'dark' : 'light'}">
 <style>
 @font-face{font-family:Geist;src:url(${font}) format('woff2');font-weight:100 900}
-html{color-scheme:${dark ? 'dark' : 'light'}}
+html{color-scheme:${dark ? 'dark' : 'light'};overflow-y:hidden}
 html,body{margin:0;padding:0;background:${paper ? '#FFFFFF' : 'transparent'}}
+body{display:flow-root}
 ${paper ? 'body{padding:16px 20px}' : ''}
 body{font-family:Geist,system-ui,sans-serif;font-size:15px;line-height:1.4;color:${text};overflow-wrap:anywhere}
 body>:last-child{margin-bottom:0}
@@ -58,6 +59,7 @@ export function MessageBody({ html, cacheKey }: { html: string; cacheKey?: strin
     if (!frame) return;
     let observer: ResizeObserver | null = null;
     let attached: Document | null = null;
+    let remeasure: (() => void) | null = null;
     let raf = 0;
     // Size the frame as soon as the srcdoc is parsed, not on `load`: `load` waits for
     // every remote image, which can take seconds on a newsletter.
@@ -66,7 +68,9 @@ export function MessageBody({ html, cacheKey }: { html: string; cacheKey?: strin
       if (!d || d === attached || d.URL !== 'about:srcdoc' || !d.body) return false;
       attached = d;
       const measure = () => {
-        const h = Math.max(24, d.documentElement.scrollHeight);
+        // Rounded up: with display scaling the content can be a fraction of a pixel taller
+        // than its rounded scrollHeight.
+        const h = Math.max(24, d.documentElement.scrollHeight, Math.ceil(d.documentElement.getBoundingClientRect().height));
         setHeight(h);
         setMeasured(true);
         if (cacheKey) remember(cacheKey, h);
@@ -99,17 +103,23 @@ export function MessageBody({ html, cacheKey }: { html: string; cacheKey?: strin
         window.dispatchEvent(copy);
         if (copy.defaultPrevented) e.preventDefault();
       });
-      // Re-measure after fonts and images settle.
+      // Re-measure after fonts and images settle: each image as it loads (a late signature
+      // banner can otherwise leave the frame short, with a scrollbar inside it).
+      d.addEventListener('load', measure, true);
+      d.addEventListener('error', measure, true);
       setTimeout(measure, 100);
       setTimeout(measure, 600);
+      remeasure = measure;
       return true;
     };
     const poll = () => {
       if (!attach()) raf = requestAnimationFrame(poll);
     };
     poll();
+    // Everything (images included) has loaded: a last measure.
     const onLoad = () => {
       attach();
+      remeasure?.();
       setMeasured(true);
     };
     frame.addEventListener('load', onLoad);

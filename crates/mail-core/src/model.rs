@@ -533,6 +533,17 @@ pub struct Person {
     pub message_count: i64,
     pub last_contact_at: String,
     pub score: f64,
+    /// The same counts within each account, for views showing one account.
+    #[serde(default)]
+    pub per_account: Vec<PersonInAccount>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonInAccount {
+    pub account_id: String,
+    pub message_count: i64,
+    pub last_contact_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -703,10 +714,23 @@ pub struct Settings {
     /// sender is allowed. Defaulted so settings saved before it existed still load.
     #[serde(default = "default_remote_images")]
     pub remote_images: String,
+    /// Working hours, in minutes after midnight: the calendar shades the time outside them.
+    #[serde(default = "default_work_start")]
+    pub work_start: u32,
+    #[serde(default = "default_work_end")]
+    pub work_end: u32,
 }
 
 fn default_remote_images() -> String {
     "show".into()
+}
+
+fn default_work_start() -> u32 {
+    9 * 60
+}
+
+fn default_work_end() -> u32 {
+    18 * 60
 }
 
 impl Default for Settings {
@@ -717,6 +741,8 @@ impl Default for Settings {
             ctrl_f: "forward".into(),
             remote_image_senders: vec![],
             remote_images: default_remote_images(),
+            work_start: default_work_start(),
+            work_end: default_work_end(),
         }
     }
 }
@@ -729,6 +755,8 @@ pub struct SettingsPatch {
     pub ctrl_f: Option<String>,
     pub remote_image_senders: Option<Vec<String>>,
     pub remote_images: Option<String>,
+    pub work_start: Option<u32>,
+    pub work_end: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

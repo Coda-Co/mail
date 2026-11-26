@@ -9,15 +9,26 @@ import { MessageRow } from '../components/MessageList';
 import { listTime } from '../lib/dates';
 import { plural } from '../lib/text';
 
+/** Recent mail shown with a person, then this many more per Show more. */
+const RECENT = 10;
+const MORE = 20;
+
 export function PeopleView() {
   const app = useApp();
   const toast = useToast();
   const [q, setQ] = useState('');
-  const [people, setPeople] = useState<Person[] | null>(null);
+  const [allPeople, setPeople] = useState<Person[] | null>(null);
+  // The account picked in the top bar's tabs (shared with Mail); web accounts have no contacts here.
+  const account = app.graphAccounts.find((a) => a.id === app.scope.accountId)?.id ?? app.graphAccounts[0]?.id;
+  const people = allPeople && account ? allPeople.filter((p) => p.accountIds.includes(account)) : allPeople;
   const selectedEmail = app.route.param ?? null;
   const [person, setPerson] = useState<Person | null>(null);
   // Recent mail with the selected person; null while loading.
   const [recent, setRecent] = useState<MessageSummary[] | null>(null);
+  const [recentFailed, setRecentFailed] = useState(false);
+  // How many to show: the latest few, and Show more for the next lot.
+  const [limit, setLimit] = useState(RECENT);
+  const [retry, setRetry] = useState(0);
   const loadedFor = useRef<string | null>(null);
 
   useEffect(() => {
@@ -26,36 +37,60 @@ export function PeopleView() {
   }, [q, app.mailVersion]);
 
   useEffect(() => {
-    // A new person: clear the last one's mail. A sync refreshes in place, without the spinner.
-    if (loadedFor.current !== selectedEmail) setRecent(null);
+    // A new person: clear the last one's mail and start from the latest few. A sync (or Show
+    // more) refreshes in place, without the spinner.
+    if (loadedFor.current !== selectedEmail) {
+      setRecent(null);
+      if (limit !== RECENT) {
+        loadedFor.current = selectedEmail;
+        setLimit(RECENT);
+        return;
+      }
+    }
     loadedFor.current = selectedEmail;
     if (!selectedEmail) {
       setPerson(null);
       return;
     }
     let cancelled = false;
-    api.getPerson(selectedEmail).then((p) => !cancelled && setPerson(p));
-    const scope = { folder: { role: 'inbox' as const }, tab: 'all' as const };
-    Promise.all([
-      api.search({ text: '', scope, allFolders: true, from: selectedEmail }),
-      api.search({ text: '', scope, allFolders: true, to: selectedEmail }),
-    ]).then(
-      ([a, b]) => {
+    // Show them at once from the list we already have; the full record follows.
+    const listed = people?.find((p) => p.email.toLowerCase() === selectedEmail.toLowerCase());
+    setPerson((cur) => (cur?.email.toLowerCase() === selectedEmail.toLowerCase() ? cur : (listed ?? null)));
+    api.getPerson(selectedEmail).then((p) => !cancelled && p && setPerson(p));
+    // Its own query, not two searches: a search started meanwhile used to cancel one of them,
+    // and then this showed no mail at all.
+    // One more than shown, to know whether there's more.
+    api.personMail(selectedEmail, account, limit + 1).then(
+      (list) => {
         if (cancelled) return;
-        const all = [...a.messages, ...b.messages.filter((m) => !a.messages.some((x) => x.id === m.id))];
-        setRecent(all.sort((x, y) => y.receivedAt.localeCompare(x.receivedAt)).slice(0, 30));
+        setRecentFailed(false);
+        setRecent(list);
       },
-      () => !cancelled && setRecent([]),
+      () => {
+        if (cancelled) return;
+        setRecentFailed(true);
+        setRecent([]);
+      },
     );
     return () => {
       cancelled = true;
     };
-  }, [selectedEmail, app.mailVersion]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmail, account, app.mailVersion, limit, retry]);
+
+  // Switching account: a person who isn't in it is put down.
+  useEffect(() => {
+    if (selectedEmail && people && !people.some((p) => p.email.toLowerCase() === selectedEmail.toLowerCase())) app.navigate({ view: 'people' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account, allPeople]);
+
+  // Counts for the account picked in the tabs, not all accounts together.
+  const inAccount = person?.perAccount?.find((x) => x.accountId === account);
 
   const select = (email: string | null) => app.navigate(email ? { view: 'people', param: email } : { view: 'people' });
 
   const email = async (p: Person) => {
-    const d = await api.createDraft({ mode: 'new', accountId: p.accountIds[0] });
+    const d = await api.createDraft({ mode: 'new', accountId: account && p.accountIds.includes(account) ? account : p.accountIds[0] });
     await api.updateDraft({ ...d, to: [{ name: p.name, email: p.email }] });
     await api.popOut('draft', d.id);
   };
@@ -94,7 +129,7 @@ export function PeopleView() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2>{person.name}</h2>
                 <div className="meta">
-                  {person.email} · {plural(person.messageCount, 'message')} · last {listTime(person.lastContactAt)}
+                  {person.email} · {plural(inAccount?.messageCount ?? person.messageCount, 'message')} · last {listTime(inAccount?.lastContactAt ?? person.lastContactAt)}
                 </div>
               </div>
               <button type="button" className="btn btn-primary" onClick={() => email(person)}>
@@ -121,15 +156,23 @@ export function PeopleView() {
                   </span>
                 </div>
               )}
-              {recent?.map((m) => (
-                <MessageRow
-                  key={m.id}
-                  m={m}
-                  selected={false}
-                  onSelect={() => api.popOut('message', m.id)}
-                />
+              {recent?.slice(0, limit).map((m) => (
+                <MessageRow key={m.id} m={m} selected={false} onSelect={() => api.popOut('message', m.id)} />
               ))}
-              {recent?.length === 0 && <div className="list-empty">No messages in the offline window</div>}
+              {recent && recent.length > limit && (
+                <button type="button" className="agenda-more person-more" onClick={() => setLimit((n) => n + MORE)}>
+                  Show more
+                </button>
+              )}
+              {recentFailed && (
+                <div className="list-empty">
+                  Couldn’t load mail with {person.name || person.email}.{' '}
+                  <button type="button" className="link-button" onClick={() => setRetry((n) => n + 1)}>
+                    Try again
+                  </button>
+                </div>
+              )}
+              {!recentFailed && recent?.length === 0 && <div className="list-empty">No mail with {person.name || person.email} yet</div>}
             </div>
           </>
         ) : (

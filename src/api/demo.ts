@@ -272,10 +272,15 @@ function people(): Person[] {
       const key = a.email.toLowerCase();
       let p = map.get(key);
       if (!p) {
-        p = { email: a.email, name: a.name || a.email, accountIds: [], messageCount: 0, lastContactAt: m.receivedAt, score: 0, _score: 0 };
+        p = { email: a.email, name: a.name || a.email, accountIds: [], messageCount: 0, lastContactAt: m.receivedAt, score: 0, perAccount: [], _score: 0 };
         map.set(key, p);
       }
       p.messageCount++;
+      const inAcc = p.perAccount!.find((x) => x.accountId === m.accountId);
+      if (inAcc) {
+        inAcc.messageCount++;
+        if (m.receivedAt > inAcc.lastContactAt) inAcc.lastContactAt = m.receivedAt;
+      } else p.perAccount!.push({ accountId: m.accountId, messageCount: 1, lastContactAt: m.receivedAt });
       if (!p.accountIds.includes(m.accountId)) p.accountIds.push(m.accountId);
       if (m.receivedAt > p.lastContactAt) p.lastContactAt = m.receivedAt;
       const ageDays = Math.max(0, (ref - new Date(m.receivedAt).getTime()) / 86400000);
@@ -817,6 +822,15 @@ export const demoApi: MailApi = {
   async getPerson(email) {
     return people().find((p) => p.email.toLowerCase() === email.toLowerCase()) ?? null;
   },
+  async personMail(email, accountId, limit) {
+    const e = email.toLowerCase();
+    const has = (list: Message['to']) => list.some((a) => a.email.toLowerCase() === e);
+    return state.messages
+      .filter((m) => !m.isDraft && (!accountId || m.accountId === accountId) && (m.from.email.toLowerCase() === e || has(m.to) || has(m.cc)))
+      .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt))
+      .slice(0, limit)
+      .map(summary);
+  },
 
   async listCalendars() {
     return clone(state.calendars);
@@ -925,7 +939,8 @@ export const demoApi: MailApi = {
   },
 
   async getSettings() {
-    return clone(state.settings);
+    // Demo data saved before working hours existed gets the defaults.
+    return clone({ ...state.settings, workStart: state.settings.workStart ?? 9 * 60, workEnd: state.settings.workEnd ?? 18 * 60 });
   },
   async updateSettings(patch) {
     Object.assign(state.settings, patch);

@@ -1101,6 +1101,27 @@ impl MailService {
         Ok(people::filter(&all, query).take(limit.clamp(1, 500)).cloned().collect())
     }
 
+    /// Recent mail from or to someone, across accounts and folders, newest first. Its own query
+    /// (not a search): it isn't cut short by searches typed meanwhile, and doesn't rebuild the
+    /// people list.
+    pub fn person_mail(&self, email: &str, account_id: Option<&str>, limit: i64) -> Result<Vec<MessageSummary>> {
+        let limit = limit.clamp(1, 200);
+        let mut all: Vec<MessageSummary> = vec![];
+        for a in self.graph_accounts()?.into_iter().filter(|a| account_id.is_none_or(|id| a.id == id)) {
+            for (from, to) in [(Some(email.to_string()), None), (None, Some(email.to_string()))] {
+                let f = MessageFilter { from_email: from, to_email: to, limit, ..Default::default() };
+                for m in self.with_account(&a.id, |db| db.list_messages(&f))? {
+                    if !m.is_draft && !all.iter().any(|x| x.id == m.id) {
+                        all.push(m);
+                    }
+                }
+            }
+        }
+        all.sort_by(|a, b| b.received_at.cmp(&a.received_at));
+        all.truncate(limit as usize);
+        Ok(all)
+    }
+
     pub fn get_person(&self, email: &str) -> Result<Option<Person>> {
         Ok(self.all_people()?.into_iter().find(|p| p.email.eq_ignore_ascii_case(email)))
     }

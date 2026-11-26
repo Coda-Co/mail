@@ -10,6 +10,7 @@ import { PALETTE } from '../lib/colors';
 import { isMac, keyLabel } from '../lib/platform';
 import { webCalendarStatus } from '../lib/webCalendar';
 import { now } from '../lib/clock';
+import { TimeField, dayTimes } from '../components/DateTimePicker';
 
 function WebCalendarConfirm({ account, onClose, onConfirm }: { account: Account; onClose: () => void; onConfirm: () => void }) {
   return (
@@ -137,6 +138,28 @@ function GeneralTab() {
           Desktop notifications for new mail and reminders
         </label>
         <span className="hint">Turn them off for single accounts under Accounts.</span>
+      </div>
+      <div className="settings-group">
+        <h3>Calendar</h3>
+        <div className="form-row">
+          <span className="form-label">Working hours</span>
+          <div className="when-row">
+            <TimeField
+              label="Working hours start"
+              value={settings.workStart}
+              options={dayTimes().filter((o) => o.minutes < settings.workEnd)}
+              onChange={(m) => updateSettings({ workStart: m })}
+            />
+            <span className="when-sep">–</span>
+            <TimeField
+              label="Working hours end"
+              value={settings.workEnd}
+              options={[...dayTimes(), { minutes: 24 * 60 }].filter((o) => o.minutes > settings.workStart)}
+              onChange={(m) => updateSettings({ workEnd: m })}
+            />
+          </div>
+        </div>
+        <span className="hint">The calendar shades the hours outside these.</span>
       </div>
       <div className="settings-group">
         <h3>Keyboard</h3>

@@ -13,7 +13,7 @@ describe('demo backend', () => {
     const counts = Object.fromEntries(accounts.map((a) => [a.displayName, a.unread]));
     expect(counts).toEqual({ 'Coda & Co': 8, 'Harbour Partners': 3, 'Fenwick Group': 1, 'Aldgate Capital': 2 });
     const list = await demoApi.listMessages(inbox, 6, 0);
-    expect(list.map((m) => m.from.name)).toEqual(['Sarah Okafor', 'Tom Reid', 'Priya Nair', 'Linear', 'James Hart', 'Elena Marsh']);
+    expect(list.map((m) => m.from.name)).toEqual(['Sarah Okafor', 'Tom Reid', 'Priya Nair', 'Linear', 'James Hart', 'Sarah Okafor']);
   });
 
   it('lists one summed folder per role when no account is given, like mail-core', async () => {

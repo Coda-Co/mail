@@ -211,9 +211,14 @@ function MessageView({
   const setActiveAddress = useCopyHoveredAddress();
   const split = useMemo(() => splitQuoted(message.bodyHtml), [message.bodyHtml]);
   const [showQuoted, setShowQuoted] = useState(false);
+  // A click on the header area (date line included) that isn't selecting text, following a
+  // link, pressing a button or picking up a name to copy.
+  const headerClick = (e: React.MouseEvent) => !!window.getSelection()?.isCollapsed && !(e.target as Element).closest('a, button, .addr');
+
   if (!expanded) {
     return (
-      <div className="message-entry">
+      // The whole row opens it, date line included.
+      <div className="message-entry collapsed-entry" onClick={(e) => headerClick(e) && onExpand()}>
         <time className="message-timestamp" dateTime={message.receivedAt}>
           {fullTime(message.receivedAt)}
         </time>
@@ -225,11 +230,6 @@ function MessageView({
             role="button"
             tabIndex={0}
             aria-expanded={false}
-            onClick={(e) => {
-              if (!window.getSelection()?.isCollapsed) return;
-              if ((e.target as Element).closest('.addr')) return;
-              onExpand();
-            }}
             onKeyDown={(e) => {
               if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
               e.preventDefault();
@@ -244,7 +244,13 @@ function MessageView({
   }
   return (
     <div className="message-entry">
-      <time className="message-timestamp" dateTime={message.receivedAt}>
+      {/* The date line is part of the header: it folds the message back too. */}
+      <time
+        className={onCollapse ? 'message-timestamp collapsible' : 'message-timestamp'}
+        dateTime={message.receivedAt}
+        title={onCollapse ? 'Collapse' : undefined}
+        onClick={onCollapse ? (e) => headerClick(e) && onCollapse() : undefined}
+      >
         {fullTime(message.receivedAt)}
       </time>
       <div className="message-block">
@@ -256,10 +262,7 @@ function MessageView({
             'aria-expanded': true,
             title: 'Collapse',
             onClick: (e: React.MouseEvent) => {
-              // Leave selecting text in the header alone.
-              if (!window.getSelection()?.isCollapsed) return;
-              if ((e.target as Element).closest('a, button, .addr')) return;
-              onCollapse();
+              if (headerClick(e)) onCollapse();
             },
             onKeyDown: (e: React.KeyboardEvent) => {
               if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;

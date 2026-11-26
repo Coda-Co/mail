@@ -436,6 +436,7 @@ export function CalendarView() {
   const [selectedId, setSelectedId] = useState<string | null>(app.calendarFocus?.eventId ?? null);
   const [form, setForm] = useState<{ event?: CalendarEvent; start?: Date; allDay?: boolean } | null>(null);
   // Only where there's a calendar to add to.
+  const { workStart, workEnd } = app.settings;
   const canCreate = app.graphAccounts.length > 0;
   const newEvent = (f: { start?: Date; allDay?: boolean }) => {
     if (canCreate) setForm(f);
@@ -684,6 +685,9 @@ export function CalendarView() {
                   if (ghost) ghost.style.display = 'none';
                 }}
               >
+                {/* Outside working hours (Settings): shaded, still clickable to add an event. */}
+                {workStart > 0 && <div className="off-hours" aria-hidden style={{ top: 0, height: (workStart / 60) * HOUR }} />}
+                {workEnd < 24 * 60 && <div className="off-hours" aria-hidden style={{ top: (workEnd / 60) * HOUR, bottom: 0 }} />}
                 <div className="slot-ghost" aria-hidden style={{ height: HOUR / 2 }} />
                 {isToday && <div className="now-line" style={{ top: ((today.getHours() * 60 + today.getMinutes()) / 60) * HOUR }} />}
                 {placed.map(({ event: e, lane, lanes }) => {

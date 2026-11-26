@@ -386,6 +386,12 @@ pub async fn get_person(s: State<'_, AppState>, email: String) -> R<Option<Perso
     s.svc.get_person(&email)
 }
 
+#[tauri::command]
+pub async fn person_mail(s: State<'_, AppState>, email: String, account_id: Option<String>, limit: i64) -> R<Vec<MessageSummary>> {
+    let svc = s.svc.clone();
+    tauri::async_runtime::spawn_blocking(move || svc.person_mail(&email, account_id.as_deref(), limit)).await.map_err(|e| Error::Other(e.to_string()))?
+}
+
 // ---------------------------------------------------------------- calendar
 
 #[tauri::command]
