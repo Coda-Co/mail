@@ -35,6 +35,8 @@
   --nav-selected: #e9e6e2;
   --row-selected: #e2ebf6;
   --row-hover: #f7f6f5;
+  /* Laid over an event's own colour on hover. */
+  --event-hover-tint: rgba(0, 0, 0, 0.06);
   --chip-neutral: #f3f1ef;
   --accent: #0b5cc4;
   --accent-hover: #084a9e;
@@ -121,6 +123,7 @@
   --nav-selected: #38342e;
   --row-selected: #253550;
   --row-hover: #292622;
+  --event-hover-tint: rgba(255, 255, 255, 0.08);
   --chip-neutral: #35322d;
   --accent: #3b82e0;
   --accent-hover: #5a98e8;
@@ -3370,6 +3373,26 @@ h3 {
   flex-direction: column;
   gap: 2px;
   margin-top: 8px;
+}
+
+/* Hover: a tint over the event's colour (set inline), so every calendar colour darkens alike. */
+.cal-event::after,
+.all-day-event::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  pointer-events: none;
+  transition: background-color 80ms ease;
+}
+
+.all-day-event {
+  position: relative;
+}
+
+.cal-event:hover::after,
+.all-day-event:hover::after {
+  background: var(--event-hover-tint);
 }
 
 .cal-event.short .title {
