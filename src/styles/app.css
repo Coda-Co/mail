@@ -446,7 +446,7 @@ h3 {
   align-self: stretch;
   display: flex;
   align-items: flex-end;
-  gap: 2px;
+  gap: 6px;
   /* Room each side for the open tab's curved feet. */
   padding: 0 10px;
   margin-left: -18px;
