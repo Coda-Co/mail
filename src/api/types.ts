@@ -373,7 +373,8 @@ export interface MailApi {
   agenda(days: number): Promise<AgendaDay[]>;
   createEvent(input: EventInput): Promise<CalendarEvent>;
   updateEvent(eventId: string, input: EventInput): Promise<CalendarEvent>;
-  respondEvent(eventId: string, response: 'accepted' | 'tentative' | 'declined'): Promise<CalendarEvent>;
+  /** sendResponse defaults to true; comment is a note to the organiser, ignored when nothing is sent. */
+  respondEvent(eventId: string, response: 'accepted' | 'tentative' | 'declined', options?: { sendResponse?: boolean; comment?: string }): Promise<CalendarEvent>;
   deleteEvent(eventId: string): Promise<void>;
 
   listSignatures(accountId?: string): Promise<Signature[]>;

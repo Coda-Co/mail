@@ -14,12 +14,13 @@ import { eventTitle, plural } from '../lib/text';
 import { TopSearch } from '../components/TopSearch';
 import { CalendarSidebar } from '../components/CalendarSidebar';
 import { Resizer } from '../components/Resizer';
+import { RsvpButtons, type Rsvp, type RsvpOptions } from '../components/RsvpButtons';
 import { eventActions, webEventSource } from '../lib/webCalendar';
 
 type Mode = 'day' | 'week' | 'month';
 const HOUR = 56;
 
-const RESPONSE_TEXT: Partial<Record<ResponseStatus, string>> = { accepted: 'You’re going', tentative: 'You said maybe', declined: 'You declined' };
+const RESPONSE_TEXT: Partial<Record<ResponseStatus, string>> = { accepted: 'You accepted', tentative: 'You tentatively accepted', declined: 'You declined' };
 
 /** "Join Teams meeting" / "Join Zoom meeting" etc., from the join link's host. */
 function joinLabel(url: string): string {
@@ -67,18 +68,13 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
   }, [event.id, event.accountId, event.attendees, event.isOnlineMeeting, fromWeb]);
   const attendees = [...webAttendees].sort((a, b) => (a.response === 'organizer' ? -1 : b.response === 'organizer' ? 1 : 0));
   const shown = showAll ? attendees : attendees.slice(0, 3);
-  const respond = async (r: 'accepted' | 'tentative' | 'declined') => {
+  const respond = async (r: Rsvp, o: RsvpOptions) => {
     try {
-      onChanged(await api.respondEvent(event.id, r));
+      onChanged(await api.respondEvent(event.id, r, o));
     } catch (e) {
       toast(`Couldn’t respond: ${e instanceof Error ? e.message : e}`);
     }
   };
-  const rsvp: [Exclude<ResponseStatus, 'none' | 'organizer'>, string][] = [
-    ['accepted', 'Going'],
-    ['tentative', 'Maybe'],
-    ['declined', 'No'],
-  ];
   return (
     <Modal
       className="event-modal"
@@ -137,15 +133,7 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
             </button>
           )}
         </div>
-        {actions.respond && (
-          <div className="rsvp">
-            {rsvp.map(([r, label]) => (
-              <button key={r} type="button" className={event.myResponse === r ? 'on' : ''} aria-pressed={event.myResponse === r} onClick={() => respond(r)}>
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+        {actions.respond && <RsvpButtons current={event.myResponse} onRespond={respond} />}
         {loadingAttendees && attendees.length === 0 && (
           <>
             <div className="form-label" style={{ paddingTop: 6 }}>

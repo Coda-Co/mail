@@ -1248,13 +1248,19 @@ impl MailService {
     }
 
     pub fn respond_event(&self, id: &str, response: EventResponse) -> Result<CalendarEvent> {
+        self.respond_event_with(id, response, true, None)
+    }
+
+    /// Accept, decline or tentatively accept, optionally without telling the organiser, or with a note.
+    pub fn respond_event_with(&self, id: &str, response: EventResponse, send_response: bool, comment: Option<String>) -> Result<CalendarEvent> {
         let (acc, raw) = ids::split(id)?;
         let ev = self.editable_event(id)?;
         if ev.my_response == ResponseStatus::Organizer {
             return Err(Error::Invalid("You organised this event".into()));
         }
         self.with_account(acc, |db| db.set_event_response(raw, response.as_status()))?;
-        self.enqueue(acc, &Op::RespondEvent { event_id: raw.to_string(), response })?;
+        let comment = if send_response { comment.filter(|c| !c.trim().is_empty()) } else { None };
+        self.enqueue(acc, &Op::RespondEvent { event_id: raw.to_string(), response, send_response, comment })?;
         self.changed(vec![acc.to_string()]);
         self.get_event(id)
     }

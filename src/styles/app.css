@@ -2858,12 +2858,43 @@ h3 {
 
 .rsvp button {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   height: 32px;
   border: 1px solid var(--input-border);
   border-radius: var(--r-button);
   background: var(--bg);
   font-size: var(--fs-meta);
   cursor: pointer;
+}
+
+.rsvp button svg {
+  color: var(--text-muted);
+}
+
+.rsvp-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* "Edit the response before sending": a note to the organiser. */
+.rsvp-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rsvp-edit textarea {
+  resize: vertical;
+  min-height: 64px;
+}
+
+.rsvp-edit-actions {
+  display: flex;
+  gap: 6px;
 }
 
 .rsvp button.on {
@@ -3396,7 +3427,7 @@ h3 {
 }
 
 .meeting-rsvp {
-  max-width: 360px;
+  max-width: 420px;
 }
 
 .meeting-preview {

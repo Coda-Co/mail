@@ -8,7 +8,7 @@ use mail_core::{EventSink, MailService};
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use wiremock::matchers::{body_partial_json, method, path, path_regex, query_param};
+use wiremock::matchers::{body_json, body_partial_json, method, path, path_regex, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[derive(Default)]
@@ -556,4 +556,32 @@ async fn meeting_requests_show_their_event() {
     svc.respond_event(&event.id, EventResponse::Accepted).unwrap();
     let again = svc.get_message(&format!("{}:M1", acc.id)).unwrap().meeting.unwrap().event.unwrap();
     assert_eq!(again.my_response, ResponseStatus::Accepted);
+}
+
+#[tokio::test]
+async fn responses_can_skip_telling_the_organiser() {
+    let (server, svc, acc, _) = setup().await;
+    let g = client(&server, Duration::from_secs(5));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    let ev = svc.list_events("2000-01-01T00:00:00Z", "2100-01-01T00:00:00Z").unwrap().into_iter().find(|e| e.my_response != ResponseStatus::Organizer).expect("an invitation");
+    let raw = ev.id.split_once(':').unwrap().1.to_string();
+    Mock::given(method("POST"))
+        .and(path(format!("/me/events/{raw}/decline")))
+        .and(body_json(json!({"sendResponse": false})))
+        .respond_with(ResponseTemplate::new(202))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path(format!("/me/events/{raw}/accept")))
+        .and(body_json(json!({"sendResponse": true, "comment": "See you there"})))
+        .respond_with(ResponseTemplate::new(202))
+        .expect(1)
+        .mount(&server)
+        .await;
+    // A note is dropped when nothing is sent.
+    svc.respond_event_with(&ev.id, EventResponse::Declined, false, Some("ignored".into())).unwrap();
+    svc.respond_event_with(&ev.id, EventResponse::Accepted, true, Some("  See you there ".into())).unwrap();
+    let mut report = Default::default();
+    Syncer::new(&svc, &g, acc.clone()).replay_ops(&mut report).await.unwrap();
 }

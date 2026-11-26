@@ -419,8 +419,14 @@ pub async fn update_event(s: State<'_, AppState>, event_id: String, input: Event
 }
 
 #[tauri::command]
-pub async fn respond_event(s: State<'_, AppState>, event_id: String, response: EventResponse) -> R<CalendarEvent> {
-    s.svc.respond_event(&event_id, response)
+pub async fn respond_event(
+    s: State<'_, AppState>,
+    event_id: String,
+    response: EventResponse,
+    send_response: Option<bool>,
+    comment: Option<String>,
+) -> R<CalendarEvent> {
+    s.svc.respond_event_with(&event_id, response, send_response.unwrap_or(true), comment)
 }
 
 #[tauri::command]

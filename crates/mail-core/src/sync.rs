@@ -811,8 +811,12 @@ impl<'a> Syncer<'a> {
                     self.db(|db| db.upsert_event(&server))?;
                 }
             }
-            Op::RespondEvent { event_id, response } => {
-                ignore_404(self.graph.post(&format!("/me/events/{}/{}", quote(event_id), response.graph_action()), &json!({"sendResponse": true})).await)?;
+            Op::RespondEvent { event_id, response, send_response, comment } => {
+                let mut body = json!({ "sendResponse": send_response });
+                if let Some(c) = comment.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
+                    body["comment"] = json!(c);
+                }
+                ignore_404(self.graph.post(&format!("/me/events/{}/{}", quote(event_id), response.graph_action()), &body).await)?;
             }
             Op::DeleteEvent { event_id } => {
                 ignore_404(self.graph.delete(&format!("/me/events/{}", quote(event_id))).await.map(|_| Value::Null))?;
