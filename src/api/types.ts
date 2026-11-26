@@ -182,6 +182,8 @@ export interface Person {
   messageCount: number;
   lastContactAt: string;
   score: number;
+  /** The same counts within each account. */
+  perAccount?: { accountId: string; messageCount: number; lastContactAt: string }[];
 }
 
 export interface SearchResult {

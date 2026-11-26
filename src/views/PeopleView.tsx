@@ -84,6 +84,9 @@ export function PeopleView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account, allPeople]);
 
+  // Counts for the account picked in the tabs, not all accounts together.
+  const inAccount = person?.perAccount?.find((x) => x.accountId === account);
+
   const select = (email: string | null) => app.navigate(email ? { view: 'people', param: email } : { view: 'people' });
 
   const email = async (p: Person) => {
@@ -126,7 +129,7 @@ export function PeopleView() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2>{person.name}</h2>
                 <div className="meta">
-                  {person.email} · {plural(person.messageCount, 'message')} · last {listTime(person.lastContactAt)}
+                  {person.email} · {plural(inAccount?.messageCount ?? person.messageCount, 'message')} · last {listTime(inAccount?.lastContactAt ?? person.lastContactAt)}
                 </div>
               </div>
               <button type="button" className="btn btn-primary" onClick={() => email(person)}>

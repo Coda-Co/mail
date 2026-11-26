@@ -533,6 +533,17 @@ pub struct Person {
     pub message_count: i64,
     pub last_contact_at: String,
     pub score: f64,
+    /// The same counts within each account, for views showing one account.
+    #[serde(default)]
+    pub per_account: Vec<PersonInAccount>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonInAccount {
+    pub account_id: String,
+    pub message_count: i64,
+    pub last_contact_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -272,10 +272,15 @@ function people(): Person[] {
       const key = a.email.toLowerCase();
       let p = map.get(key);
       if (!p) {
-        p = { email: a.email, name: a.name || a.email, accountIds: [], messageCount: 0, lastContactAt: m.receivedAt, score: 0, _score: 0 };
+        p = { email: a.email, name: a.name || a.email, accountIds: [], messageCount: 0, lastContactAt: m.receivedAt, score: 0, perAccount: [], _score: 0 };
         map.set(key, p);
       }
       p.messageCount++;
+      const inAcc = p.perAccount!.find((x) => x.accountId === m.accountId);
+      if (inAcc) {
+        inAcc.messageCount++;
+        if (m.receivedAt > inAcc.lastContactAt) inAcc.lastContactAt = m.receivedAt;
+      } else p.perAccount!.push({ accountId: m.accountId, messageCount: 1, lastContactAt: m.receivedAt });
       if (!p.accountIds.includes(m.accountId)) p.accountIds.push(m.accountId);
       if (m.receivedAt > p.lastContactAt) p.lastContactAt = m.receivedAt;
       const ageDays = Math.max(0, (ref - new Date(m.receivedAt).getTime()) / 86400000);
