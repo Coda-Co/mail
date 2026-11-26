@@ -75,6 +75,7 @@
 
   --sidebar-w: 232px;
   --list-w: 360px;
+  --reading-max-w: 920px;
   --agenda-w: 264px;
   --hour-h: 56px;
 
@@ -1254,9 +1255,12 @@ h3 {
 .message-row .subject,
 .message-row .snippet {
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+  /* Long text fades out at the right edge instead of ending in "…". Short text never
+     reaches the faded strip, so it's untouched. */
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
 }
 
 .message-row .from {
@@ -1366,6 +1370,11 @@ h3 {
 }
 
 .reading-content {
+  /* A readable column, centred on wide windows, so cards don't stretch edge to edge. */
+  width: 100%;
+  max-width: var(--reading-max-w);
+  margin: 0 auto;
+  box-sizing: border-box;
   padding: 24px 32px 48px;
   display: flex;
   flex-direction: column;
