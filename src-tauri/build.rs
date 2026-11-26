@@ -31,6 +31,7 @@ const COMMANDS: &[&str] = &[
     "remove_attachment",
     "discard_draft",
     "send_draft",
+    "cancel_send",
     "search",
     "search_server",
     "list_people",

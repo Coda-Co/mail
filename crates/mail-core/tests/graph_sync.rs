@@ -8,7 +8,7 @@ use mail_core::{EventSink, MailService};
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use wiremock::matchers::{body_partial_json, method, path, path_regex, query_param};
+use wiremock::matchers::{body_json, body_partial_json, method, path, path_regex, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[derive(Default)]
@@ -184,6 +184,64 @@ async fn reply_is_created_saved_and_sent() {
     assert_eq!(r.ops_done, 2, "save then send");
     assert!(svc.get_draft(&d.id).is_err(), "sent drafts are removed");
     assert_eq!(svc.sync_status().unwrap().outbox_held, 0);
+}
+
+async fn mount_reply_and_send(server: &MockServer, sends: u64) {
+    Mock::given(method("POST")).and(path("/me/messages/M1/createReply")).respond_with(ResponseTemplate::new(201).set_body_json(json!({"id": "D1"}))).mount(server).await;
+    Mock::given(method("PATCH")).and(path("/me/messages/D1")).respond_with(ResponseTemplate::new(200).set_body_json(json!({}))).mount(server).await;
+    Mock::given(method("GET")).and(path("/me/messages/D1/attachments")).respond_with(ResponseTemplate::new(200).set_body_json(json!({"value": []}))).mount(server).await;
+    Mock::given(method("POST")).and(path("/me/messages/D1/send")).respond_with(ResponseTemplate::new(202)).expect(sends).mount(server).await;
+}
+
+#[tokio::test]
+async fn the_outbox_sends_without_waiting_for_a_full_sync() {
+    let (server, svc, acc, _) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    mount_reply_and_send(&server, 1).await;
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None }).unwrap();
+    svc.send_draft(&d.id).unwrap();
+    let before = server.received_requests().await.unwrap().len();
+    let r = Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run_outbox().await.unwrap();
+    assert_eq!(r.ops_done, 2, "save then send");
+    assert!(svc.get_draft(&d.id).is_err(), "sent: gone from Drafts and the Outbox");
+    let drafts = svc.list_folders(Some(&acc.id)).unwrap().into_iter().find(|f| f.role == Some(FolderRole::Drafts)).unwrap();
+    assert_eq!(drafts.outbox, 0);
+    // Only the send and a refresh of Sent: no inbox, folders or calendar.
+    let paths: Vec<String> = server.received_requests().await.unwrap()[before..].iter().map(|r| r.url.path().to_string()).collect();
+    assert!(paths.last().is_some_and(|p| p.contains("delta")), "Sent refreshed after the send: {paths:?}");
+    assert!(!paths.iter().any(|p| p.contains("calendar")), "no full sync: {paths:?}");
+    // Nothing queued: nothing to do.
+    let r = Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run_outbox().await.unwrap();
+    assert_eq!(r.ops_done, 0);
+}
+
+#[tokio::test]
+async fn taken_back_to_edit_it_is_not_sent() {
+    let (server, svc, acc, _) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    mount_reply_and_send(&server, 0).await;
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None }).unwrap();
+    svc.send_draft(&d.id).unwrap();
+    svc.cancel_send(&d.id).unwrap();
+    Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run_outbox().await.unwrap();
+    assert_eq!(svc.get_draft(&d.id).unwrap().status, DraftStatus::Editing);
+}
+
+#[tokio::test]
+async fn a_send_cut_off_by_a_quit_is_held_not_repeated() {
+    let (server, svc, acc, _) = setup().await;
+    let g = client(&server, Duration::from_secs(10));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    mount_reply_and_send(&server, 0).await;
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None }).unwrap();
+    svc.send_draft(&d.id).unwrap();
+    let (_, raw) = mail_core::ids::split(&d.id).unwrap();
+    svc.with_account(&acc.id, |db| db.set_draft_status(raw, DraftStatus::Sending, None)).unwrap();
+    Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run_outbox().await.unwrap();
+    assert_eq!(svc.get_draft(&d.id).unwrap().status, DraftStatus::Unknown);
+    assert_eq!(svc.sync_status().unwrap().outbox_held, 1);
 }
 
 #[tokio::test]
@@ -556,4 +614,32 @@ async fn meeting_requests_show_their_event() {
     svc.respond_event(&event.id, EventResponse::Accepted).unwrap();
     let again = svc.get_message(&format!("{}:M1", acc.id)).unwrap().meeting.unwrap().event.unwrap();
     assert_eq!(again.my_response, ResponseStatus::Accepted);
+}
+
+#[tokio::test]
+async fn responses_can_skip_telling_the_organiser() {
+    let (server, svc, acc, _) = setup().await;
+    let g = client(&server, Duration::from_secs(5));
+    Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
+    let ev = svc.list_events("2000-01-01T00:00:00Z", "2100-01-01T00:00:00Z").unwrap().into_iter().find(|e| e.my_response != ResponseStatus::Organizer).expect("an invitation");
+    let raw = ev.id.split_once(':').unwrap().1.to_string();
+    Mock::given(method("POST"))
+        .and(path(format!("/me/events/{raw}/decline")))
+        .and(body_json(json!({"sendResponse": false})))
+        .respond_with(ResponseTemplate::new(202))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path(format!("/me/events/{raw}/accept")))
+        .and(body_json(json!({"sendResponse": true, "comment": "See you there"})))
+        .respond_with(ResponseTemplate::new(202))
+        .expect(1)
+        .mount(&server)
+        .await;
+    // A note is dropped when nothing is sent.
+    svc.respond_event_with(&ev.id, EventResponse::Declined, false, Some("ignored".into())).unwrap();
+    svc.respond_event_with(&ev.id, EventResponse::Accepted, true, Some("  See you there ".into())).unwrap();
+    let mut report = Default::default();
+    Syncer::new(&svc, &g, acc.clone()).replay_ops(&mut report).await.unwrap();
 }

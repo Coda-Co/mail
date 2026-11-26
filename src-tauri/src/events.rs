@@ -58,8 +58,9 @@ impl EventSink for TauriEvents {
         });
     }
     fn work_queued(&self, _account_id: &str) {
+        // Sends and other changes go straight away, without waiting for a full sync.
         if let Some(s) = self.app.try_state::<AppState>() {
-            s.wake.notify_one();
+            s.outbox.notify_one();
         }
     }
     fn new_mail(&self, account: &Account, messages: &[MessageSummary]) {

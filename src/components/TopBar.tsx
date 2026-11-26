@@ -1,3 +1,4 @@
+import { MailboxTabs } from './MailboxTabs';
 import { createContext, useContext } from 'react';
 import { ArrowDownToLine, Search, SquarePen } from 'lucide-react';
 import { api } from '../api';
@@ -25,6 +26,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   const showTrigger = (view === 'mail' && !app.searchActive) || view === 'web';
   return (
     <header className="topbar">
+      <MailboxTabs />
       <div className="topbar-search" ref={slotRef}>
         {showTrigger && (
           <button

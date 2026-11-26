@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays } from 'lucide-react';
 import { api } from '../api';
-import type { CalendarEvent, Message, MeetingInfo, ResponseStatus } from '../api/types';
+import type { CalendarEvent, Message, MeetingInfo } from '../api/types';
 import { useApp } from '../state/app';
 import { addDays, dayShort, hhmm, monthName, monthShort, sameDay, startOfDay } from '../lib/dates';
 import { eventFill } from '../lib/colors';
@@ -9,8 +9,9 @@ import { layoutDay } from '../lib/eventLayout';
 import { eventActions } from '../lib/webCalendar';
 import { eventTitle } from '../lib/text';
 import { useToast } from './ui';
+import { RsvpButtons, type Rsvp, type RsvpOptions } from './RsvpButtons';
 
-const HOUR = 30;
+const HOUR = 40;
 
 /** "Wednesday 2 December 2026, 10:00 – 11:00", "Wednesday 2 December 2026, all day", or a span of days. */
 export function meetingWhen(start: Date, end: Date, allDay: boolean): string {
@@ -29,7 +30,7 @@ export function meetingWhen(start: Date, end: Date, allDay: boolean): string {
 const STATUS: Partial<Record<MeetingInfo['kind'], string>> = { cancelled: 'Cancelled', accepted: 'Accepted', tentative: 'Tentative', declined: 'Declined' };
 
 /**
- * Above a meeting message's body: when and where, Going / Maybe / No, and that part of the
+ * Above a meeting message's body: when and where, Accept / Tentative / Decline, and that part of the
  * day from every visible calendar (all accounts), so a clash shows before answering.
  */
 export function MeetingCard({ message, onChanged }: { message: Message; onChanged: (m: Message) => void }) {
@@ -47,10 +48,10 @@ export function MeetingCard({ message, onChanged }: { message: Message; onChange
   const cancelled = meeting.kind === 'cancelled' || !!event?.isCancelled;
   const canRespond = isRequest && !cancelled && !!event && eventActions(event).respond;
 
-  const respond = async (r: 'accepted' | 'tentative' | 'declined') => {
+  const respond = async (r: Rsvp, o: RsvpOptions) => {
     if (!event) return;
     try {
-      await api.respondEvent(event.id, r);
+      await api.respondEvent(event.id, r, o);
       onChanged(await api.getMessage(message.id));
     } catch (e) {
       toast(`Couldn’t respond: ${e instanceof Error ? e.message : e}`);
@@ -63,11 +64,6 @@ export function MeetingCard({ message, onChanged }: { message: Message; onChange
     app.navigate({ view: 'calendar' });
   };
 
-  const rsvp: [Exclude<ResponseStatus, 'none' | 'organizer'>, string][] = [
-    ['accepted', 'Going'],
-    ['tentative', 'Maybe'],
-    ['declined', 'No'],
-  ];
   const status = STATUS[cancelled ? 'cancelled' : meeting.kind];
 
   return (
@@ -85,15 +81,7 @@ export function MeetingCard({ message, onChanged }: { message: Message; onChange
           </button>
         )}
       </div>
-      {canRespond && (
-        <div className="rsvp meeting-rsvp" role="group" aria-label="Respond">
-          {rsvp.map(([r, label]) => (
-            <button key={r} type="button" className={event.myResponse === r ? 'on' : ''} aria-pressed={event.myResponse === r} onClick={() => respond(r)}>
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
+      {canRespond && <RsvpButtons className="meeting-rsvp" current={event.myResponse} onRespond={respond} />}
       {valid && isRequest && !cancelled && <DayPreview meeting={meeting} start={start} end={end} allDay={allDay} subject={message.subject} accountId={message.accountId} onOpen={openInCalendar} />}
     </section>
   );
@@ -165,13 +153,13 @@ function DayPreview({
 
   const allDayEvents = all.filter((e) => e.isAllDay);
   const timed = all.filter((e) => !e.isAllDay);
-  // An hour before to an hour after (at least three hours), within the day.
+  // An hour before to an hour after (at least four hours), within the day.
   const dayEnd = addDays(day, 1).getTime();
   let from = allDay ? 9 : Math.max(0, start.getHours() - 1);
   let to = allDay ? 17 : Math.min(24, Math.ceil((Math.min(end.getTime(), dayEnd) - dayMs) / 3600000) + 1);
-  if (to - from < 3) {
-    to = Math.min(24, from + 3);
-    from = Math.max(0, to - 3);
+  if (to - from < 4) {
+    to = Math.min(24, from + 4);
+    from = Math.max(0, to - 4);
   }
   const winStart = dayMs + from * 3600000;
   const winEnd = dayMs + to * 3600000;

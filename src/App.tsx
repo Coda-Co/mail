@@ -76,7 +76,14 @@ function Shell() {
 
 function PopOut({ kind, id }: { kind: 'compose' | 'message'; id: string }) {
   useGlobalShortcuts();
-  return kind === 'compose' ? <ComposeWindow draftId={id} /> : <MessageWindow messageId={id} />;
+  const app = useApp();
+  return (
+    <>
+      {kind === 'compose' ? <ComposeWindow draftId={id} /> : <MessageWindow messageId={id} />}
+      {/* The compose window's signature picker can open signature settings. */}
+      {app.settingsTab && <SettingsModal />}
+    </>
+  );
 }
 
 export function App() {

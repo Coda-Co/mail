@@ -76,6 +76,9 @@ pub struct MailService {
     events: Mutex<Arc<dyn EventSink>>,
     online: std::sync::atomic::AtomicBool,
     in_memory: bool,
+    /// Held while queued changes are replayed against the server, so the outbox loop and a
+    /// full sync never replay at once (a message must never be sent twice).
+    pub(crate) replay_lock: tokio::sync::Mutex<()>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -104,6 +107,7 @@ impl MailService {
             events: Mutex::new(Arc::new(NoEvents)),
             online: std::sync::atomic::AtomicBool::new(true),
             in_memory,
+            replay_lock: tokio::sync::Mutex::new(()),
         }
     }
 
@@ -384,7 +388,7 @@ impl MailService {
                             s.unread += f.unread;
                             s.total += f.total;
                         }
-                        None => sums.push(Folder { id: format!("all:{}", role.as_str()), account_id: String::new(), name: f.name.clone(), role: Some(role), parent_id: None, unread: f.unread, total: f.total }),
+                        None => sums.push(Folder { id: format!("all:{}", role.as_str()), account_id: String::new(), name: f.name.clone(), outbox: 0, role: Some(role), parent_id: None, unread: f.unread, total: f.total }),
                     }
                 }
             }
@@ -442,10 +446,12 @@ impl MailService {
                 None => false,
             };
             if is_drafts {
-                // Drafts are listed by draft id (local drafts, plus server drafts made elsewhere).
-                if scope.tab == ListTab::All {
+                // Drafts are listed by draft id (local drafts, plus server drafts made elsewhere);
+                // the Outbox is the drafts already sent but not yet gone.
+                if matches!(scope.tab, ListTab::All | ListTab::Outbox) {
                     let me = self.app().get_account(&acc)?;
-                    all.extend(self.with_account(&acc, |db| db.draft_summaries(&Address::new(me.display_name.clone(), me.email.clone()), offset + limit))?);
+                    let outbox = scope.tab == ListTab::Outbox;
+                    all.extend(self.with_account(&acc, |db| db.draft_summaries(&Address::new(me.display_name.clone(), me.email.clone()), offset + limit, outbox))?);
                 }
             } else {
                 all.extend(self.with_account(&acc, |db| db.list_messages(&f))?);
@@ -719,6 +725,11 @@ impl MailService {
         self.with_account(acc, |db| match db.get_draft(raw) {
             Ok((d, _)) => Ok(d),
             Err(Error::NotFound(_)) => {
+                // The server copy of a draft we already have (e.g. opened from search): that draft,
+                // never a second copy. A copy would outlive the send and linger in Drafts.
+                if let Some(local) = db.draft_by_server_id(raw)? {
+                    return Ok(db.get_draft(&local)?.0);
+                }
                 let m = db.get_message(raw)?;
                 if !m.message.summary.is_draft {
                     return Err(Error::NotFound(format!("draft {raw}")));
@@ -962,6 +973,30 @@ impl MailService {
         self.delete_dropped_copies(&d.attachments);
         self.changed(vec![acc.to_string()]);
         Ok(())
+    }
+
+    /// Take a message in the Outbox back to Drafts to edit: it won't be sent. Not once it's
+    /// actually going out. A held send (we couldn't confirm it went) can be taken back too.
+    pub fn cancel_send(&self, id: &str) -> Result<Draft> {
+        let (acc, raw) = ids::split(id)?;
+        let taken = self.with_account(acc, |db| {
+            if !db.cancel_queued_send(raw)? {
+                return Ok(false);
+            }
+            for op in db.ops_for_draft(raw)? {
+                if op.kind == "send" {
+                    db.op_done(op.id)?;
+                }
+            }
+            Ok(true)
+        })?;
+        if !taken {
+            return Err(Error::Invalid("This message is already being sent".into()));
+        }
+        self.events().draft_changed(id);
+        self.events().sync_status();
+        self.changed(vec![acc.to_string()]);
+        self.get_draft(id)
     }
 
     /// Queue for sending. Works offline; the sync engine sends on reconnect.
@@ -1248,13 +1283,19 @@ impl MailService {
     }
 
     pub fn respond_event(&self, id: &str, response: EventResponse) -> Result<CalendarEvent> {
+        self.respond_event_with(id, response, true, None)
+    }
+
+    /// Accept, decline or tentatively accept, optionally without telling the organiser, or with a note.
+    pub fn respond_event_with(&self, id: &str, response: EventResponse, send_response: bool, comment: Option<String>) -> Result<CalendarEvent> {
         let (acc, raw) = ids::split(id)?;
         let ev = self.editable_event(id)?;
         if ev.my_response == ResponseStatus::Organizer {
             return Err(Error::Invalid("You organised this event".into()));
         }
         self.with_account(acc, |db| db.set_event_response(raw, response.as_status()))?;
-        self.enqueue(acc, &Op::RespondEvent { event_id: raw.to_string(), response })?;
+        let comment = if send_response { comment.filter(|c| !c.trim().is_empty()) } else { None };
+        self.enqueue(acc, &Op::RespondEvent { event_id: raw.to_string(), response, send_response, comment })?;
         self.changed(vec![acc.to_string()]);
         self.get_event(id)
     }

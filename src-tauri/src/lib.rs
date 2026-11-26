@@ -85,6 +85,7 @@ pub fn run() {
             svc.set_events(Arc::new(events::TauriEvents::new(handle.clone())));
             let state = AppState::new(svc.clone(), demo, &app.config().identifier);
             let wake = state.wake.clone();
+            let outbox = state.outbox.clone();
             let clients = state.client_factory();
             app.manage(state);
             app.manage(webaccounts::WebCalendars::default());
@@ -95,7 +96,9 @@ pub fn run() {
             if !demo {
                 // New mail within ~10 seconds; folders, other mail folders and calendars every 2 minutes.
                 let (inbox_every, full_every) = (std::time::Duration::from_secs(10), std::time::Duration::from_secs(120));
-                tauri::async_runtime::spawn(mail_core::sync::run_loop(svc.clone(), clients, wake, inbox_every, full_every));
+                tauri::async_runtime::spawn(mail_core::sync::run_loop(svc.clone(), clients.clone(), wake, inbox_every, full_every));
+                // Sends (and other changes) go as soon as they're made.
+                tauri::async_runtime::spawn(mail_core::sync::outbox_loop(svc.clone(), clients, outbox));
             }
             tauri::async_runtime::spawn(events::reminder_loop(handle.clone()));
             tauri::async_runtime::spawn(webaccounts::calendar_loop(handle.clone()));
@@ -155,6 +158,7 @@ pub fn run() {
             commands::remove_attachment,
             commands::discard_draft,
             commands::send_draft,
+            commands::cancel_send,
             commands::search,
             commands::search_server,
             commands::list_people,

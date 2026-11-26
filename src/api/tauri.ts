@@ -43,6 +43,7 @@ export const tauriApi: MailApi = {
   removeAttachment: (draftId, attachmentId) => call('remove_attachment', { draftId, attachmentId }),
   discardDraft: (draftId) => call('discard_draft', { draftId }),
   sendDraft: (draftId) => call('send_draft', { draftId }),
+  cancelSend: (draftId) => call('cancel_send', { draftId }),
 
   search: (query) => call('search', { query }),
   searchServer: (query) => call('search_server', { query }),
@@ -56,7 +57,7 @@ export const tauriApi: MailApi = {
   agenda: (days) => call('agenda', { days }),
   createEvent: (input) => call('create_event', { input }),
   updateEvent: (eventId, input) => call('update_event', { eventId, input }),
-  respondEvent: (eventId, response) => call('respond_event', { eventId, response }),
+  respondEvent: (eventId, response, options) => call('respond_event', { eventId, response, sendResponse: options?.sendResponse ?? true, comment: options?.comment || null }),
   deleteEvent: (eventId) => call('delete_event', { eventId }),
 
   listSignatures: (accountId) => call('list_signatures', { accountId }),

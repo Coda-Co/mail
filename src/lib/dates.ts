@@ -76,15 +76,6 @@ export function rangeTitle(start: Date, end: Date): string {
   return `${start.getDate()} – ${end.getDate()} ${monthName(end.getMonth())}`;
 }
 
-/** Value for <input type="datetime-local"> */
-export function toLocalInput(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${hhmm(d)}`;
-}
-
-export function toDateInput(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
 /** How long ago something happened: "just now", "4 min ago", "at 09:42", "yesterday at 09:42". */
 export function agoTime(iso: string, ref: Date = now()): string {
   const d = new Date(iso);

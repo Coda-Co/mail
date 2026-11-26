@@ -10,6 +10,8 @@ use std::sync::{Arc, Mutex};
 pub struct AppState {
     pub svc: Arc<MailService>,
     pub wake: Arc<tokio::sync::Notify>,
+    /// Wakes the outbox loop: something was sent or changed and should go now.
+    pub outbox: Arc<tokio::sync::Notify>,
     pub auth: AuthConfig,
     pub tokens: Arc<dyn TokenStore>,
     token_cache: Arc<Mutex<HashMap<String, Arc<Tokens>>>>,
@@ -46,6 +48,7 @@ impl AppState {
         AppState {
             svc,
             wake: Arc::new(tokio::sync::Notify::new()),
+            outbox: Arc::new(tokio::sync::Notify::new()),
             auth: AuthConfig::new(client_id()),
             tokens,
             token_cache: Arc::new(Mutex::new(HashMap::new())),

@@ -14,12 +14,13 @@ import { eventTitle, plural } from '../lib/text';
 import { TopSearch } from '../components/TopSearch';
 import { CalendarSidebar } from '../components/CalendarSidebar';
 import { Resizer } from '../components/Resizer';
+import { RsvpButtons, type Rsvp, type RsvpOptions } from '../components/RsvpButtons';
 import { eventActions, webEventSource } from '../lib/webCalendar';
 
 type Mode = 'day' | 'week' | 'month';
 const HOUR = 56;
 
-const RESPONSE_TEXT: Partial<Record<ResponseStatus, string>> = { accepted: 'You’re going', tentative: 'You said maybe', declined: 'You declined' };
+const RESPONSE_TEXT: Partial<Record<ResponseStatus, string>> = { accepted: 'You accepted', tentative: 'You tentatively accepted', declined: 'You declined' };
 
 /** "Join Teams meeting" / "Join Zoom meeting" etc., from the join link's host. */
 function joinLabel(url: string): string {
@@ -67,18 +68,13 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
   }, [event.id, event.accountId, event.attendees, event.isOnlineMeeting, fromWeb]);
   const attendees = [...webAttendees].sort((a, b) => (a.response === 'organizer' ? -1 : b.response === 'organizer' ? 1 : 0));
   const shown = showAll ? attendees : attendees.slice(0, 3);
-  const respond = async (r: 'accepted' | 'tentative' | 'declined') => {
+  const respond = async (r: Rsvp, o: RsvpOptions) => {
     try {
-      onChanged(await api.respondEvent(event.id, r));
+      onChanged(await api.respondEvent(event.id, r, o));
     } catch (e) {
       toast(`Couldn’t respond: ${e instanceof Error ? e.message : e}`);
     }
   };
-  const rsvp: [Exclude<ResponseStatus, 'none' | 'organizer'>, string][] = [
-    ['accepted', 'Going'],
-    ['tentative', 'Maybe'],
-    ['declined', 'No'],
-  ];
   return (
     <Modal
       className="event-modal"
@@ -137,15 +133,7 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
             </button>
           )}
         </div>
-        {actions.respond && (
-          <div className="rsvp">
-            {rsvp.map(([r, label]) => (
-              <button key={r} type="button" className={event.myResponse === r ? 'on' : ''} aria-pressed={event.myResponse === r} onClick={() => respond(r)}>
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+        {actions.respond && <RsvpButtons current={event.myResponse} onRespond={respond} />}
         {loadingAttendees && attendees.length === 0 && (
           <>
             <div className="form-label" style={{ paddingTop: 6 }}>
@@ -326,7 +314,15 @@ export function CalendarView() {
   const [anchor, setAnchor] = useState<Date>(() => (app.calendarFocus ? new Date(app.calendarFocus.date) : now()));
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(app.calendarFocus?.eventId ?? null);
-  const [form, setForm] = useState<{ event?: CalendarEvent; start?: Date } | null>(null);
+  const [form, setForm] = useState<{ event?: CalendarEvent; start?: Date; allDay?: boolean } | null>(null);
+  // Only where there's a calendar to add to.
+  const canCreate = app.graphAccounts.length > 0;
+  const newEvent = (f: { start?: Date; allDay?: boolean }) => {
+    if (canCreate) setForm(f);
+  };
+  // The quarter hour under the pointer in a day column, as minutes after midnight.
+  const slotAt = (ev: { clientY: number; currentTarget: HTMLElement }) =>
+    Math.max(0, Math.min(24 * 60 - 15, Math.floor((ev.clientY - ev.currentTarget.getBoundingClientRect().top) / (HOUR / 4)) * 15));
   const [version, setVersion] = useState(0);
   const [query, setQuery] = useState('');
   const [field, setField] = useState<EventField>(lastEventField);
@@ -429,7 +425,13 @@ export function CalendarView() {
       {events.some((e) => e.isAllDay) && (
         <div className="all-day-row">
           {days.map((d) => (
-            <div key={d.toISOString()} className="cell">
+            <div
+              key={d.toISOString()}
+              className="cell"
+              onClick={(ev) => {
+                if (ev.target === ev.currentTarget) newEvent({ start: startOfDay(d), allDay: true });
+              }}
+            >
               {dayEvents(d)
                 .filter((e) => e.isAllDay)
                 .map((e) => (
@@ -457,14 +459,29 @@ export function CalendarView() {
                 key={d.toISOString()}
                 className={`day-column${isToday ? ' today' : ''}`}
                 style={{ height: 24 * HOUR }}
-                onDoubleClick={(ev) => {
+                onClick={(ev) => {
+                  // Click an empty slot: a new half-hour event starting at the quarter hour clicked.
                   if (ev.target !== ev.currentTarget) return;
-                  const y = ev.nativeEvent.offsetY;
                   const start = new Date(d);
-                  start.setMinutes(Math.floor(y / (HOUR / 2)) * 30);
-                  setForm({ start });
+                  start.setMinutes(slotAt(ev));
+                  newEvent({ start });
+                }}
+                onMouseMove={(ev) => {
+                  // Shows where a click would put the event. Moved directly, not re-rendered.
+                  const ghost = ev.currentTarget.querySelector<HTMLElement>(':scope > .slot-ghost');
+                  if (!ghost) return;
+                  if (ev.target !== ev.currentTarget || !canCreate) return void (ghost.style.display = 'none');
+                  const m = slotAt(ev);
+                  ghost.style.display = 'block';
+                  ghost.style.top = `${(m / 60) * HOUR}px`;
+                  ghost.dataset.time = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+                }}
+                onMouseLeave={(ev) => {
+                  const ghost = ev.currentTarget.querySelector<HTMLElement>(':scope > .slot-ghost');
+                  if (ghost) ghost.style.display = 'none';
                 }}
               >
+                <div className="slot-ghost" aria-hidden style={{ height: HOUR / 2 }} />
                 {isToday && <div className="now-line" style={{ top: ((today.getHours() * 60 + today.getMinutes()) / 60) * HOUR }} />}
                 {placed.map(({ event: e, lane, lanes }) => {
                   const s = new Date(e.start);
@@ -518,7 +535,14 @@ export function CalendarView() {
         {days.map((d) => {
           const list = dayEvents(d).sort((a, b) => a.start.localeCompare(b.start));
           return (
-            <div key={d.toISOString()} className={`month-cell${d.getMonth() !== anchor.getMonth() ? ' other' : ''}${sameDay(d, today) ? ' today' : ''}`}>
+            <div
+              key={d.toISOString()}
+              className={`month-cell${d.getMonth() !== anchor.getMonth() ? ' other' : ''}${sameDay(d, today) ? ' today' : ''}`}
+              onClick={(ev) => {
+                // Click an empty part of a day: a new event that day at 09:00.
+                if (ev.target === ev.currentTarget) newEvent({ start: new Date(startOfDay(d).getTime() + 9 * 3600000) });
+              }}
+            >
               <button
                 type="button"
                 className="num"
@@ -622,6 +646,7 @@ export function CalendarView() {
         <EventForm
           event={form.event}
           start={form.start}
+          allDay={form.allDay}
           onClose={() => setForm(null)}
           onSaved={(e) => {
             setForm(null);

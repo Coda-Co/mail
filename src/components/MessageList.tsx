@@ -3,7 +3,7 @@ import { Flag, Paperclip } from 'lucide-react';
 import type { MessageSummary } from '../api/types';
 import { listTime } from '../lib/dates';
 
-export function MessageRow({ m, selected, onSelect }: { m: MessageSummary; selected: boolean; onSelect: () => void }) {
+export function MessageRow({ m, selected, onSelect, draftTag = true }: { m: MessageSummary; selected: boolean; onSelect: () => void; draftTag?: boolean }) {
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (selected) ref.current?.scrollIntoView({ block: 'nearest' });
@@ -20,7 +20,7 @@ export function MessageRow({ m, selected, onSelect }: { m: MessageSummary; selec
     >
       <span className="line">
         <span className="from">
-          {m.isDraft && <span className="draft-label">Draft</span>}
+          {m.isDraft && draftTag && <span className="draft-label">Draft</span>}
           {who}
         </span>
         <span className="icons">
@@ -50,6 +50,7 @@ export function MessageList({
   onLoadMore,
   footer,
   header,
+  draftTags = true,
 }: {
   messages: MessageSummary[];
   selectedId: string | null;
@@ -58,6 +59,8 @@ export function MessageList({
   onLoadMore?: () => void;
   footer?: React.ReactNode;
   header?: React.ReactNode;
+  /** Mark drafts "Draft" (not in the Outbox, where everything has already been sent). */
+  draftTags?: boolean;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   return (
@@ -72,7 +75,7 @@ export function MessageList({
     >
       {header}
       {messages.map((m) => (
-        <MessageRow key={m.id} m={m} selected={m.id === selectedId} onSelect={() => onSelect(m)} />
+        <MessageRow key={m.id} m={m} selected={m.id === selectedId} onSelect={() => onSelect(m)} draftTag={draftTags} />
       ))}
       {messages.length === 0 && <div className="list-empty">{empty}</div>}
       {footer}

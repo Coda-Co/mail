@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { demoApi, resetDemo } from './demo';
 import type { SearchQuery, ViewScope } from './types';
 
@@ -106,14 +106,29 @@ describe('demo backend', () => {
     await expect(demoApi.setDraftSignature(d.id, 'sig-coda')).rejects.toThrow(/another account/);
   });
 
-  it('sending files the message in Sent and removes the draft', async () => {
-    const d = await demoApi.createDraft({ mode: 'new', accountId: 'acc-coda' });
-    await expect(demoApi.sendDraft(d.id)).rejects.toThrow(/recipient/);
-    await demoApi.updateDraft({ ...d, to: [{ name: 'Tom Reid', email: 'tom@coda.example' }], subject: 'Hello' });
-    const sent = await demoApi.sendDraft(d.id);
-    expect(sent.status).toBe('sent');
-    const list = await demoApi.listMessages({ accountId: 'acc-coda', folder: { role: 'sent' }, tab: 'all' }, 5, 0);
-    expect(list[0].subject).toBe('Hello');
+  it('sending goes through the Outbox, then files the message in Sent', async () => {
+    vi.useFakeTimers();
+    try {
+      const d = await demoApi.createDraft({ mode: 'new', accountId: 'acc-coda' });
+      await expect(demoApi.sendDraft(d.id)).rejects.toThrow(/recipient/);
+      await demoApi.updateDraft({ ...d, to: [{ name: 'Tom Reid', email: 'tom@coda.example' }], subject: 'Hello' });
+      const queued = await demoApi.sendDraft(d.id);
+      expect(queued.status).toBe('queued');
+      const drafts = { accountId: 'acc-coda', folder: { role: 'drafts' as const }, tab: 'all' as const };
+      expect((await demoApi.listMessages(drafts, 50, 0)).some((m) => m.id === d.id)).toBe(false);
+      expect((await demoApi.listMessages({ ...drafts, tab: 'outbox' }, 50, 0)).map((m) => m.id)).toEqual([d.id]);
+      // Taken back to edit, it stays a draft; sent again, it goes.
+      expect((await demoApi.cancelSend(d.id)).status).toBe('editing');
+      await vi.advanceTimersByTimeAsync(3000);
+      expect((await demoApi.listMessages(drafts, 50, 0)).some((m) => m.id === d.id)).toBe(true);
+      await demoApi.sendDraft(d.id);
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(await demoApi.listMessages({ ...drafts, tab: 'outbox' }, 50, 0)).toEqual([]);
+      const list = await demoApi.listMessages({ accountId: 'acc-coda', folder: { role: 'sent' }, tab: 'all' }, 5, 0);
+      expect(list[0].subject).toBe('Hello');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('archive moves to the account’s Archive and undo restores', async () => {

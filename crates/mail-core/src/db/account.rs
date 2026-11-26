@@ -296,16 +296,23 @@ impl AccountDb {
                     parent_id: r.get::<_, Option<String>>(3)?.map(|p| self.pid(&p)),
                     total: r.get(4)?,
                     unread: r.get(5)?,
+                    outbox: 0,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
-        // Drafts count is the number of drafts, not unread.
+        // Drafts count is the number of drafts to finish, not unread: drafts here, plus server
+        // drafts not linked to one. Messages already sent (in the Outbox) are counted apart.
         for f in rows.iter_mut() {
             if f.role == Some(FolderRole::Drafts) {
                 let raw = ids::split(&f.id)?.1.to_string();
-                let n: i64 = self.conn.query_row("SELECT COUNT(*) FROM messages WHERE folder_id = ?1", [raw], |r| r.get(0))?;
-                let local: i64 = self.conn.query_row("SELECT COUNT(*) FROM drafts WHERE server_id IS NULL AND status IN ('editing','failed')", [], |r| r.get(0))?;
-                f.unread = n + local;
+                let unlinked: i64 = self.conn.query_row(
+                    "SELECT COUNT(*) FROM messages WHERE folder_id = ?1 AND id NOT IN (SELECT server_id FROM drafts WHERE server_id IS NOT NULL)",
+                    [raw],
+                    |r| r.get(0),
+                )?;
+                let local: i64 = self.conn.query_row("SELECT COUNT(*) FROM drafts WHERE status IN ('editing','failed')", [], |r| r.get(0))?;
+                f.unread = unlinked + local;
+                f.outbox = self.conn.query_row("SELECT COUNT(*) FROM drafts WHERE status IN ('queued','sending','unknown')", [], |r| r.get(0))?;
             }
         }
         rows.sort_by(|a, b| {
@@ -886,12 +893,15 @@ impl AccountDb {
         Ok(rows)
     }
 
-    /// The Drafts folder: local drafts (by draft id) and server drafts not linked to one.
-    pub fn draft_summaries(&self, me: &Address, limit: i64) -> Result<Vec<MessageSummary>> {
+    /// The Drafts folder: local drafts still being written (by draft id) and server drafts not
+    /// linked to one. With `outbox`, the drafts sent but not yet gone instead.
+    pub fn draft_summaries(&self, me: &Address, limit: i64, outbox: bool) -> Result<Vec<MessageSummary>> {
         let folder = self.folder_id_by_role(FolderRole::Drafts)?.unwrap_or_default();
+        let wanted = |s: DraftStatus| if outbox { matches!(s, DraftStatus::Queued | DraftStatus::Sending | DraftStatus::Unknown) } else { matches!(s, DraftStatus::Editing | DraftStatus::Failed) };
         let mut out: Vec<MessageSummary> = self
             .list_drafts()?
             .into_iter()
+            .filter(|d| wanted(d.status))
             .map(|d| MessageSummary {
                 id: d.id.clone(),
                 account_id: self.account_id.clone(),
@@ -912,7 +922,7 @@ impl AccountDb {
         let mut st = self.conn.prepare(&format!(
             "SELECT {MSG_COLS} FROM messages m WHERE m.folder_id = ?1 AND m.id NOT IN (SELECT server_id FROM drafts WHERE server_id IS NOT NULL) ORDER BY m.received_at DESC LIMIT ?2"
         ))?;
-        let rows = st.query_map(params![folder, limit], |r| self.row_summary(r))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        let rows = if outbox { vec![] } else { st.query_map(params![folder, limit], |r| self.row_summary(r))?.collect::<rusqlite::Result<Vec<_>>>()? };
         out.extend(rows.into_iter().map(|mut m| {
             m.is_draft = true;
             m
@@ -949,6 +959,33 @@ impl AccountDb {
     pub fn delete_draft(&self, raw_id: &str) -> Result<()> {
         self.conn.execute("DELETE FROM drafts WHERE id = ?1", [raw_id])?;
         Ok(())
+    }
+
+    /// Local drafts tied to a server draft that has been sent: all of them go.
+    pub fn delete_drafts_for_server_id(&self, server_id: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM drafts WHERE server_id = ?1", [server_id])?;
+        Ok(())
+    }
+
+    /// Drafts adopted from a server draft (their id is the server id) whose server copy has gone,
+    /// sent or deleted elsewhere, with nothing unsaved here. Before the fix in get_draft, opening a
+    /// draft's server copy made such a duplicate, which stayed in Drafts after the original sent.
+    pub fn drop_orphaned_adopted_drafts(&self) -> Result<usize> {
+        Ok(self.conn.execute(
+            "DELETE FROM drafts WHERE id = server_id AND saved_to_server = 1 AND status IN ('editing', 'failed')
+               AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.id = drafts.server_id)",
+            [],
+        )?)
+    }
+
+    /// Take a queued draft for sending. False if it was taken back for editing meanwhile.
+    pub fn claim_draft_for_send(&self, raw_id: &str) -> Result<bool> {
+        Ok(self.conn.execute("UPDATE drafts SET status = 'sending', error = NULL WHERE id = ?1 AND status = 'queued'", [raw_id])? == 1)
+    }
+
+    /// Take a queued or held draft back for editing. False if it's already going out.
+    pub fn cancel_queued_send(&self, raw_id: &str) -> Result<bool> {
+        Ok(self.conn.execute("UPDATE drafts SET status = 'editing', error = NULL WHERE id = ?1 AND status IN ('queued', 'unknown')", [raw_id])? == 1)
     }
 
     pub fn count_held_sends(&self) -> Result<i64> {

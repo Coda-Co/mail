@@ -5,9 +5,15 @@ import { useApp } from '../state/app';
 import { Modal } from '../components/ui';
 import { AddressField } from '../components/AddressField';
 import { RichEditor } from '../components/RichEditor';
-import { addDays, startOfDay, toDateInput, toLocalInput } from '../lib/dates';
+import { DateButton, TimeField, dayTimes, type TimeOption } from '../components/DateTimePicker';
+import { addDays, sameDay, startOfDay } from '../lib/dates';
 import { now } from '../lib/clock';
+import { durationLabel, snapDate, STEP_MIN } from '../lib/timeEntry';
 
+const MIN = 60000;
+const DEFAULT_MIN = 30;
+
+/** The next half hour. */
 function defaultStart(): Date {
   const n = now();
   const d = new Date(n);
@@ -15,15 +21,32 @@ function defaultStart(): Date {
   return d;
 }
 
-export function EventForm({ event, start, onClose, onSaved }: { event?: CalendarEvent; start?: Date; onClose: () => void; onSaved: (e: CalendarEvent) => void }) {
+const minutesInto = (d: Date, day: Date) => Math.round((d.getTime() - startOfDay(day).getTime()) / MIN);
+const atMinutes = (day: Date, m: number) => new Date(startOfDay(day).getTime() + m * MIN);
+
+export function EventForm({
+  event,
+  start,
+  allDay: allDayAt,
+  onClose,
+  onSaved,
+}: {
+  event?: CalendarEvent;
+  start?: Date;
+  /** A new all-day event on start's day. */
+  allDay?: boolean;
+  onClose: () => void;
+  onSaved: (e: CalendarEvent) => void;
+}) {
   const { graphAccounts } = useApp();
-  const s0 = event ? new Date(event.start) : (start ?? defaultStart());
-  const e0 = event ? new Date(event.end) : new Date(s0.getTime() + 30 * 60000);
+  const s0 = event ? new Date(event.start) : snapDate(start ?? defaultStart());
+  const e0 = event ? new Date(event.end) : allDayAt ? addDays(startOfDay(s0), 1) : new Date(s0.getTime() + DEFAULT_MIN * MIN);
   const [accountId, setAccountId] = useState(event?.accountId ?? graphAccounts[0]?.id ?? '');
   const [subject, setSubject] = useState(event?.subject ?? '');
-  const [allDay, setAllDay] = useState(event?.isAllDay ?? false);
-  const [startText, setStartText] = useState(allDay ? toDateInput(s0) : toLocalInput(s0));
-  const [endText, setEndText] = useState(allDay ? toDateInput(addDays(e0, -1)) : toLocalInput(e0));
+  const [allDay, setAllDay] = useState(event?.isAllDay ?? !!allDayAt);
+  // Timed: start and end instants. All day: the first and last day (inclusive), at midnight.
+  const [from, setFrom] = useState(allDay ? startOfDay(s0) : s0);
+  const [to, setTo] = useState(allDay ? addDays(startOfDay(e0), -1) : e0);
   const [location, setLocation] = useState(event?.location ?? '');
   const [attendees, setAttendees] = useState<Address[]>(event?.attendees.filter((a) => a.response !== 'organizer').map((a) => a.address) ?? []);
   const [online, setOnline] = useState(event?.isOnlineMeeting ?? false);
@@ -34,24 +57,44 @@ export function EventForm({ event, start, onClose, onSaved }: { event?: Calendar
 
   const toggleAllDay = (v: boolean) => {
     setAllDay(v);
-    const s = new Date(startText);
-    const e = new Date(endText);
-    setStartText(v ? toDateInput(s) : toLocalInput(new Date(startOfDay(s).getTime() + 9 * 3600000)));
-    setEndText(v ? toDateInput(e) : toLocalInput(new Date(startOfDay(s).getTime() + 9.5 * 3600000)));
+    if (v) {
+      setFrom(startOfDay(from));
+      // An event ending at midnight ends the day before.
+      setTo(startOfDay(to.getTime() === startOfDay(to).getTime() && to > from ? addDays(to, -1) : to));
+    } else {
+      // Back to a timed event: 09:00 for half an hour on the first day.
+      const s = atMinutes(from, 9 * 60);
+      setFrom(s);
+      setTo(new Date(s.getTime() + DEFAULT_MIN * MIN));
+    }
   };
+
+  // Moving the start keeps the length; so does a new start date.
+  const moveStart = (s: Date) => {
+    if (allDay) {
+      const days = Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / 86400000);
+      setFrom(startOfDay(s));
+      setTo(addDays(startOfDay(s), Math.max(0, days)));
+      return;
+    }
+    const len = Math.max(STEP_MIN * MIN, to.getTime() - from.getTime());
+    setFrom(s);
+    setTo(new Date(s.getTime() + len));
+  };
+
+  // End times: each quarter hour after the start, up to a day later, with how long that makes it.
+  const startMin = minutesInto(from, from);
+  const endOptions: TimeOption[] = Array.from({ length: 1440 / STEP_MIN }, (_, i) => {
+    const len = (i + 1) * STEP_MIN;
+    return { minutes: startMin + len, sub: durationLabel(len) };
+  });
+  const lengthMin = Math.round((to.getTime() - from.getTime()) / MIN);
+  const multiDay = !sameDay(from, new Date(to.getTime() - 1));
 
   const save = async () => {
     setError(null);
-    let start: Date;
-    let end: Date;
-    if (allDay) {
-      start = new Date(`${startText}T00:00`);
-      end = addDays(new Date(`${endText}T00:00`), 1);
-    } else {
-      start = new Date(startText);
-      end = new Date(endText);
-    }
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return setError('Check the start and end times.');
+    const start = allDay ? startOfDay(from) : from;
+    const end = allDay ? addDays(startOfDay(to), 1) : to;
     if (end <= start) return setError('The end must be after the start.');
     const input: EventInput = {
       accountId,
@@ -108,14 +151,29 @@ export function EventForm({ event, start, onClose, onSaved }: { event?: Calendar
             ))}
           </select>
         </div>
-        <div className="form-inline">
-          <div className="form-row" style={{ flex: 1 }}>
-            <label htmlFor="ev-start">Starts</label>
-            <input id="ev-start" className="input" type={allDay ? 'date' : 'datetime-local'} value={startText} onChange={(e) => setStartText(e.target.value)} />
-          </div>
-          <div className="form-row" style={{ flex: 1 }}>
-            <label htmlFor="ev-end">Ends</label>
-            <input id="ev-end" className="input" type={allDay ? 'date' : 'datetime-local'} value={endText} onChange={(e) => setEndText(e.target.value)} />
+        <div className="form-row">
+          <span className="form-label">When</span>
+          <div className="when-row">
+            <DateButton label={allDay ? 'First day' : 'Date'} value={from} onChange={moveStart} />
+            {allDay ? (
+              <>
+                <span className="when-sep">to</span>
+                <DateButton label="Last day" value={to} onChange={(d) => setTo(startOfDay(d))} />
+              </>
+            ) : (
+              <>
+                <TimeField label="Start time" value={startMin} options={dayTimes()} onChange={(m) => moveStart(atMinutes(from, m))} />
+                <span className="when-sep">–</span>
+                <TimeField
+                  label="End time"
+                  value={minutesInto(to, from)}
+                  options={lengthMin > 0 && lengthMin <= 1440 && lengthMin % STEP_MIN === 0 ? endOptions : [{ minutes: minutesInto(to, from) }, ...endOptions]}
+                  onChange={(m) => setTo(atMinutes(from, m))}
+                />
+                {multiDay && <DateButton label="End date" value={to} onChange={(d) => setTo(d)} />}
+                {lengthMin > 0 && <span className="when-length">{durationLabel(lengthMin)}</span>}
+              </>
+            )}
           </div>
         </div>
         <div className="form-inline">

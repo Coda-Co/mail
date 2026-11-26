@@ -41,6 +41,8 @@ export interface Folder {
   parentId?: string;
   unread: number;
   total: number;
+  /** Drafts folder only: messages waiting to send, held ones included. */
+  outbox?: number;
 }
 
 export interface Address {
@@ -48,7 +50,8 @@ export interface Address {
   email: string;
 }
 
-export type ListTab = 'all' | 'unread' | 'flagged';
+/** 'outbox' applies to the Drafts folder: messages sent but not yet gone. */
+export type ListTab = 'all' | 'unread' | 'flagged' | 'outbox';
 
 /**
  * What the message list shows. No accountId = all Graph accounts (unified).
@@ -359,6 +362,8 @@ export interface MailApi {
   removeAttachment(draftId: string, attachmentId: string): Promise<Draft>;
   discardDraft(draftId: string): Promise<void>;
   sendDraft(draftId: string): Promise<Draft>;
+  /** Take a message in the Outbox back to Drafts; it won't be sent. Fails once it's going out. */
+  cancelSend(draftId: string): Promise<Draft>;
 
   search(query: SearchQuery): Promise<SearchResult>;
   searchServer(query: SearchQuery): Promise<SearchResult>;
@@ -373,7 +378,8 @@ export interface MailApi {
   agenda(days: number): Promise<AgendaDay[]>;
   createEvent(input: EventInput): Promise<CalendarEvent>;
   updateEvent(eventId: string, input: EventInput): Promise<CalendarEvent>;
-  respondEvent(eventId: string, response: 'accepted' | 'tentative' | 'declined'): Promise<CalendarEvent>;
+  /** sendResponse defaults to true; comment is a note to the organiser, ignored when nothing is sent. */
+  respondEvent(eventId: string, response: 'accepted' | 'tentative' | 'declined', options?: { sendResponse?: boolean; comment?: string }): Promise<CalendarEvent>;
   deleteEvent(eventId: string): Promise<void>;
 
   listSignatures(accountId?: string): Promise<Signature[]>;

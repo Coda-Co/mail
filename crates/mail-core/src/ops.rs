@@ -17,8 +17,21 @@ pub enum Op {
     Send { draft_id: String },
     CreateEvent { event_id: String },
     UpdateEvent { event_id: String },
-    RespondEvent { event_id: String, response: EventResponse },
+    RespondEvent {
+        event_id: String,
+        response: EventResponse,
+        /// Whether the organiser is told. Ops queued before this existed always sent.
+        #[serde(default = "yes")]
+        send_response: bool,
+        /// A note to the organiser with the response.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        comment: Option<String>,
+    },
     DeleteEvent { event_id: String },
+}
+
+fn yes() -> bool {
+    true
 }
 
 impl Op {
@@ -48,5 +61,11 @@ mod tests {
         assert_eq!(v, serde_json::json!({"op": "send", "draftId": "d1"}));
         let back: Op = serde_json::from_value(v).unwrap();
         assert_eq!(back.kind(), "send");
+    }
+
+    #[test]
+    fn responses_queued_before_send_response_existed_still_send() {
+        let op: Op = serde_json::from_str(r#"{"op":"respondEvent","eventId":"E1","response":"accepted"}"#).unwrap();
+        assert_eq!(op, Op::RespondEvent { event_id: "E1".into(), response: EventResponse::Accepted, send_response: true, comment: None });
     }
 }

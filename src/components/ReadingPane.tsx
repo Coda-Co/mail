@@ -13,6 +13,7 @@ import { splitQuoted } from '../lib/quoted';
 import { FileIcon } from './FileIcon';
 import { MeetingCard } from './MeetingCard';
 import { ClosedDraft, Compose, PoppedOutDraft } from './Compose';
+import { inOutbox, OutboxItem } from './OutboxItem';
 
 export type Selection = { kind: 'message' | 'draft'; id: string };
 
@@ -541,7 +542,9 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
           <div className="reading-content">
             {error && <span className="error-text">{error}</span>}
             {draft &&
-              (draft.poppedOut ? (
+              (inOutbox(draft) ? (
+                <OutboxItem key={draft.id} initial={draft} onGone={onBack} onEdit={setDraft} />
+              ) : draft.poppedOut ? (
                 <PoppedOutDraft draft={draft} />
               ) : (
                 <Compose key={draft.id} initial={draft} layout="inline" autoFocus onDone={() => onBack()} />

@@ -424,6 +424,103 @@ fn drafts_folder_lists_by_draft_id() {
 }
 
 #[test]
+fn sending_moves_a_draft_from_drafts_to_the_outbox() {
+    let (svc, ids) = setup();
+    let drafts = ViewScope { account_id: Some(ids.coda.clone()), folder: FolderSelector::Role { role: FolderRole::Drafts }, tab: ListTab::All };
+    let outbox = ViewScope { tab: ListTab::Outbox, ..drafts.clone() };
+    let counts = || {
+        let f = svc.list_folders(Some(&ids.coda)).unwrap().into_iter().find(|f| f.role == Some(FolderRole::Drafts)).unwrap();
+        (f.unread, f.outbox)
+    };
+    let (drafts_before, _) = counts();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()) }).unwrap();
+    let mut e = d.clone();
+    e.to = vec![Address::new("Tom", "tom@coda.example")];
+    let d = svc.update_draft(&e).unwrap();
+    assert!(svc.list_messages(&drafts, 50, 0).unwrap().iter().any(|m| m.id == d.id));
+    assert_eq!(counts(), (drafts_before + 1, 0));
+
+    svc.send_draft(&d.id).unwrap();
+    assert!(!svc.list_messages(&drafts, 50, 0).unwrap().iter().any(|m| m.id == d.id), "sent: out of Drafts");
+    assert_eq!(svc.list_messages(&outbox, 50, 0).unwrap().iter().map(|m| m.id.clone()).collect::<Vec<_>>(), vec![d.id.clone()]);
+    assert_eq!(counts(), (drafts_before, 1));
+
+    // Edit takes it back to Drafts and it won't be sent.
+    let back = svc.cancel_send(&d.id).unwrap();
+    assert_eq!(back.status, DraftStatus::Editing);
+    assert!(svc.list_messages(&outbox, 50, 0).unwrap().is_empty());
+    assert!(svc.list_messages(&drafts, 50, 0).unwrap().iter().any(|m| m.id == d.id));
+    assert_eq!(ops(&svc, &ids.coda).iter().filter(|k| *k == "send").count(), 0, "the queued send is withdrawn");
+
+    // Not once it's actually going out.
+    svc.send_draft(&d.id).unwrap();
+    let (_, raw) = mail_core::ids::split(&d.id).unwrap();
+    assert!(svc.with_account(&ids.coda, |db| db.claim_draft_for_send(raw)).unwrap());
+    assert!(svc.cancel_send(&d.id).is_err());
+    assert!(!svc.with_account(&ids.coda, |db| db.claim_draft_for_send(raw)).unwrap(), "claimed once");
+}
+
+#[test]
+fn a_drafts_server_copy_opens_that_draft_not_a_duplicate() {
+    let (svc, ids) = setup();
+    let src = format!("{}:m-agenda", ids.harbour);
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src.clone()), account_id: None }).unwrap();
+    let mut e = d.clone();
+    e.body_html = format!("<p>Sounds great</p>{}", d.body_html);
+    let d = svc.update_draft(&e).unwrap();
+    let (_, raw) = mail_core::ids::split(&d.id).unwrap();
+    // Saved to the server, and its server copy synced back in as a message (e.g. found by search).
+    svc.with_account(&ids.harbour, |db| db.set_draft_server_id(raw, "srv-reply")).unwrap();
+    let conv = svc.get_message(&src).unwrap().summary.conversation_id;
+    svc.store_messages(
+        &ids.harbour,
+        &[mail_core::db::account::MessageRecord {
+            id: "srv-reply".into(),
+            folder_id: "drafts".into(),
+            conversation_id: conv,
+            subject: d.subject.clone(),
+            body_html: Some("<p>Sounds great</p>".into()),
+            received_at: "2026-11-22T10:00:00Z".into(),
+            is_draft: true,
+            ..Default::default()
+        }],
+    )
+    .unwrap();
+    let opened = svc.get_draft(&format!("{}:srv-reply", ids.harbour)).unwrap();
+    assert_eq!(opened.id, d.id, "the draft we already have");
+    let count = svc.with_account(&ids.harbour, |db| Ok(db.list_drafts()?.len())).unwrap();
+    assert_eq!(count, 1, "no second copy");
+}
+
+#[test]
+fn copies_left_by_an_earlier_send_are_cleaned_up() {
+    let (svc, ids) = setup();
+    // A duplicate adopted from a server draft that has since been sent: no server copy remains.
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()) }).unwrap();
+    let (_, raw) = mail_core::ids::split(&d.id).unwrap();
+    svc.with_account(&ids.coda, |db| {
+        let (mut stray, _) = db.get_draft(raw)?;
+        stray.edited = true;
+        stray.saved_to_server = true;
+        db.save_draft("srv-gone", &stray, None, "user")?;
+        db.set_draft_server_id("srv-gone", "srv-gone")
+    })
+    .unwrap();
+    // One whose server copy is still there stays (a draft made in Outlook, opened here).
+    svc.store_messages(
+        &ids.coda,
+        &[mail_core::db::account::MessageRecord { id: "srv-live".into(), folder_id: "drafts".into(), conversation_id: "c-live".into(), received_at: "2026-11-22T10:00:00Z".into(), is_draft: true, ..Default::default() }],
+    )
+    .unwrap();
+    svc.get_draft(&format!("{}:srv-live", ids.coda)).unwrap();
+    let dropped = svc.with_account(&ids.coda, |db| db.drop_orphaned_adopted_drafts()).unwrap();
+    assert_eq!(dropped, 1);
+    let left: Vec<String> = svc.with_account(&ids.coda, |db| Ok(db.list_drafts()?.into_iter().map(|d| d.id).collect())).unwrap();
+    assert!(left.iter().any(|id| id.ends_with("srv-live")));
+    assert!(!left.iter().any(|id| id.ends_with("srv-gone")));
+}
+
+#[test]
 fn sent_drafts_leave_the_thread_held_ones_stay() {
     let (svc, ids) = setup();
     let src = format!("{}:m-agenda", ids.harbour);

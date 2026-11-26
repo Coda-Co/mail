@@ -105,7 +105,7 @@ interface Props {
 export function Compose({ initial, layout, onDone, autoFocus }: Props) {
   const { draft, update, replace, save, saveState, touched } = useDraft(initial);
   const toast = useToast();
-  const { sync } = useApp();
+  const { sync, openSettings } = useApp();
   const editor = useRef<RichEditorHandle>(null);
   const root = useRef<HTMLDivElement>(null);
   const [showCc, setShowCc] = useState(initial.cc.length > 0);
@@ -271,7 +271,7 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
     <div className="field-row">
       <span className="field-label">From</span>
       <AccountPicker accountId={draft.accountId} onChange={changeAccount} />
-      <SignaturePicker accountId={draft.accountId} signatureId={draft.signatureId} onChange={changeSignature} />
+      <SignaturePicker accountId={draft.accountId} signatureId={draft.signatureId} onChange={changeSignature} onManage={() => openSettings('signatures')} />
     </div>
   );
   const toRow = (
@@ -349,9 +349,8 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
           <span className="kbd-hint">{keyLabel('Mod+Enter')}</span>
           <span className="spacer" />
           <span className="kbd-hint">{saveLabel}</span>
-          <button type="button" className="btn btn-ghost" onClick={attach}>
-            <Paperclip size={15} />
-            Attach
+          <button type="button" className="btn btn-ghost btn-icon" aria-label="Attach a file" title="Attach a file" onClick={attach}>
+            <Paperclip size={16} />
           </button>
           <button type="button" className="btn btn-ghost" onClick={dockBack}>
             Dock back
@@ -409,7 +408,7 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
         </button>
         <span className="kbd-hint">{keyLabel('Mod+Enter')}</span>
         <span className="spacer" />
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="Attach a file" onClick={attach}>
+        <button type="button" className="btn btn-ghost btn-icon" aria-label="Attach a file" title="Attach a file" onClick={attach}>
           <Paperclip size={16} />
         </button>
         <span className="kbd-hint">{saveLabel}</span>
