@@ -78,6 +78,8 @@
   --reading-max-w: 920px;
   /* Space either side of the text in the reading pane. */
   --reading-pad: 40px;
+  /* Widest the calendar grid gets, beside its list of calendars. */
+  --calendar-max-w: 1320px;
   /* Space left of the message list card, and above it (matches the reading column's top padding). */
   --list-gutter: 32px;
   --list-top: 24px;
@@ -3096,6 +3098,63 @@ h3 {
   height: 100%;
 }
 
+/* ---------- Calendar and People: the same card as Mail ---------- */
+
+/* Centred on the canvas, one card split by a hairline, running off the bottom of the window. */
+.calendar-view,
+.people-view {
+  background: var(--reading-canvas);
+  box-sizing: border-box;
+  padding-right: var(--list-gutter);
+}
+
+.calendar-view {
+  padding-left: max(var(--list-gutter), (100% - var(--sidebar-w) - var(--calendar-max-w)) / 2);
+}
+
+.people-view {
+  padding-left: max(var(--list-gutter), (100% - var(--list-w) - var(--reading-max-w)) / 2);
+}
+
+/* Left half: the list. Each half keeps its own shadow, trimmed where they meet. */
+.calendar-view .cal-sidebar,
+.people-view .people-list {
+  margin-top: var(--list-top);
+  background: var(--message-card);
+  border: 1px solid var(--border-subtle);
+  border-right: none;
+  border-bottom: none;
+  border-radius: var(--r-card) 0 0 0;
+  box-shadow: var(--shadow-card);
+  clip-path: inset(-24px 0 -24px -24px);
+  overflow: hidden;
+}
+
+/* Right half: what the list opens; its left edge is the hairline. */
+.calendar-view .calendar-main,
+.people-view .person-detail {
+  margin-top: var(--list-top);
+  background: var(--message-card);
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+  border-radius: 0 var(--r-card) 0 0;
+  box-shadow: var(--shadow-card);
+  clip-path: inset(-24px -24px -24px 0);
+}
+
+.calendar-view .calendar-main {
+  max-width: var(--calendar-max-w);
+  overflow: hidden;
+}
+
+.people-view .person-detail {
+  flex: 0 1 var(--reading-max-w);
+}
+
+.calendar-view .sidebar-resizer {
+  margin-top: var(--list-top);
+}
+
 .week-pane {
   flex: 1;
   min-width: 0;
@@ -3550,7 +3609,6 @@ h3 {
   flex: 0 1 var(--list-w);
   max-width: var(--list-w);
   min-width: 280px;
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -3749,6 +3807,28 @@ h3 {
 
 
 @media (max-width: 959px) {
+  /* Calendar and People: flat, full width, like Mail. */
+  .calendar-view,
+  .people-view {
+    padding: 0;
+  }
+
+  .calendar-view .cal-sidebar,
+  .people-view .people-list,
+  .calendar-view .calendar-main,
+  .people-view .person-detail {
+    margin-top: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    clip-path: none;
+    max-width: none;
+  }
+
+  .calendar-view .cal-sidebar {
+    border-right: 1px solid var(--border);
+  }
+
   :root {
     --sidebar-w: 200px;
   }
