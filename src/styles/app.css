@@ -463,7 +463,7 @@ h3 {
 .mailbox-tab .count {
   font-size: var(--fs-caption);
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 
@@ -902,7 +902,7 @@ h3 {
   padding: 0 5px;
   border-radius: 9px;
   background: var(--bg);
-  color: var(--text-secondary);
+  color: var(--accent);
   border: 1px solid var(--tag-border);
   font-size: var(--fs-caption);
   font-weight: 600;
@@ -1305,6 +1305,12 @@ h3 {
   line-height: 15px;
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+/* Unread counts are in the accent colour; other counts (drafts, outbox) stay quiet. */
+.folder-count.unread,
+.folder-tab.selected .folder-count.unread {
+  color: var(--accent);
 }
 
 .folder-tab.selected .folder-count {

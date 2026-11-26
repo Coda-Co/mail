@@ -100,7 +100,7 @@ export function FolderBar({ scope, folders, onChange }: { scope: ViewScope; fold
             onClick={() => (target ? go({ role: target.role }, target.tab) : go({ role: key as FolderRole }))}
           >
             <Icon size={17} />
-            {count > 0 && <span className="folder-count">{count > 99 ? '99+' : count}</span>}
+            {count > 0 && <span className={`folder-count${key === 'inbox' ? ' unread' : ''}`}>{count > 99 ? '99+' : count}</span>}
           </button>
         );
       })}
