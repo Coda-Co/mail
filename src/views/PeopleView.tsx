@@ -9,6 +9,10 @@ import { MessageRow } from '../components/MessageList';
 import { listTime } from '../lib/dates';
 import { plural } from '../lib/text';
 
+/** Recent mail shown with a person, then this many more per Show more. */
+const RECENT = 10;
+const MORE = 20;
+
 export function PeopleView() {
   const app = useApp();
   const toast = useToast();
@@ -18,6 +22,10 @@ export function PeopleView() {
   const [person, setPerson] = useState<Person | null>(null);
   // Recent mail with the selected person; null while loading.
   const [recent, setRecent] = useState<MessageSummary[] | null>(null);
+  const [recentFailed, setRecentFailed] = useState(false);
+  // How many to show: the latest few, and Show more for the next lot.
+  const [limit, setLimit] = useState(RECENT);
+  const [retry, setRetry] = useState(0);
   const loadedFor = useRef<string | null>(null);
 
   useEffect(() => {
@@ -26,8 +34,16 @@ export function PeopleView() {
   }, [q, app.mailVersion]);
 
   useEffect(() => {
-    // A new person: clear the last one's mail. A sync refreshes in place, without the spinner.
-    if (loadedFor.current !== selectedEmail) setRecent(null);
+    // A new person: clear the last one's mail and start from the latest few. A sync (or Show
+    // more) refreshes in place, without the spinner.
+    if (loadedFor.current !== selectedEmail) {
+      setRecent(null);
+      if (limit !== RECENT) {
+        loadedFor.current = selectedEmail;
+        setLimit(RECENT);
+        return;
+      }
+    }
     loadedFor.current = selectedEmail;
     if (!selectedEmail) {
       setPerson(null);
@@ -40,15 +56,24 @@ export function PeopleView() {
     api.getPerson(selectedEmail).then((p) => !cancelled && p && setPerson(p));
     // Its own query, not two searches: a search started meanwhile used to cancel one of them,
     // and then this showed no mail at all.
-    api.personMail(selectedEmail, 30).then(
-      (list) => !cancelled && setRecent(list),
-      () => !cancelled && setRecent([]),
+    // One more than shown, to know whether there's more.
+    api.personMail(selectedEmail, limit + 1).then(
+      (list) => {
+        if (cancelled) return;
+        setRecentFailed(false);
+        setRecent(list);
+      },
+      () => {
+        if (cancelled) return;
+        setRecentFailed(true);
+        setRecent([]);
+      },
     );
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEmail, app.mailVersion]);
+  }, [selectedEmail, app.mailVersion, limit, retry]);
 
   const select = (email: string | null) => app.navigate(email ? { view: 'people', param: email } : { view: 'people' });
 
@@ -119,15 +144,23 @@ export function PeopleView() {
                   </span>
                 </div>
               )}
-              {recent?.map((m) => (
-                <MessageRow
-                  key={m.id}
-                  m={m}
-                  selected={false}
-                  onSelect={() => api.popOut('message', m.id)}
-                />
+              {recent?.slice(0, limit).map((m) => (
+                <MessageRow key={m.id} m={m} selected={false} onSelect={() => api.popOut('message', m.id)} />
               ))}
-              {recent?.length === 0 && <div className="list-empty">No messages in the offline window</div>}
+              {recent && recent.length > limit && (
+                <button type="button" className="agenda-more person-more" onClick={() => setLimit((n) => n + MORE)}>
+                  Show more
+                </button>
+              )}
+              {recentFailed && (
+                <div className="list-empty">
+                  Couldn’t load mail with {person.name || person.email}.{' '}
+                  <button type="button" className="link-button" onClick={() => setRetry((n) => n + 1)}>
+                    Try again
+                  </button>
+                </div>
+              )}
+              {!recentFailed && recent?.length === 0 && <div className="list-empty">No mail with {person.name || person.email} yet</div>}
             </div>
           </>
         ) : (

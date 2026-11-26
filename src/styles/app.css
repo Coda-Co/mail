@@ -2222,6 +2222,10 @@ h3 {
   cursor: pointer;
 }
 
+.person-more {
+  margin: 12px 0 0;
+}
+
 .agenda-more:hover {
   color: var(--text);
   text-decoration: underline;
