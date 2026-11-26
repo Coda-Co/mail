@@ -315,6 +315,7 @@ export function MailView() {
           </div>
         )}
         <MessageList
+          draftTags={searchActive || scope.tab !== 'outbox'}
           messages={list}
           selectedId={selection?.id ?? null}
           onSelect={select}
@@ -337,7 +338,9 @@ export function MailView() {
                   ? 'Add a mailbox with + in the sidebar'
                   : scope.tab === 'unread'
                     ? 'No unread messages'
-                    : `Nothing in ${folderName}`
+                    : scope.tab === 'outbox'
+                      ? 'Nothing waiting to send'
+                      : `Nothing in ${folderName}`
           }
           header={searchActive && result && !searchPending ? <ContactCard result={result} onEmail={(email, name) => newMessage({ email, name })} /> : undefined}
           footer={

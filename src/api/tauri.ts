@@ -43,6 +43,7 @@ export const tauriApi: MailApi = {
   removeAttachment: (draftId, attachmentId) => call('remove_attachment', { draftId, attachmentId }),
   discardDraft: (draftId) => call('discard_draft', { draftId }),
   sendDraft: (draftId) => call('send_draft', { draftId }),
+  cancelSend: (draftId) => call('cancel_send', { draftId }),
 
   search: (query) => call('search', { query }),
   searchServer: (query) => call('search_server', { query }),

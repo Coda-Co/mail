@@ -155,6 +155,7 @@ pub fn run() {
             commands::remove_attachment,
             commands::discard_draft,
             commands::send_draft,
+            commands::cancel_send,
             commands::search,
             commands::search_server,
             commands::list_people,

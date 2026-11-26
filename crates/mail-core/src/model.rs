@@ -173,6 +173,9 @@ pub struct Folder {
     pub parent_id: Option<String>,
     pub unread: i64,
     pub total: i64,
+    /// Drafts folder only: messages waiting to send, held ones included.
+    #[serde(default)]
+    pub outbox: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -201,6 +204,8 @@ pub enum ListTab {
     All,
     Unread,
     Flagged,
+    /// Drafts folder only: messages sent but not yet gone (queued, sending, or held).
+    Outbox,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

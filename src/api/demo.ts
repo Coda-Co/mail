@@ -145,6 +145,47 @@ function summary(m: Message): MessageSummary {
   return { id, accountId, folderId, conversationId, from, to, subject, snippet, receivedAt, isRead, isFlagged, hasAttachments, isDraft, hasDraft };
 }
 
+/** The demo's outbox: a queued draft goes after a short wait, unless taken back to edit. */
+function scheduleDemoSend(draftId: string, delay = 2500) {
+  setTimeout(() => {
+    const d = state.drafts.find((x) => x.id === draftId);
+    if (!d || d.status !== 'queued') return;
+    if (hasWindow && !navigator.onLine) return scheduleDemoSend(draftId, 5000);
+    d.status = 'sent';
+    const sent = folderOf(d.accountId, 'sent');
+    const me = myAddress(d.accountId);
+    state.messages.push({
+      id: `msg-${Math.random().toString(36).slice(2, 9)}`,
+      accountId: d.accountId,
+      folderId: sent?.id ?? '',
+      conversationId: d.conversationId ?? `conv-${d.id}`,
+      from: me,
+      to: d.to,
+      cc: d.cc,
+      bcc: d.bcc,
+      replyTo: [],
+      subject: d.subject || '(no subject)',
+      snippet: htmlToText(d.bodyHtml).slice(0, 140),
+      receivedAt: now().toISOString(),
+      isRead: true,
+      isFlagged: false,
+      hasAttachments: d.attachments.length > 0,
+      isDraft: false,
+      bodyHtml: d.bodyHtml,
+      remoteImagesBlocked: false,
+      attachments: d.attachments,
+    });
+    if (d.sourceMessageId) {
+      const src = state.messages.find((m) => m.id === d.sourceMessageId);
+      if (src) src.isRead = true;
+    }
+    state.drafts = state.drafts.filter((x) => x.id !== draftId);
+    save();
+    changed([d.accountId]);
+    emit(EVENTS.draftDocked, { draftId });
+  }, delay);
+}
+
 function draftSummary(d: Draft): MessageSummary {
   return {
     id: d.id,
@@ -479,7 +520,14 @@ export const demoApi: MailApi = {
   },
 
   async listFolders(accountId) {
-    if (accountId) return clone(state.folders.filter((f) => f.accountId === accountId));
+    // Drafts counts drafts still being written; outbox, the ones sent but not yet gone.
+    const withDrafts = (f: Folder): Folder => {
+      if (f.role !== 'drafts') return f;
+      const mine = state.drafts.filter((d) => d.accountId === f.accountId && d.status !== 'sent');
+      const out = mine.filter((d) => d.status === 'queued' || d.status === 'sending' || d.status === 'unknown').length;
+      return { ...f, unread: mine.length - out, total: mine.length - out, outbox: out };
+    };
+    if (accountId) return clone(state.folders.filter((f) => f.accountId === accountId).map(withDrafts));
     // Same shape as mail-core's list_folders: one summed folder per role across
     // graph accounts, user folders left out, in sidebar role order.
     const sums: Folder[] = [];
@@ -503,7 +551,9 @@ export const demoApi: MailApi = {
     let list: MessageSummary[];
     if (isDrafts || draftFolder?.role === 'drafts') {
       const accounts = scope.accountId ? [scope.accountId] : graphIds();
-      list = state.drafts.filter((d) => accounts.includes(d.accountId) && d.status !== 'sent').map(draftSummary);
+      // Drafts still being written; the Outbox tab is the ones sent but not yet gone.
+      const outbox = (s: Draft['status']) => s === 'queued' || s === 'sending' || s === 'unknown';
+      list = state.drafts.filter((d) => accounts.includes(d.accountId) && d.status !== 'sent' && outbox(d.status) === (scope.tab === 'outbox')).map(draftSummary);
     } else {
       list = state.messages.filter((m) => inScope(m, scope)).map(summary);
     }
@@ -723,46 +773,24 @@ export const demoApi: MailApi = {
   async sendDraft(draftId) {
     const d = getDraftState(draftId);
     if (d.to.length + d.cc.length + d.bcc.length === 0) throw new Error('Add at least one recipient.');
-    const online = !hasWindow || navigator.onLine;
-    if (!online) {
-      d.status = 'queued';
-      save();
-      changed([d.accountId]);
-      return clone(d);
-    }
-    d.status = 'sent';
-    const sent = folderOf(d.accountId, 'sent');
-    const me = myAddress(d.accountId);
-    state.messages.push({
-      id: `msg-${Math.random().toString(36).slice(2, 9)}`,
-      accountId: d.accountId,
-      folderId: sent?.id ?? '',
-      conversationId: d.conversationId ?? `conv-${d.id}`,
-      from: me,
-      to: d.to,
-      cc: d.cc,
-      bcc: d.bcc,
-      replyTo: [],
-      subject: d.subject || '(no subject)',
-      snippet: htmlToText(d.bodyHtml).slice(0, 140),
-      receivedAt: now().toISOString(),
-      isRead: true,
-      isFlagged: false,
-      hasAttachments: d.attachments.length > 0,
-      isDraft: false,
-      bodyHtml: d.bodyHtml,
-      remoteImagesBlocked: false,
-      attachments: d.attachments,
-    });
-    if (d.sourceMessageId) {
-      const src = state.messages.find((m) => m.id === d.sourceMessageId);
-      if (src) src.isRead = true;
-    }
-    const result = clone(d);
-    state.drafts = state.drafts.filter((x) => x.id !== draftId);
+    // Into the Outbox; it goes a moment later (or when back online), like the real outbox.
+    d.status = 'queued';
+    d.error = undefined;
+    save();
     changed([d.accountId]);
-    emit(EVENTS.draftDocked, { draftId });
+    const result = clone(d);
+    scheduleDemoSend(d.id);
     return result;
+  },
+  async cancelSend(draftId) {
+    const d = getDraftState(draftId);
+    if (d.status !== 'queued' && d.status !== 'unknown') throw new Error('This message is already being sent');
+    d.status = 'editing';
+    d.error = undefined;
+    save();
+    changed([d.accountId]);
+    emit(EVENTS.draftChanged, { draftId });
+    return clone(d);
   },
 
   async search(query) {

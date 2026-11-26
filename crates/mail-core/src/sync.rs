@@ -137,6 +137,9 @@ impl<'a> Syncer<'a> {
         self.sync_me().await?;
         self.sync_folders().await?;
         self.sync_messages(report).await?;
+        if self.db(|db| db.drop_orphaned_adopted_drafts())? > 0 {
+            report.messages_changed += 1;
+        }
         self.sync_attachments(ATTACHMENT_BUDGET_FULL, report).await?;
         self.sync_calendars(report).await?;
         self.prune_bodies()?;
@@ -990,11 +993,24 @@ impl<'a> Syncer<'a> {
             return Ok(());
         }
         // Make sure the server copy is current. A failure here is safe to retry: nothing was sent.
+        if draft.status == DraftStatus::Sending {
+            // A send cut off part way (the app quit): it may have gone. Held, never repeated;
+            // reconcile_held_sends settles it from the server.
+            self.hold(raw_id, op_id, "interrupted while sending")?;
+            return Ok(());
+        }
+        if draft.status != DraftStatus::Queued {
+            // Taken back to edit (or held for the user): not ours to send.
+            return Ok(());
+        }
         let server_id = match (server_id, draft.saved_to_server) {
             (Some(s), true) => s,
             _ => self.save_draft(raw_id).await?,
         };
-        self.db(|db| db.set_draft_status(raw_id, DraftStatus::Sending, None))?;
+        // Taken back to edit while we were saving: don't send.
+        if !self.db(|db| db.claim_draft_for_send(raw_id))? {
+            return Ok(());
+        }
         self.svc.events().draft_changed(&ids::join(self.acc(), raw_id));
         match self.graph.post(&format!("/me/messages/{}/send", quote(&server_id)), &json!({})).await {
             Ok(_) => {
@@ -1038,6 +1054,7 @@ impl<'a> Syncer<'a> {
         let attachments = self.db(|db| db.get_draft(raw_id)).map(|(d, _)| d.attachments).unwrap_or_default();
         self.db(|db| {
             db.delete_draft(raw_id)?;
+            db.delete_drafts_for_server_id(server_id)?;
             db.delete_message(server_id)?;
             for op in db.ops_for_draft(raw_id)? {
                 db.op_done(op.id)?;
@@ -1048,6 +1065,8 @@ impl<'a> Syncer<'a> {
         self.svc.delete_dropped_copies(&attachments);
         self.svc.events().draft_changed(&ids::join(self.acc(), raw_id));
         self.svc.events().sync_status();
+        // Out of the Outbox; lists and counts refresh.
+        self.svc.events().mail_changed(&[self.acc().to_string()]);
         Ok(())
     }
 

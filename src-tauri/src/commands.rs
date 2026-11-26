@@ -334,6 +334,11 @@ pub async fn send_draft(app: AppHandle, s: State<'_, AppState>, draft_id: String
     Ok(d)
 }
 
+#[tauri::command]
+pub async fn cancel_send(s: State<'_, AppState>, draft_id: String) -> R<Draft> {
+    s.svc.cancel_send(&draft_id)
+}
+
 // ---------------------------------------------------------------- search & people
 
 #[tauri::command]

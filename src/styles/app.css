@@ -2510,6 +2510,63 @@ h3 {
   border-color: var(--accent);
 }
 
+/* ---------- Outbox item (sent, not yet gone) ---------- */
+
+.outbox-item {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px 20px;
+  background: var(--message-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+
+.outbox-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-button);
+  background: var(--panel-muted);
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+}
+
+.outbox-status .text {
+  flex: 1;
+}
+
+.outbox-item.held .outbox-status {
+  background: var(--warning-bg, var(--panel-muted));
+  color: var(--text);
+}
+
+.outbox-item.held .outbox-status svg {
+  color: var(--warning);
+}
+
+.outbox-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-meta);
+  color: var(--text-secondary);
+}
+
+.outbox-head .label {
+  display: inline-block;
+  width: 32px;
+  color: var(--text-muted);
+}
+
+.outbox-attachments {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* ---------- Date and time pickers (event form) ---------- */
 
 .when-row {
