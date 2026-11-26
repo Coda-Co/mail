@@ -273,10 +273,13 @@ h3 {
 
 /* Offset by the field picker's width, so opening search grows the box leftwards
    (picker first, like Outlook) while the text field stays where it was. */
+/* Search sits on the right of the bar in every view, beside sync and New email. Its field
+   picker (From, Everything…) opens out to its left, into the free space. */
 .topbar-search {
-  flex: 0 1 640px;
-  min-width: 0;
-  margin-left: var(--search-scope-w);
+  flex: 0 6 480px;
+  /* Shrinks before the mailbox tabs do. */
+  min-width: 220px;
+  margin-left: auto;
 }
 
 .search-row {
@@ -380,7 +383,7 @@ h3 {
 }
 
 .topbar .spacer {
-  flex: 1;
+  flex: 0 0 4px;
 }
 
 /* ---------- Mailbox tabs (top bar, while Mail is open) ---------- */
@@ -496,19 +499,6 @@ h3 {
 .mailbox-tabs.overflowing.at-end {
   -webkit-mask-image: none;
   mask-image: none;
-}
-
-/* With tabs on the left, search moves to the right, beside sync and New email. */
-.mailbox-tabs ~ .topbar-search {
-  flex-basis: 480px;
-  /* Search gives up space before the tabs do. */
-  flex-shrink: 6;
-  min-width: 220px;
-  margin-left: auto;
-}
-
-.mailbox-tabs ~ .spacer {
-  flex: 0 0 4px;
 }
 
 .sync-indicator {
