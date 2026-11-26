@@ -2085,54 +2085,64 @@ h3 {
 .agenda {
   flex: 0 0 var(--agenda-w);
   width: var(--agenda-w);
-  border-left: 1px solid var(--border);
-  background: var(--panel-muted);
-  padding: 28px 18px;
+  /* No panel: the agenda sits on the canvas beside the mail, top aligned with the subject. */
+  background: var(--reading-canvas);
+  padding: 24px 22px 24px 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 18px;
   overflow-y: auto;
 }
 
-.agenda-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 8px;
-}
-
-.agenda-header button {
-  font-size: var(--fs-reading);
-  font-weight: 600;
-  color: var(--text);
-  border: none;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.agenda-header .date {
-  font-size: var(--fs-small);
-  color: var(--text-muted);
+/* The canvas runs behind the resize handle between the mail and the agenda too. */
+.mail-view {
+  background: var(--reading-canvas);
 }
 
 .agenda-day {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 0 8px;
-  border-top: 1px solid var(--border-subtle);
 }
 
 .agenda-day .label {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
   font-size: var(--fs-small);
   font-weight: 600;
   color: var(--text-muted);
+  cursor: pointer;
+}
+
+.agenda-day .label:hover {
+  color: var(--text);
 }
 
 .agenda-day .none {
   font-size: var(--fs-meta);
   color: var(--text-muted);
+}
+
+/* Quiet: muted text, not a call to action. */
+.agenda-more {
+  align-self: flex-start;
+  margin-top: -6px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.agenda-more:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .event-results {
@@ -2247,7 +2257,7 @@ h3 {
 
 .agenda-event .title {
   font-size: var(--fs-meta);
-  font-weight: 500;
+  font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

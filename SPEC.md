@@ -100,7 +100,7 @@ Each account has one of two backends. The interface treats them the same where i
 - Create and edit events, with invitations sent through the server.
   - Click an empty slot in day or week view for a half-hour event at that quarter hour (a faint block under the pointer shows where); click an empty part of a day in month view for 09:00, or the all-day row for an all-day event. Double-click an event to edit it.
   - Times are quarter hours. The event form has a date button that opens a month calendar (arrow keys, Page Up/Down, Today) and time fields you can type into ("930", "2:30pm", rounded to the quarter hour; arrow keys step 15 min) or pick from a list; end times show the resulting length. Moving the start keeps the length.
-- **Agenda panel** on the right of the mail view: Today, Tomorrow, then by weekday; time, account colour bar, title, location. Click through to the calendar.
+- **Agenda** on the right of the mail view, straight on the canvas with no panel or header: Today and Tomorrow, with a quiet Show more for the rest of the five days (remembered); time, account colour bar, title, location. A day label or an event opens the calendar there.
 - Reminders as desktop notifications.
 
 ### 3.5 Web accounts
