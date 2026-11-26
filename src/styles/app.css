@@ -84,7 +84,7 @@
 
   --reading-canvas: #f6f5f4;
   /* The top bar: a shade darker than the canvas below it. */
-  --topbar: #edebe8;
+  --topbar: #e6e4e0;
   --message-card: #ffffff;
   --scrollbar-thumb: rgba(38, 36, 33, 0.14);
   --scrollbar-thumb-hover: rgba(38, 36, 33, 0.32);
@@ -141,7 +141,7 @@
   --logo-text: #1c1a17;
   --overlay: rgba(0, 0, 0, 0.5);
   --reading-canvas: #151412;
-  --topbar: #0e0d0c;
+  --topbar: #0b0a09;
   --message-card: #22201d;
   --scrollbar-thumb: rgba(255, 255, 255, 0.12);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
