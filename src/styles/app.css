@@ -83,6 +83,8 @@
   --hour-h: 56px;
 
   --reading-canvas: #f6f5f4;
+  /* The top bar: a shade darker than the canvas below it. */
+  --topbar: #edebe8;
   --message-card: #ffffff;
   --scrollbar-thumb: rgba(38, 36, 33, 0.14);
   --scrollbar-thumb-hover: rgba(38, 36, 33, 0.32);
@@ -139,6 +141,7 @@
   --logo-text: #1c1a17;
   --overlay: rgba(0, 0, 0, 0.5);
   --reading-canvas: #151412;
+  --topbar: #0e0d0c;
   --message-card: #22201d;
   --scrollbar-thumb: rgba(255, 255, 255, 0.12);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
@@ -263,8 +266,8 @@ h3 {
   height: 56px;
   padding: 0 20px;
   border-bottom: 1px solid var(--border);
-  /* The same canvas as the mail beneath it; search sits on it as a white field. */
-  background: var(--reading-canvas);
+  /* A shade darker than the canvas beneath it; search sits on it as a white field. */
+  background: var(--topbar);
 }
 
 .topbar .search-trigger,
