@@ -3010,7 +3010,13 @@ h3 {
   background-color: var(--today-col);
 }
 
-/* Where a double-click would add an event: a faint half-hour block under the pointer. */
+/* Where a click would add an event: a faint half-hour block under the pointer. */
+.day-column,
+.all-day-row .cell,
+.month-cell {
+  cursor: pointer;
+}
+
 .slot-ghost {
   display: none;
   position: absolute;

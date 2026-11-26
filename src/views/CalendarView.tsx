@@ -428,7 +428,7 @@ export function CalendarView() {
             <div
               key={d.toISOString()}
               className="cell"
-              onDoubleClick={(ev) => {
+              onClick={(ev) => {
                 if (ev.target === ev.currentTarget) newEvent({ start: startOfDay(d), allDay: true });
               }}
             >
@@ -459,15 +459,15 @@ export function CalendarView() {
                 key={d.toISOString()}
                 className={`day-column${isToday ? ' today' : ''}`}
                 style={{ height: 24 * HOUR }}
-                onDoubleClick={(ev) => {
-                  // Double-click an empty slot: a new half-hour event starting at the quarter hour clicked.
+                onClick={(ev) => {
+                  // Click an empty slot: a new half-hour event starting at the quarter hour clicked.
                   if (ev.target !== ev.currentTarget) return;
                   const start = new Date(d);
                   start.setMinutes(slotAt(ev));
                   newEvent({ start });
                 }}
                 onMouseMove={(ev) => {
-                  // Shows where a double-click would put the event. Moved directly, not re-rendered.
+                  // Shows where a click would put the event. Moved directly, not re-rendered.
                   const ghost = ev.currentTarget.querySelector<HTMLElement>(':scope > .slot-ghost');
                   if (!ghost) return;
                   if (ev.target !== ev.currentTarget || !canCreate) return void (ghost.style.display = 'none');
@@ -538,8 +538,8 @@ export function CalendarView() {
             <div
               key={d.toISOString()}
               className={`month-cell${d.getMonth() !== anchor.getMonth() ? ' other' : ''}${sameDay(d, today) ? ' today' : ''}`}
-              onDoubleClick={(ev) => {
-                // Double-click a day: a new event that day at 09:00.
+              onClick={(ev) => {
+                // Click an empty part of a day: a new event that day at 09:00.
                 if (ev.target === ev.currentTarget) newEvent({ start: new Date(startOfDay(d).getTime() + 9 * 3600000) });
               }}
             >
