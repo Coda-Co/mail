@@ -8,10 +8,13 @@ export function SignaturePicker({
   accountId,
   signatureId,
   onChange,
+  onManage,
 }: {
   accountId: string;
   signatureId?: string;
   onChange: (id: string | null) => void;
+  /** Open the signature settings, to create or edit signatures. */
+  onManage: () => void;
 }) {
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -26,8 +29,6 @@ export function SignaturePicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId]);
 
-  // Nothing to pick from: the account has no signatures and the draft carries none.
-  if (signatures.length === 0 && !signatureId) return null;
   const current = signatures.find((s) => s.id === signatureId);
   const pick = (id: string | null) => {
     if (id !== (signatureId ?? null)) onChange(id);
@@ -45,7 +46,7 @@ export function SignaturePicker({
           void load();
         }}
       >
-        {current ? current.name : signatureId ? 'Signature' : 'No signature'} ▾
+        {current ? current.name : signatureId ? 'Signature' : signatures.length === 0 ? 'Add signature' : 'No signature'} ▾
       </button>
       {anchor && (
         <Menu
@@ -54,6 +55,7 @@ export function SignaturePicker({
           items={[
             { label: 'No signature', checked: !signatureId, onSelect: () => pick(null) },
             ...signatures.map((s) => ({ label: s.name, checked: s.id === signatureId, onSelect: () => pick(s.id) })),
+            { label: signatures.length === 0 ? 'Create a signature…' : 'Manage signatures…', separatorBefore: true, onSelect: onManage },
           ]}
         />
       )}
