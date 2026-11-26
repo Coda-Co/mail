@@ -121,7 +121,7 @@ Each account has one of two backends. The interface treats them the same where i
 - Keyboard shortcuts identical on both platforms (Ctrl on Windows, Cmd on Mac):
   - Ctrl+N new message, Ctrl+R reply, Ctrl+Shift+R reply all, Ctrl+F forward (to confirm: clashes with find)
   - E archive, Delete delete, Ctrl+Z undo (archive, delete, move), Ctrl+Enter send, Ctrl+E search, Esc close or clear (closes a draft: an unchanged reply or forward, or a new message with no content, is discarded; anything else is saved. Closes a pop-out window)
-  - Ctrl+1 calendar, Ctrl+2 people, Ctrl+3 to Ctrl+9 the mailboxes in tab order
+  - Ctrl+1 mail, Ctrl+2 calendar, Ctrl+3 people (the rail top to bottom), Ctrl+4 to Ctrl+9 the mailboxes in tab order
 - Narrow windows: agenda panel folds away first, then the reading pane stacks.
 
 ## 5. Architecture

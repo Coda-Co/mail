@@ -9,7 +9,7 @@ import type { MailboxSlot } from '../lib/shortcuts';
 import { Menu, useToast, type Anchor, type MenuItem } from './ui';
 import { RemoveAccountDialog, ApprovalDialog } from '../views/AccountDialogs';
 
-const SLOTS: MailboxSlot[] = [1, 2, 3, 4, 5, 6, 7];
+const SLOTS: MailboxSlot[] = [1, 2, 3, 4, 5, 6];
 
 function badgeText(n: number): string {
   return n > 99 ? '99+' : String(n);
@@ -23,7 +23,7 @@ function tabName(a: Account, all: Account[]): string {
 
 /**
  * One tab per mailbox, in the top bar while Mail is open. Each mailbox is its own space;
- * there's no combined inbox. Mod+3..9 open them from anywhere.
+ * there's no combined inbox. Mod+4..9 open them from anywhere.
  */
 export function MailboxTabs() {
   const app = useApp();
@@ -107,7 +107,7 @@ export function MailboxTabs() {
     if (a.syncState === 'needsAuth') lines.push(`Sign-in needed${a.syncError ? `: ${a.syncError}` : ''}. Right-click to sign in again.`);
     else if (a.syncState === 'error' && a.syncError) lines.push(a.syncError);
     if (a.unread) lines.push(`${a.unread} unread`);
-    if (i < SLOTS.length) lines.push(keyLabel(`Mod+${i + 3}`));
+    if (i < SLOTS.length) lines.push(keyLabel(`Mod+${i + 4}`));
     return lines.join('\n');
   };
 

@@ -84,6 +84,8 @@
 
   --reading-canvas: #f6f5f4;
   --message-card: #ffffff;
+  --scrollbar-thumb: rgba(38, 36, 33, 0.14);
+  --scrollbar-thumb-hover: rgba(38, 36, 33, 0.32);
   --shadow-card: 0 1px 2px rgba(38, 36, 33, 0.06), 0 2px 8px rgba(38, 36, 33, 0.05);
   --shadow-card-hover: 0 1px 3px rgba(38, 36, 33, 0.08), 0 4px 12px rgba(38, 36, 33, 0.07);
   --shadow-draft: 0 2px 8px rgba(38, 36, 33, 0.06);
@@ -138,6 +140,8 @@
   --overlay: rgba(0, 0, 0, 0.5);
   --reading-canvas: #151412;
   --message-card: #22201d;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
   --shadow-card-hover: 0 1px 3px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.35);
   --shadow-draft: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -148,6 +152,38 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* Quiet scrollbars: no track or arrow buttons, a thin rounded thumb that darkens while you're
+   over the area it scrolls. (The desktop app's web views, WebView2 and WebKit, both use these.) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  min-height: 32px;
+}
+
+:hover::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--text-muted);
 }
 
 html,
@@ -1104,7 +1140,9 @@ h3 {
 }
 
 /* The list and the reading column share the reading canvas. On wide windows the pair is
-   centred, so the list sits beside the message cards instead of against the left edge. */
+   centred, so the list sits beside the message cards instead of against the left edge.
+   The panes still run the full width, so the reading pane scrolls at the window's edge,
+   not in the middle: the centring is left padding, and the reading column sits left in its pane. */
 .mail-center {
   background: var(--reading-canvas);
 }
@@ -1113,11 +1151,12 @@ h3 {
   flex: 1;
   min-height: 0;
   display: flex;
-  width: 100%;
-  max-width: calc(var(--list-gutter) + var(--list-w) + var(--reading-max-w));
-  margin: 0 auto;
-  padding-left: var(--list-gutter);
+  padding-left: max(var(--list-gutter), (100% - var(--list-w) - var(--reading-max-w)) / 2);
   box-sizing: border-box;
+}
+
+.mail-panes .reading-content {
+  margin-left: 0;
 }
 
 /* The list is a card like the messages, but runs off the bottom of the window: square
@@ -3331,7 +3370,6 @@ h3 {
   }
 
   .mail-panes {
-    max-width: none;
     padding-left: 0;
   }
 
