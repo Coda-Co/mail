@@ -315,6 +315,28 @@ pub async fn add_attachment_data(s: State<'_, AppState>, request: tauri::ipc::Re
     s.svc.add_attachment_bytes(&draft_id, &name, bytes)
 }
 
+/// Attach the files on the system clipboard: copied in Explorer or Finder, or copied from a
+/// message here. `None` when the clipboard holds no files, so the caller can fall back to what
+/// the web view saw (a screenshot, say). Folders are skipped.
+#[tauri::command]
+pub async fn paste_attachments(app: AppHandle, s: State<'_, AppState>, draft_id: String) -> R<Option<Draft>> {
+    // The clipboard context lives on the main thread; see copy_attachments.
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(crate::clipboard::get_files());
+    })
+    .map_err(|e| Error::Other(e.to_string()))?;
+    let paths = rx.await.map_err(|e| Error::Other(e.to_string()))??;
+    if paths.is_empty() {
+        return Ok(None);
+    }
+    let mut d = s.svc.get_draft(&draft_id)?;
+    for path in paths.iter().filter(|p| p.is_file()) {
+        d = s.svc.add_attachment(&draft_id, path)?;
+    }
+    Ok(Some(d))
+}
+
 #[tauri::command]
 pub async fn remove_attachment(s: State<'_, AppState>, draft_id: String, attachment_id: String) -> R<Draft> {
     s.svc.remove_attachment(&draft_id, &attachment_id)

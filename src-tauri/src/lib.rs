@@ -155,6 +155,7 @@ pub fn run() {
             commands::set_draft_signature,
             commands::add_attachment,
             commands::add_attachment_data,
+            commands::paste_attachments,
             commands::remove_attachment,
             commands::discard_draft,
             commands::send_draft,

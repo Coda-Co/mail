@@ -762,6 +762,10 @@ export const demoApi: MailApi = {
     save();
     return clone(d);
   },
+  // The browser can't read file paths off the clipboard; the paste event's own files are used.
+  async pasteAttachments() {
+    return null;
+  },
   async removeAttachment(draftId, attachmentId) {
     const d = getDraftState(draftId);
     d.attachments = d.attachments.filter((a) => a.id !== attachmentId);

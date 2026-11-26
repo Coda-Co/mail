@@ -40,6 +40,7 @@ export const tauriApi: MailApi = {
     invoke('add_attachment_data', new Uint8Array(await file.arrayBuffer()), {
       headers: { 'x-draft-id': encodeURIComponent(draftId), 'x-file-name': encodeURIComponent(file.name) },
     }),
+  pasteAttachments: (draftId) => call('paste_attachments', { draftId }),
   removeAttachment: (draftId, attachmentId) => call('remove_attachment', { draftId, attachmentId }),
   discardDraft: (draftId) => call('discard_draft', { draftId }),
   sendDraft: (draftId) => call('send_draft', { draftId }),

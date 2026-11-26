@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import { ExternalLink, Paperclip, X } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
 import type { Draft, Message } from '../api/types';
@@ -186,6 +186,38 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
     replace(await api.addAttachment(draft.id));
   };
 
+  // Files pasted with Ctrl/Cmd+V: copied in Explorer or Finder, copied from a message here, or
+  // a screenshot. Taken in the capture phase, before the editor or an address field sees it.
+  // A paste that carries HTML (a selection from Word or a web page, perhaps with a picture in
+  // it) is left to the editor, so pasting formatted text works as before.
+  const onPaste = (e: ClipboardEvent) => {
+    const data = e.clipboardData;
+    const types = Array.from(data.types);
+    if (types.includes('text/html')) return;
+    const fileUris = /^file:/m.test(data.getData('text/uri-list'));
+    if (!types.includes('Files') && !fileUris) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // Read now: the event's data is gone once the handler returns.
+    const carried = Array.from(data.files);
+    void pasteFiles(carried);
+  };
+  const pasteFiles = async (carried: File[]) => {
+    await save();
+    setError(null);
+    // The system clipboard gives real files with their names, and works where the web view
+    // hands over only an icon or nothing at all (Finder). Fall back to what the event carried.
+    let fromClipboard: Draft | null;
+    try {
+      fromClipboard = await api.pasteAttachments(draft.id);
+    } catch (err) {
+      setError(`Couldn't paste attachments: ${err instanceof Error ? err.message : String(err)}`);
+      return;
+    }
+    if (fromClipboard) replace(fromClipboard);
+    else await attachFiles(carried);
+  };
+
   // Files dragged in from Explorer, Finder or the desktop. Only drags that carry files
   // are taken over, so dragging text within the editor still works as normal.
   const [dropping, setDropping] = useState(false);
@@ -222,6 +254,9 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
     if (files.length === 0) return;
     await save();
     setError(null);
+    await attachFiles(files);
+  };
+  const attachFiles = async (files: File[]) => {
     for (const f of files) {
       try {
         replace(await api.addAttachmentFile(draft.id, f));
@@ -230,7 +265,7 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
       }
     }
   };
-  const dropProps = { onDragEnter, onDragOver, onDragLeave, onDrop };
+  const dropProps = { onDragEnter, onDragOver, onDragLeave, onDrop, onPasteCapture: onPaste };
   const dropHint = dropping && (
     <div className="drop-hint" aria-hidden>
       <Paperclip size={18} />
