@@ -36,6 +36,7 @@ const COMMANDS: &[&str] = &[
     "search_server",
     "list_people",
     "get_person",
+    "person_mail",
     "list_calendars",
     "set_calendar_visible",
     "list_events",

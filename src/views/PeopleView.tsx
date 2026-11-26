@@ -34,22 +34,20 @@ export function PeopleView() {
       return;
     }
     let cancelled = false;
-    api.getPerson(selectedEmail).then((p) => !cancelled && setPerson(p));
-    const scope = { folder: { role: 'inbox' as const }, tab: 'all' as const };
-    Promise.all([
-      api.search({ text: '', scope, allFolders: true, from: selectedEmail }),
-      api.search({ text: '', scope, allFolders: true, to: selectedEmail }),
-    ]).then(
-      ([a, b]) => {
-        if (cancelled) return;
-        const all = [...a.messages, ...b.messages.filter((m) => !a.messages.some((x) => x.id === m.id))];
-        setRecent(all.sort((x, y) => y.receivedAt.localeCompare(x.receivedAt)).slice(0, 30));
-      },
+    // Show them at once from the list we already have; the full record follows.
+    const listed = people?.find((p) => p.email.toLowerCase() === selectedEmail.toLowerCase());
+    setPerson((cur) => (cur?.email.toLowerCase() === selectedEmail.toLowerCase() ? cur : (listed ?? null)));
+    api.getPerson(selectedEmail).then((p) => !cancelled && p && setPerson(p));
+    // Its own query, not two searches: a search started meanwhile used to cancel one of them,
+    // and then this showed no mail at all.
+    api.personMail(selectedEmail, 30).then(
+      (list) => !cancelled && setRecent(list),
       () => !cancelled && setRecent([]),
     );
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmail, app.mailVersion]);
 
   const select = (email: string | null) => app.navigate(email ? { view: 'people', param: email } : { view: 'people' });
