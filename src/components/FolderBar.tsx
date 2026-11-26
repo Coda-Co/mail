@@ -7,7 +7,8 @@ type ItemKey = FolderRole | 'unread' | 'outbox';
 
 /**
  * The row of folder icons above the message list, in this order. Unread is Inbox filtered to
- * unread; Outbox is the drafts sent but not yet gone, shown only while there are any.
+ * unread; Outbox is the drafts sent but not yet gone (it lives in Drafts, so it shows wherever
+ * Drafts does).
  */
 const ROLE_ITEMS: { key: ItemKey; label: string; Icon: LucideIcon }[] = [
   { key: 'inbox', label: 'Inbox', Icon: Inbox },
@@ -64,8 +65,7 @@ export function FolderBar({ scope, folders, onChange }: { scope: ViewScope; fold
   const go = (folder: ViewScope['folder'], tab: ViewScope['tab'] = 'all') => onChange({ accountId: scope.accountId, folder, tab });
 
   const outboxCount = byRole('drafts')?.outbox ?? 0;
-  const inOutbox = role === 'drafts' && scope.tab === 'outbox';
-  const items = ROLE_ITEMS.filter((it) => (it.key === 'outbox' ? outboxCount > 0 || inOutbox : ALWAYS.includes(it.key) || byRole(it.key as FolderRole)));
+  const items = ROLE_ITEMS.filter((it) => ALWAYS.includes(it.key) || byRole((it.key === 'outbox' ? 'drafts' : it.key) as FolderRole));
 
   const menuItems: MenuItem[] = tree.map(({ folder: f, depth }) => ({
     label: f.name,
