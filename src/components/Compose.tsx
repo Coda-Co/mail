@@ -365,9 +365,10 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
         {ccRow}
         {bccRow}
         {subjectRow}
+        {/* Attachments sit above the message, under the address fields. */}
+        {attachments}
         <div className="popout-body">
           {body}
-          {attachments}
           {source && (
             <div className="quoted">
               <span className="meta">
@@ -399,8 +400,9 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
       {ccRow}
       {bccRow}
       {subjectRow}
-      {body}
+      {/* Attachments sit above the message, under the address fields. */}
       {attachments}
+      {body}
       {error && <div className="draft-error">{error}</div>}
       <div className="draft-footer">
         <button type="button" className="btn btn-primary" onClick={send} disabled={sending}>

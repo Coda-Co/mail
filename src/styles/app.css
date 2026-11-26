@@ -1962,7 +1962,8 @@ h3 {
 }
 
 .draft-section .draft-attachments {
-  padding: 0 0 12px;
+  padding: 10px 0 2px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .draft-section .draft-footer {
@@ -2142,7 +2143,8 @@ h3 {
 }
 
 .draft-attachments {
-  padding: 0 16px 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .draft-popped {
