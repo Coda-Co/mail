@@ -76,6 +76,8 @@
   --sidebar-w: 232px;
   --list-w: 360px;
   --reading-max-w: 920px;
+  /* Space either side of the text in the reading pane. */
+  --reading-pad: 40px;
   /* Space left of the message list card, and above it (matches the reading column's top padding). */
   --list-gutter: 32px;
   --list-top: 24px;
@@ -183,6 +185,36 @@
 
 :hover::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb-hover);
+}
+
+/* Inside the mail card the scrollbars stay out of sight until you're over that pane, and
+   stop short of the card's rounded top corners. Chromium doesn't repaint a scrollbar when
+   only a :hover rule on it changes, but it does when the scroller's colour changes: so the
+   thumb is drawn in the scroller's text colour, which is transparent until hovered, and the
+   contents get their own colour back. */
+.mail-panes .message-rows,
+.mail-panes .reading-scroll {
+  color: transparent;
+  transition: color 0.15s ease;
+}
+
+.mail-panes .message-rows:hover,
+.mail-panes .reading-scroll:hover {
+  color: var(--scrollbar-thumb-hover);
+}
+
+.mail-panes .message-rows > *,
+.mail-panes .reading-scroll > * {
+  color: var(--text);
+}
+
+.mail-panes .message-rows::-webkit-scrollbar-thumb,
+.mail-panes .reading-scroll::-webkit-scrollbar-thumb {
+  background-color: currentColor;
+}
+
+.mail-panes .reading-scroll::-webkit-scrollbar-track {
+  margin-top: 14px;
 }
 
 ::-webkit-scrollbar-thumb:active {
@@ -1524,7 +1556,7 @@ h3 {
   max-width: var(--reading-max-w);
   margin: 0 auto;
   box-sizing: border-box;
-  padding: 22px 28px 48px;
+  padding: 22px var(--reading-pad) 48px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -1817,17 +1849,26 @@ h3 {
 .message-entry {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 0 14px;
-  border-top: 1px solid var(--border-subtle);
+  padding: 0 0 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* The date line carries the space above it, so the header area clicks as one piece. */
+.message-entry > .message-timestamp {
+  padding: 12px 0 4px;
+}
+
+.collapsed-entry,
+.message-timestamp.collapsible {
+  cursor: pointer;
 }
 
 /* A collapsed message highlights edge to edge across the card on hover. */
 .message-entry:has(> .message-block.collapsed):hover {
   background: var(--row-hover);
-  margin: 0 -28px;
-  padding-left: 28px;
-  padding-right: 28px;
+  margin: 0 calc(-1 * var(--reading-pad));
+  padding-left: var(--reading-pad);
+  padding-right: var(--reading-pad);
 }
 
 .message-timestamp {
@@ -1884,7 +1925,7 @@ h3 {
   flex-direction: column;
   overflow: visible;
   padding: 12px 0 6px;
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--border);
 }
 
 .draft-section-header {
@@ -3769,7 +3810,8 @@ h3 {
   }
 
   .reading-content {
-    padding: 20px 16px 40px;
+    --reading-pad: 16px;
+    padding: 20px var(--reading-pad) 40px;
   }
 
   .message-block {
@@ -3808,6 +3850,8 @@ h3 {
 .later-toggle {
   align-self: flex-start;
   font-size: var(--fs-meta);
+  /* Clear of the hairline beneath it. */
+  margin: -4px 0 14px;
 }
 
 .quote-toggle {

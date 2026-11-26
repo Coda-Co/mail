@@ -19,7 +19,7 @@ export interface DemoState {
   serverOnly: Message[];
 }
 
-export const DEMO_VERSION = 5;
+export const DEMO_VERSION = 6;
 
 const COLORS = { coda: '#1F883D', harbour: '#8250DF', fenwick: '#D4600F', aldgate: '#6E7781' };
 
@@ -137,8 +137,11 @@ export function buildDemoState(now: Date): DemoState {
     'Hi Miles,\n\nIT have approved read access for your account from Monday. You’ll get a separate email with the connection details.\n\nPriya', { unread: true }).snippet = 'IT have approved read access for your account from Monday.';
   add('coda', 'inbox', PEOPLE.linear, at(now, 0, 8, 2), '3 issues assigned to you',
     'You have 3 new issues assigned to you this morning.\n\nEvaluation harness, and 2 more.', { images: true }).snippet = 'Evaluation harness, and 2 more.';
+  // A conversation of several messages (two in the inbox, Miles's reply in Sent).
+  add('harbour', 'inbox', PEOPLE.sarah, at(now, -1, 11, 2), 'Re: Portfolio scan next steps',
+    'Thanks both. I’ve narrowed it to three options; the shortlist is in the shared folder.\n\nSarah', { to: [ME_ADDR.harbour, PEOPLE.james], conversation: 'conv-portfolio' });
   add('harbour', 'inbox', PEOPLE.james, at(now, -1, 18, 20), 'Re: Portfolio scan next steps',
-    'Agree with the shortlist. Let’s pick it up on Thursday.\n\nJames', { flagged: true });
+    'Agree with the shortlist. Let’s pick it up on Thursday.\n\nJames', { flagged: true, conversation: 'conv-portfolio' });
   add('coda', 'inbox', PEOPLE.elena, at(now, -6, 17, 5), 'Intro: Elena / Miles', 'Great to be connected. Would a call next week work?\n\nElena', { flagged: true });
 
   // Older unread mail so the counts match the sidebar in the mockup (8 / 3 / 1).
@@ -192,7 +195,7 @@ export function buildDemoState(now: Date): DemoState {
   });
 
   // Sent mail.
-  add('harbour', 'sent', ME_ADDR.harbour, at(now, -1, 17, 40), 'Re: Portfolio scan next steps', 'Shortlist attached. Happy to go through it on Thursday.\n\nMiles', { to: [PEOPLE.james, PEOPLE.sarah] });
+  add('harbour', 'sent', ME_ADDR.harbour, at(now, -1, 17, 40), 'Re: Portfolio scan next steps', 'Shortlist attached. Happy to go through it on Thursday.\n\nMiles', { to: [PEOPLE.james, PEOPLE.sarah], conversation: 'conv-portfolio' });
   add('coda', 'sent', ME_ADDR.coda, at(now, -2, 9, 5), 'Re: Q1 planning doc', 'Thanks Hannah, I’ll add comments by Wednesday.\n\nMiles', { to: [PEOPLE.hannah] });
   add('fenwick', 'sent', ME_ADDR.fenwick, at(now, -4, 15, 0), 'Data warehouse access', 'Hi Priya, could you request read access to the warehouse for me?\n\nThanks,\nMiles', { to: [PEOPLE.priya] });
 
