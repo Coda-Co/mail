@@ -263,7 +263,20 @@ h3 {
   height: 56px;
   padding: 0 20px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  /* The same canvas as the mail beneath it; search sits on it as a white field. */
+  background: var(--reading-canvas);
+}
+
+.topbar .search-trigger,
+.topbar .search-scope,
+.topbar .search-box,
+.topbar .search-box.quiet,
+.topbar .search-box.quiet:focus-within {
+  background: var(--message-card);
+}
+
+.topbar .search-scope:hover {
+  background: var(--row-hover);
 }
 
 :root {
