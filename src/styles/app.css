@@ -1877,7 +1877,8 @@ h3 {
   flex-shrink: 0;
 }
 
-.field-row input.plain {
+.field-row input.plain,
+.address-field input.plain {
   flex: 1;
   border: none;
   outline: none;
@@ -2509,6 +2510,189 @@ h3 {
   border-color: var(--accent);
 }
 
+/* ---------- Date and time pickers (event form) ---------- */
+
+.when-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.picker-field {
+  height: 34px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--r-button);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-body);
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.picker-field:hover {
+  border-color: var(--text-muted);
+}
+
+.picker-field:focus,
+.picker-field:focus-visible,
+.picker-field[aria-expanded='true'] {
+  border-color: var(--accent);
+}
+
+.date-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 0 10px;
+  cursor: pointer;
+}
+
+.date-field svg {
+  color: var(--text-muted);
+}
+
+.time-field {
+  width: 72px;
+  padding: 0 10px;
+  text-align: center;
+}
+
+.when-sep {
+  color: var(--text-muted);
+}
+
+.when-length {
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.month-picker {
+  padding: 4px 4px 2px;
+}
+
+.month-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 0 8px 6px;
+}
+
+.month-picker-head .title {
+  flex: 1;
+  font-weight: 600;
+}
+
+.month-picker-head .btn-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.month-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.month-picker-grid .wd {
+  text-align: center;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--text-muted);
+  padding-bottom: 4px;
+}
+
+.month-picker-grid .day {
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-meta);
+  color: var(--text);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.month-picker-grid .day:hover {
+  background: var(--row-hover);
+}
+
+.month-picker-grid .day.other {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.month-picker-grid .day.today {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.month-picker-grid .day.selected {
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+  opacity: 1;
+}
+
+.month-picker-grid .day:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.month-picker-today {
+  display: block;
+  margin: 6px auto 2px;
+  font-size: var(--fs-meta);
+}
+
+.popover:has(> .time-list) {
+  min-width: 0;
+  padding: 4px;
+}
+
+.time-list {
+  max-height: 264px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  margin: -2px;
+}
+
+.time-option {
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--r-nav);
+  background: none;
+  font: inherit;
+  font-size: var(--fs-meta);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-option:hover {
+  background: var(--row-hover);
+}
+
+.time-option.selected {
+  background: var(--nav-selected);
+  font-weight: 600;
+}
+
+.time-option .sub {
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  font-weight: 400;
+}
+
 .check {
   display: inline-flex;
   align-items: center;
@@ -2824,6 +3008,28 @@ h3 {
 
 .day-column.today {
   background-color: var(--today-col);
+}
+
+/* Where a double-click would add an event: a faint half-hour block under the pointer. */
+.slot-ghost {
+  display: none;
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--accent) 35%, transparent);
+  pointer-events: none;
+}
+
+.slot-ghost::before {
+  content: attr(data-time);
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  font-size: var(--fs-caption);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
 }
 
 .now-line {
