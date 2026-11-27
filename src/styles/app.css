@@ -1107,6 +1107,44 @@ h3 {
   margin-left: -4px;
 }
 
+.cal-account {
+  display: flex;
+  align-items: center;
+}
+
+.cal-account .cal-check {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Folds an account's calendars away, e.g. to hide Birthdays and holidays. */
+.cal-collapse {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.cal-collapse:hover {
+  background: var(--event-hover-tint);
+  color: var(--text);
+}
+
+.cal-collapse svg {
+  transition: transform 0.15s ease;
+}
+
+.cal-collapse.closed svg {
+  transform: rotate(-90deg);
+}
+
 /* Month overview at the top of Calendar's sidebar. */
 .mini-cal {
   display: flex;
