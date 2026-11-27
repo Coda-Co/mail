@@ -719,6 +719,26 @@ pub struct Settings {
     pub work_start: u32,
     #[serde(default = "default_work_end")]
     pub work_end: u32,
+    /// Underline misspelt words in drafts.
+    #[serde(default = "default_true")]
+    pub spellcheck: bool,
+    /// Fix common typos as they're typed.
+    #[serde(default = "default_true")]
+    pub autocorrect: bool,
+    /// "en-GB" or "en-US".
+    #[serde(default = "default_spelling_language")]
+    pub spelling_language: String,
+    /// The user's own words, lower case, sorted.
+    #[serde(default)]
+    pub dictionary: Vec<String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_spelling_language() -> String {
+    "en-GB".into()
 }
 
 fn default_remote_images() -> String {
@@ -743,6 +763,10 @@ impl Default for Settings {
             remote_images: default_remote_images(),
             work_start: default_work_start(),
             work_end: default_work_end(),
+            spellcheck: true,
+            autocorrect: true,
+            spelling_language: default_spelling_language(),
+            dictionary: vec![],
         }
     }
 }
@@ -757,6 +781,10 @@ pub struct SettingsPatch {
     pub remote_images: Option<String>,
     pub work_start: Option<u32>,
     pub work_end: Option<u32>,
+    pub spellcheck: Option<bool>,
+    pub autocorrect: Option<bool>,
+    pub spelling_language: Option<String>,
+    pub dictionary: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

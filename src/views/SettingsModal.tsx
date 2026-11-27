@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bold, ImagePlus, Italic, Link, Palette, Trash2 } from 'lucide-react';
+import { Bold, ImagePlus, Italic, Link, Palette, Trash2, X } from 'lucide-react';
 import { api } from '../api';
 import type { Account, Signature } from '../api/types';
 import { useApp } from '../state/app';
@@ -116,6 +116,26 @@ function UpdatesGroup() {
   );
 }
 
+/** Words added to the dictionary, each removable. */
+function OwnWords() {
+  const { settings, updateSettings } = useApp();
+  return (
+    <div className="own-words">
+      <span className="form-label">Your words</span>
+      <div className="own-words-list">
+        {settings.dictionary.map((w) => (
+          <span key={w} className="own-word">
+            {w}
+            <button type="button" aria-label={`Remove ${w}`} onClick={() => updateSettings({ dictionary: settings.dictionary.filter((x) => x !== w) })}>
+              <X size={12} />
+            </button>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function GeneralTab() {
   const { settings, updateSettings, disk } = useApp();
   return (
@@ -160,6 +180,34 @@ function GeneralTab() {
           </div>
         </div>
         <span className="hint">The calendar shades the hours outside these.</span>
+      </div>
+      <div className="settings-group">
+        <h3>Spelling</h3>
+        <label className="check">
+          <input type="checkbox" checked={settings.spellcheck} onChange={(e) => updateSettings({ spellcheck: e.target.checked })} />
+          Underline misspelt words
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={settings.autocorrect} onChange={(e) => updateSettings({ autocorrect: e.target.checked })} />
+          Correct common typos as I type
+        </label>
+        <div className="form-row">
+          <label htmlFor="spelling-language">Language</label>
+          <select
+            id="spelling-language"
+            className="select"
+            style={{ maxWidth: 260 }}
+            value={settings.spellingLanguage}
+            onChange={(e) => updateSettings({ spellingLanguage: e.target.value as 'en-GB' | 'en-US' })}
+          >
+            <option value="en-GB">English (UK)</option>
+            <option value="en-US">English (US)</option>
+          </select>
+        </div>
+        <span className="hint">
+          Click an underlined word for suggestions, or press {keyLabel('Mod+;')} to go to the next one. Backspace straight after a correction puts back what you typed.
+        </span>
+        {settings.dictionary.length > 0 && <OwnWords />}
       </div>
       <div className="settings-group">
         <h3>Keyboard</h3>

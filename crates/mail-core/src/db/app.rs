@@ -251,6 +251,29 @@ impl AppDb {
             }
             s.remote_images = v.clone();
         }
+        if let Some(v) = p.spellcheck {
+            s.spellcheck = v;
+        }
+        if let Some(v) = p.autocorrect {
+            s.autocorrect = v;
+        }
+        if let Some(v) = &p.spelling_language {
+            if !["en-GB", "en-US"].contains(&v.as_str()) {
+                return Err(Error::Invalid(format!("spellingLanguage {v}")));
+            }
+            s.spelling_language = v.clone();
+        }
+        if let Some(v) = &p.dictionary {
+            // One word each, no spaces; long strings and huge lists aren't words.
+            s.dictionary = v
+                .iter()
+                .map(|w| w.trim().to_lowercase())
+                .filter(|w| !w.is_empty() && w.chars().count() <= 64 && !w.chars().any(char::is_whitespace))
+                .collect();
+            s.dictionary.sort();
+            s.dictionary.dedup();
+            s.dictionary.truncate(10_000);
+        }
         let (start, end) = (p.work_start.unwrap_or(s.work_start), p.work_end.unwrap_or(s.work_end));
         if p.work_start.is_some() || p.work_end.is_some() {
             if start % 15 != 0 || end % 15 != 0 || end > 24 * 60 || start >= end {
@@ -410,5 +433,17 @@ mod tests {
         db.conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('app', ?1)", [r#"{"theme":"dark","notifications":true,"ctrlF":"forward","remoteImageSenders":[]}"#]).unwrap();
         let s = db.settings().unwrap();
         assert_eq!((s.theme.as_str(), s.work_start, s.work_end), ("dark", 540, 1080));
+        assert!(s.spellcheck && s.autocorrect);
+        assert_eq!((s.spelling_language.as_str(), s.dictionary.len()), ("en-GB", 0));
+    }
+
+    #[test]
+    fn spelling_settings_validate_and_tidy_the_dictionary() {
+        let db = db();
+        assert!(db.update_settings(&SettingsPatch { spelling_language: Some("fr".into()), ..Default::default() }).is_err());
+        let words = vec!["Mecsia".into(), " motherduck ".into(), "mecsia".into(), "".into(), "two words".into(), "x".repeat(65)];
+        let s = db.update_settings(&SettingsPatch { spelling_language: Some("en-US".into()), autocorrect: Some(false), dictionary: Some(words), ..Default::default() }).unwrap();
+        assert_eq!(s.dictionary, vec!["mecsia".to_string(), "motherduck".to_string()]);
+        assert_eq!((s.spelling_language.as_str(), s.autocorrect, s.spellcheck), ("en-US", false, true));
     }
 }

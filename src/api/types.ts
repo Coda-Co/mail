@@ -291,6 +291,13 @@ export interface Settings {
   /** Working hours, in minutes after midnight (quarter hours). The calendar shades the rest. */
   workStart: number;
   workEnd: number;
+  /** Underline misspelt words while writing. */
+  spellcheck: boolean;
+  /** Fix common typos as you type (Backspace straight after puts the word back). */
+  autocorrect: boolean;
+  spellingLanguage: 'en-GB' | 'en-US';
+  /** Words added to the dictionary, lower case. */
+  dictionary: string[];
 }
 
 export interface SyncStatus {
