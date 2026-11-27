@@ -77,5 +77,5 @@ permissions = [
 
 [[set]]
 identifier = "web-account-reporting"
-description = "What an Outlook on the web page may call: report its unread count, forward notifications, and answer the app's calendar requests."
-permissions = ["allow-web-account-report", "allow-web-account-notify", "allow-web-account-calendar-report", "allow-web-account-event-attendees-report"]
+description = "What an Outlook on the web page may call: report its unread count, forward notifications and the app's Ctrl+1–9 shortcuts, and answer the app's calendar requests."
+permissions = ["allow-web-account-report", "allow-web-account-notify", "allow-web-account-shortcut", "allow-web-account-calendar-report", "allow-web-account-event-attendees-report"]

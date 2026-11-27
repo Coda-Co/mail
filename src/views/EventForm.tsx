@@ -55,6 +55,13 @@ export function EventForm({
   const [body, setBody] = useState(event?.bodyHtml ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // A new Teams meeting with no one invited is usually a slip: the first Save asks, the second saves.
+  const [confirmEmpty, setConfirmEmpty] = useState(false);
+  const noInvitees = !event && online && attendees.length === 0;
+  const changeAttendees = (list: Address[]) => {
+    setAttendees(list);
+    setConfirmEmpty(false);
+  };
 
   const toggleAllDay = (v: boolean) => {
     setAllDay(v);
@@ -97,6 +104,7 @@ export function EventForm({
     const start = allDay ? startOfDay(from) : from;
     const end = allDay ? addDays(startOfDay(to), 1) : to;
     if (end <= start) return setError('The end must be after the start.');
+    if (noInvitees && !confirmEmpty) return setConfirmEmpty(true);
     const input: EventInput = {
       accountId,
       subject: subject.trim(),
@@ -132,15 +140,26 @@ export function EventForm({
             Cancel
           </button>
           <button type="button" className="btn btn-primary" onClick={save} disabled={busy || !accountId}>
-            {attendees.length > 0 && !event ? 'Send' : 'Save'}
+            {attendees.length > 0 && !event ? 'Send' : noInvitees && confirmEmpty ? 'Save without attendees' : 'Save'}
           </button>
         </>
       }
     >
       <div className="modal-body">
+        {noInvitees && confirmEmpty && (
+          <div className="form-warning" role="alert">
+            No one is invited to this meeting. Add attendees above, or save it to your calendar only.
+          </div>
+        )}
         <div className="form-row">
           <label htmlFor="ev-title">Title</label>
           <input id="ev-title" className="input" autoFocus value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Add a title" />
+        </div>
+        <div className="form-row">
+          <span className="form-label">Attendees</span>
+          <div className="input" style={{ display: 'flex' }}>
+            <AddressField label="Attendees" value={attendees} onChange={changeAttendees} />
+          </div>
         </div>
         <div className="form-row">
           <label htmlFor="ev-account">Calendar</label>
@@ -182,7 +201,14 @@ export function EventForm({
             <input type="checkbox" checked={allDay} onChange={(e) => toggleAllDay(e.target.checked)} /> All day
           </label>
           <label className="check">
-            <input type="checkbox" checked={online} onChange={(e) => setOnline(e.target.checked)} /> Teams meeting
+            <input
+              type="checkbox"
+              checked={online}
+              onChange={(e) => {
+                setOnline(e.target.checked);
+                setConfirmEmpty(false);
+              }}
+            /> Teams meeting
           </label>
           <label className="check">
             Reminder
@@ -198,12 +224,6 @@ export function EventForm({
         <div className="form-row">
           <label htmlFor="ev-location">Location</label>
           <input id="ev-location" className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Room or address" />
-        </div>
-        <div className="form-row">
-          <span className="form-label">Attendees</span>
-          <div className="input" style={{ display: 'flex' }}>
-            <AddressField label="Attendees" value={attendees} onChange={setAttendees} />
-          </div>
         </div>
         <div className="form-row">
           <span className="form-label">Description</span>

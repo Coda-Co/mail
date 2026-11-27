@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, Clock, LoaderCircle, MapPin, Video } from 'lucide-react';
+import { Check, Clock, LoaderCircle, MapPin, Reply, ReplyAll, Video } from 'lucide-react';
 import { api } from '../api';
 import type { CalendarEvent, EventField, EventInput, ResponseStatus } from '../api/types';
 import { useApp } from '../state/app';
@@ -18,6 +18,7 @@ import { RsvpButtons, type Rsvp, type RsvpOptions } from '../components/RsvpButt
 import { eventActions, isPending, webEventSource } from '../lib/webCalendar';
 import { durationLabel } from '../lib/timeEntry';
 import { isBlankHtml, stripMeetingBlock } from '../lib/meetingBody';
+import { canReplyToEvent, eventReply, replyAllDiffers, type EventReplyMode } from '../lib/eventReply';
 
 type Mode = 'day' | 'week' | 'month';
 const HOUR = 56;
@@ -43,6 +44,7 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
   const { accountById, navigate } = useApp();
   const toast = useToast();
   const [showAll, setShowAll] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const acc = accountById(event.accountId);
   const fromWeb = acc?.kind === 'web';
   const start = new Date(event.start);
@@ -93,6 +95,36 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
       toast(`Couldn’t respond: ${e instanceof Error ? e.message : e}`);
     }
   };
+  // Email the people on the invite. Web accounts send from Outlook on the web, so they don't get this.
+  const withAttendees = { ...event, attendees: webAttendees };
+  const myEmail = acc?.email ?? '';
+  const canReply = !fromWeb && canReplyToEvent(withAttendees, myEmail);
+  const showReplyAll = canReply && replyAllDiffers(withAttendees, myEmail);
+  const replyTo = async (mode: EventReplyMode) => {
+    try {
+      const r = eventReply(withAttendees, myEmail, mode);
+      const d = await api.createDraft({ mode: 'new', accountId: event.accountId });
+      await api.updateDraft({ ...d, to: r.to, cc: r.cc, subject: r.subject, edited: true });
+      await api.popOut('draft', d.id);
+      onClose();
+    } catch (e) {
+      toast(`Couldn’t start the email: ${e instanceof Error ? e.message : e}`);
+    }
+  };
+  const replyButtons = canReply && (
+    <>
+      <button type="button" className="btn" onClick={() => void replyTo('reply')} title="Email the organiser">
+        <Reply size={16} aria-hidden />
+        Reply
+      </button>
+      {showReplyAll && (
+        <button type="button" className="btn" onClick={() => void replyTo('replyAll')} title="Email everyone on the invite">
+          <ReplyAll size={16} aria-hidden />
+          Reply all
+        </button>
+      )}
+    </>
+  );
   return (
     <Modal
       className="event-modal"
@@ -118,21 +150,21 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
               type="button"
               className="btn btn-danger"
               style={{ marginRight: 'auto' }}
-              onClick={async () => {
-                await api.deleteEvent(event.id);
-                toast(event.attendees.length > 1 ? 'Event cancelled' : 'Event deleted');
-                onDeleted();
-              }}
+              onClick={() => setConfirmDelete(true)}
             >
               {event.attendees.length > 1 ? 'Cancel event' : 'Delete'}
             </button>
+            {replyButtons}
             <button type="button" className="btn" onClick={onEdit}>
               Edit
             </button>
           </>
+        ) : canReply ? (
+          replyButtons
         ) : undefined
       }
     >
+      {confirmDelete && <DeleteEventModal event={event} onCancel={() => setConfirmDelete(false)} onDeleted={onDeleted} />}
       <div className="modal-body event-detail">
         <span className="acc">
           <span className="acc-dot" style={{ background: acc?.color ?? event.color }} />
@@ -238,6 +270,51 @@ function retimed(event: CalendarEvent, start: Date, end: Date): EventInput {
     isOnlineMeeting: event.isOnlineMeeting,
     reminderMinutes: event.reminderMinutes,
   };
+}
+
+/** Asks before an event is deleted, or a meeting cancelled (its attendees get a cancellation). */
+function DeleteEventModal({ event, onCancel, onDeleted }: { event: CalendarEvent; onCancel: () => void; onDeleted: () => void }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const meeting = event.attendees.length > 1;
+  const invitees = otherAttendees(event);
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await api.deleteEvent(event.id);
+      toast(meeting ? 'Event cancelled' : 'Event deleted');
+      onDeleted();
+    } catch (e) {
+      toast(`Couldn’t ${meeting ? 'cancel' : 'delete'} the event: ${e instanceof Error ? e.message : e}`);
+      setBusy(false);
+      onCancel();
+    }
+  };
+  return (
+    <Modal
+      className="reschedule-modal"
+      title={meeting ? 'Cancel event?' : 'Delete event?'}
+      onClose={onCancel}
+      footer={
+        <>
+          <span className="hint" style={{ marginRight: 'auto' }}>
+            {meeting && invitees.length > 0 ? 'Attendees get a cancellation.' : ''}
+          </span>
+          <button type="button" className="btn" autoFocus onClick={onCancel}>
+            {meeting ? 'Keep event' : 'Cancel'}
+          </button>
+          <button type="button" className="btn btn-danger" onClick={remove} disabled={busy}>
+            {meeting ? 'Cancel event' : 'Delete'}
+          </button>
+        </>
+      }
+    >
+      <div className="modal-body reschedule">
+        <div className="reschedule-title">{eventTitle(event)}</div>
+        <span className="muted">{longDate(new Date(event.start))}{event.isAllDay ? '' : `, ${hhmm(new Date(event.start))} – ${hhmm(new Date(event.end))}`}</span>
+      </div>
+    </Modal>
+  );
 }
 
 /** Asks before a dragged or resized meeting is saved, since its attendees hear about it. */

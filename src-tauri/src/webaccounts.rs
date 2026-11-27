@@ -19,12 +19,22 @@ use mail_core::model::{Account, AccountKind};
 use mail_core::Error;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Webview, WebviewBuilder, WebviewUrl, WebviewWindowBuilder};
 
 const SCRIPT: &str = include_str!("web_account.js");
+
+/// Whether a web account is showing over the main panel (embedded mode only).
+static EMBEDDED_SHOWN: AtomicBool = AtomicBool::new(false);
+
+/// True while an embedded web account covers the main panel, so it, not the main
+/// interface, should take keyboard focus when the window is activated.
+pub fn embedded_shown() -> bool {
+    EMBEDDED_SHOWN.load(Ordering::Relaxed)
+}
 
 fn label(account_id: &str) -> String {
     format!("web-{account_id}")
@@ -230,11 +240,15 @@ pub async fn show_web_account(app: AppHandle, s: tauri::State<'_, AppState>, acc
     w.set_position(LogicalPosition::new(bounds.x, bounds.y)).map_err(|e| Error::Other(e.to_string()))?;
     w.set_size(LogicalSize::new(bounds.width.max(1.0), bounds.height.max(1.0))).map_err(|e| Error::Other(e.to_string()))?;
     w.show().map_err(|e| Error::Other(e.to_string()))?;
+    EMBEDDED_SHOWN.store(true, Ordering::Relaxed);
     let _ = w.set_focus();
     Ok(())
 }
 
 fn hide_all_except(app: &AppHandle, keep: Option<&str>) {
+    if keep.is_none() {
+        EMBEDDED_SHOWN.store(false, Ordering::Relaxed);
+    }
     let keep = keep.map(label);
     for (l, w) in app.webviews() {
         if l.starts_with("web-") && Some(&l) != keep.as_ref() && app.get_webview_window(&l).is_none() {
@@ -246,6 +260,13 @@ fn hide_all_except(app: &AppHandle, keep: Option<&str>) {
 #[tauri::command]
 pub async fn hide_web_accounts(app: AppHandle) -> Result<(), Error> {
     hide_all_except(&app, None);
+    // A hidden web view can keep keyboard focus (after Ctrl+1 from Outlook, say), leaving key
+    // presses going nowhere; give it back to the interface.
+    if !window_mode() {
+        if let Some(w) = app.get_webview(crate::MAIN) {
+            let _ = w.set_focus();
+        }
+    }
     Ok(())
 }
 
@@ -321,6 +342,18 @@ pub async fn web_account_report(webview: Webview, s: tauri::State<'_, AppState>,
         use tauri::Emitter;
         let _ = webview.app_handle().emit("web-account://unread", serde_json::json!({"accountId": id, "unread": unread}));
     }
+    Ok(())
+}
+
+/// Called by the injected script when Ctrl+1–9 (Cmd on macOS) is pressed in the page. The
+/// main interface runs the shortcut as if pressed there (switch to Mail, Calendar, a mailbox).
+#[tauri::command]
+pub async fn web_account_shortcut(webview: Webview, digit: u8) -> Result<(), Error> {
+    if account_of(&webview).is_none() || !(1..=9).contains(&digit) {
+        return Ok(());
+    }
+    use tauri::Emitter;
+    let _ = webview.app_handle().emit("web-account://shortcut", serde_json::json!({ "digit": digit }));
     Ok(())
 }
 

@@ -4778,3 +4778,12 @@ h3 {
   background: var(--row-hover);
   color: var(--text);
 }
+
+.form-warning {
+  padding: 8px 12px;
+  border: 1px solid var(--warning-border);
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--text);
+  font-size: 13px;
+}
