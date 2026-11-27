@@ -39,3 +39,7 @@ clipboard-rs = { version = "0.3", default-features = false }
 # Re-exported by tauri for Webview::set_cookie; named directly so we can rewrite the sign-in
 # session cookies as persistent (see webaccounts::persist_auth_cookies).
 cookie = "0.18"
+
+[target.'cfg(windows)'.dependencies]
+# GetAsyncKeyState, to hold off refocusing the interface until a title-bar click is over.
+windows-sys = { version = "0.61", features = ["Win32_UI_Input_KeyboardAndMouse"] }

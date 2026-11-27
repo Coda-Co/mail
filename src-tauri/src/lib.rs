@@ -119,11 +119,7 @@ pub fn run() {
                 // bar (or Alt+Tab) focuses only the native window and key presses go nowhere:
                 // Ctrl+1/2/3 and the other shortcuts do nothing until the page is clicked.
                 // Hand focus to the interface, unless a web account is showing over it.
-                if !webaccounts::embedded_shown() {
-                    if let Some(w) = window.app_handle().get_webview(MAIN) {
-                        let _ = w.set_focus();
-                    }
-                }
+                focus_interface_after_click(window.clone());
             }
             // Closing a pop-out compose window docks the draft back.
             tauri::WindowEvent::Destroyed => commands::on_window_closed(window.app_handle(), window.label()),
@@ -274,4 +270,39 @@ mod tests {
             assert!(allowed.contains(&h.replace('_', "-")), "`allow-{}` is missing from permissions/app.toml", h.replace('_', "-"));
         }
     }
+}
+
+/// Moves keyboard focus into the main interface once the window has been activated.
+///
+/// On Windows the window is activated on mouse-down in the title bar, before Windows starts
+/// its move loop or tracks a press on minimise / maximise / close. Moving focus into the
+/// child web view at that moment cancels the drag and the button press, so the title bar
+/// seems dead. Wait until the left button is released, then only refocus if the window is
+/// still the active one (the click may have minimised it, say).
+fn focus_interface_after_click(window: tauri::Window) {
+    let focus = move |window: &tauri::Window| {
+        if webaccounts::embedded_shown() || !window.is_focused().unwrap_or(false) {
+            return;
+        }
+        if let Some(w) = window.app_handle().get_webview(MAIN) {
+            let _ = w.set_focus();
+        }
+    };
+    #[cfg(target_os = "windows")]
+    tauri::async_runtime::spawn(async move {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+        // A drag can last as long as the user likes; stop watching after a minute.
+        for _ in 0..1200 {
+            // SAFETY: GetAsyncKeyState only reads global input state.
+            let down = unsafe { GetAsyncKeyState(VK_LBUTTON as i32) } as u16 & 0x8000 != 0;
+            if !down {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        let w = window.clone();
+        let _ = window.run_on_main_thread(move || focus(&w));
+    });
+    #[cfg(not(target_os = "windows"))]
+    focus(&window);
 }
