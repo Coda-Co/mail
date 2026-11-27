@@ -1,4 +1,5 @@
-//! Tray (Windows) / menu-bar (macOS) icon with the total unread count.
+//! Tray (Windows) / menu-bar (macOS) icon with the total unread count, and the new-mail
+//! envelope on the Windows taskbar button.
 
 use crate::state::AppState;
 use crate::MAIN;
@@ -50,6 +51,22 @@ pub fn show_main(app: &AppHandle) {
         let _ = w.unminimize();
         let _ = w.set_focus();
     }
+    // Hiding the window to the tray removes its taskbar button, and the envelope with it.
+    show_new_mail(app);
+}
+
+/// Put the envelope on the taskbar button while there is new mail (crate::badge), and take it
+/// off when there isn't. Windows only: macOS and Linux show the unread count instead.
+pub fn show_new_mail(app: &AppHandle) {
+    #[cfg(target_os = "windows")]
+    {
+        let on = app.try_state::<crate::badge::NewMail>().is_some_and(|b| b.is_on());
+        if let Some(w) = app.get_window(MAIN) {
+            let icon = on.then(|| tauri::image::Image::from_bytes(include_bytes!("../icons/new-mail.png")).ok()).flatten();
+            let _ = w.set_overlay_icon(icon);
+        }
+    }
+    let _ = app;
 }
 
 pub fn set_unread(app: &AppHandle, total: i64) {

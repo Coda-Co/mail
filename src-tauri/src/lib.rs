@@ -1,6 +1,7 @@
 //! Desktop shell: windows, native web views for web accounts, tray, notifications,
 //! and the bridge from the React interface to mail-core.
 
+mod badge;
 mod commands;
 mod clipboard;
 mod events;
@@ -56,11 +57,7 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // A second launch focuses the running app (one process owns the databases).
-            if let Some(w) = app.get_window(MAIN) {
-                let _ = w.show();
-                let _ = w.unminimize();
-                let _ = w.set_focus();
-            }
+            tray::show_main(app);
         }))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
@@ -89,6 +86,7 @@ pub fn run() {
             let clients = state.client_factory();
             app.manage(state);
             app.manage(webaccounts::WebCalendars::default());
+            app.manage(badge::NewMail::default());
 
             app.manage(updater::Updates::new(app));
             create_main_window(app)?;

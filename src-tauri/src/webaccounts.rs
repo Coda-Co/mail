@@ -338,9 +338,18 @@ fn account_of(webview: &Webview) -> Option<String> {
 pub async fn web_account_report(webview: Webview, s: tauri::State<'_, AppState>, unread: Option<i64>) -> Result<(), Error> {
     let Some(id) = account_of(&webview) else { return Ok(()) };
     let unread = unread.filter(|n| (0..100_000).contains(n));
-    if s.svc.set_web_unread(&id, unread)? {
+    let old = s.svc.set_web_unread(&id, unread)?;
+    if old != unread {
         use tauri::Emitter;
-        let _ = webview.app_handle().emit("web-account://unread", serde_json::json!({"accountId": id, "unread": unread}));
+        let app = webview.app_handle();
+        let _ = app.emit("web-account://unread", serde_json::json!({"accountId": id, "unread": unread}));
+        // The count going up is new mail, unless the account's notifications are off (as for
+        // other accounts); going down is mail read, whichever account it is.
+        let notifies = s.svc.get_account(&id).is_ok_and(|a| a.notifications);
+        let counted = if notifies { unread } else { unread.min(old) };
+        if app.try_state::<crate::badge::NewMail>().is_some_and(|b| b.web_count(&id, old, counted)) {
+            crate::tray::show_new_mail(app);
+        }
     }
     Ok(())
 }

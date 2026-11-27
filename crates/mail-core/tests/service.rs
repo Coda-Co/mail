@@ -643,3 +643,34 @@ fn removing_a_dropped_attachment_deletes_its_copy() {
     assert!(b.exists(), "the other copy stays");
     assert_eq!(d.attachments.len(), 1);
 }
+
+#[derive(Default)]
+struct Reads(std::sync::atomic::AtomicUsize);
+impl mail_core::EventSink for Reads {
+    fn unread_mail_read(&self) {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+/// Reading unread mail is what turns the new-mail envelope off; marking read mail read again,
+/// or marking mail unread, isn't.
+#[test]
+fn reading_unread_mail_is_reported() {
+    let (svc, ids) = setup();
+    let reads = std::sync::Arc::new(Reads::default());
+    svc.set_events(reads.clone());
+    let count = || reads.0.load(std::sync::atomic::Ordering::SeqCst);
+    let id = format!("{}:m-agenda", ids.harbour);
+    assert!(!svc.get_message(&id).unwrap().summary.is_read);
+    assert_eq!(svc.still_unread(std::slice::from_ref(&id)), vec![id.clone()]);
+
+    svc.mark_read(std::slice::from_ref(&id), true).unwrap();
+    assert_eq!(count(), 1);
+    assert!(svc.still_unread(std::slice::from_ref(&id)).is_empty());
+    svc.mark_read(std::slice::from_ref(&id), true).unwrap();
+    assert_eq!(count(), 1, "already read");
+    svc.mark_read(std::slice::from_ref(&id), false).unwrap();
+    assert_eq!(count(), 1, "marked unread");
+    let gone = format!("{}:no-such-message", ids.harbour);
+    assert_eq!(svc.still_unread(&[id.clone(), gone]), vec![id]);
+}

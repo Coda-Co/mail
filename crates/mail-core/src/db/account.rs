@@ -647,9 +647,9 @@ impl AccountDb {
         Ok(rows)
     }
 
-    pub fn set_read(&self, raw_id: &str, read: bool) -> Result<()> {
-        self.conn.execute("UPDATE messages SET is_read = ?2 WHERE id = ?1", params![raw_id, read])?;
-        Ok(())
+    /// True when the message was stored and changed (unread to read, or back).
+    pub fn set_read(&self, raw_id: &str, read: bool) -> Result<bool> {
+        Ok(self.conn.execute("UPDATE messages SET is_read = ?2 WHERE id = ?1 AND is_read != ?2", params![raw_id, read])? > 0)
     }
 
     pub fn set_flag(&self, raw_id: &str, flagged: bool) -> Result<()> {

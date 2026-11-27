@@ -1,5 +1,7 @@
-//! Core events → window events, desktop notifications and the unread badge.
+//! Core events → window events, desktop notifications, the unread badge and the new-mail
+//! envelope.
 
+use crate::badge::NewMail;
 use crate::state::AppState;
 use mail_core::model::{Account, MessageSummary};
 use mail_core::EventSink;
@@ -37,6 +39,7 @@ impl EventSink for TauriEvents {
         self.later(move |app| {
             let _ = app.emit("mail://changed", json!({ "accountIds": ids }));
             emit_accounts(app);
+            prune_new_mail(app);
         });
     }
     fn accounts_changed(&self) {
@@ -66,7 +69,28 @@ impl EventSink for TauriEvents {
     fn new_mail(&self, account: &Account, messages: &[MessageSummary]) {
         let account = account.clone();
         let messages = messages.to_vec();
-        self.later(move |app| notify_new_mail(app, &account, &messages));
+        self.later(move |app| {
+            if let Some(b) = app.try_state::<NewMail>() {
+                b.arrived(messages.iter().map(|m| m.id.clone()));
+                crate::tray::show_new_mail(app);
+            }
+            notify_new_mail(app, &account, &messages)
+        });
+    }
+    fn unread_mail_read(&self) {
+        self.later(|app| {
+            if app.try_state::<NewMail>().is_some_and(|b| b.read()) {
+                crate::tray::show_new_mail(app);
+            }
+        });
+    }
+}
+
+/// Mail read on another device (or deleted) no longer counts as new mail.
+fn prune_new_mail(app: &AppHandle) {
+    let (Some(b), Some(s)) = (app.try_state::<NewMail>(), app.try_state::<AppState>()) else { return };
+    if b.prune(|ids| s.svc.still_unread(ids)) {
+        crate::tray::show_new_mail(app);
     }
 }
 

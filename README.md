@@ -17,7 +17,7 @@ A lightweight, fast replacement for Outlook on Windows and macOS: mail, calendar
 | 5. Calendar | Built. Day, work week and month views, accounts overlaid and toggleable, event panel with Accept / Tentative / Decline, create and edit, agenda panel, reminders. |
 | 6. Web accounts | Built. Outlook on the web in an isolated native web view per account, kept loaded in the background, with unread count and notifications captured from the page. Optional read-only calendar per account, read from the page with Outlook's own sign-in (docs/WEB_CALENDAR.md); checked against a real account on Windows. Needs the milestone-1 check on Windows and macOS, and the web calendar check on macOS. |
 | Find times | Built (beyond the spec). A button on each message sends that email to a model through the Vercel AI Gateway (`openai/gpt-6-luna` by default), which returns the times it proposes. The core converts zones and checks the weekdays; the interface checks each time against every visible calendar on the device, with Reply and Hold. Off until an AI Gateway key is added in Settings › General. |
-| 7. Polish | Mostly done. Dark mode, notifications, tray/dock badge, identical shortcuts, CI and signing/update pipeline ([docs/RELEASING.md](docs/RELEASING.md)). Still to do: real certificates, update host, two weeks of daily use. |
+| 7. Polish | Mostly done. Dark mode, notifications, tray/dock badge, a new-mail envelope on the Windows taskbar (on when new mail arrives, off once you read an unread message, as in classic Outlook), identical shortcuts, CI and signing/update pipeline ([docs/RELEASING.md](docs/RELEASING.md)). Still to do: real certificates, update host, two weeks of daily use. |
 
 ## Try it
 

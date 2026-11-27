@@ -182,10 +182,11 @@ impl AppDb {
         Ok(())
     }
 
-    pub fn set_web_unread(&self, id: &str, unread: Option<i64>) -> Result<bool> {
+    /// Returns the count it replaced.
+    pub fn set_web_unread(&self, id: &str, unread: Option<i64>) -> Result<Option<i64>> {
         let old: Option<i64> = self.conn.query_row("SELECT web_unread FROM accounts WHERE id = ?1", [id], |r| r.get(0)).optional()?.flatten();
         self.conn.execute("UPDATE accounts SET web_unread = ?2 WHERE id = ?1", params![id, unread])?;
-        Ok(old != unread)
+        Ok(old)
     }
 
     /// Turn reading the calendar from Outlook on the web on or off. Off clears the status.

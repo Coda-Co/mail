@@ -29,6 +29,9 @@ pub trait EventSink: Send + Sync {
     /// A pending operation was queued; the sync engine should run soon.
     fn work_queued(&self, _account_id: &str) {}
     fn new_mail(&self, _account: &Account, _messages: &[MessageSummary]) {}
+    /// The user marked mail that was unread as read here (opened it, or chose Mark as read).
+    /// Marking mail that was already read doesn't count, nor does mail read on another device.
+    fn unread_mail_read(&self) {}
 }
 
 pub struct NoEvents;
@@ -363,12 +366,13 @@ impl MailService {
         Ok(())
     }
 
-    pub fn set_web_unread(&self, id: &str, unread: Option<i64>) -> Result<bool> {
-        let changed = self.app().set_web_unread(id, unread)?;
-        if changed {
+    /// Record a web account's Inbox unread count. Returns the count it replaced.
+    pub fn set_web_unread(&self, id: &str, unread: Option<i64>) -> Result<Option<i64>> {
+        let old = self.app().set_web_unread(id, unread)?;
+        if old != unread {
             self.events().accounts_changed();
         }
-        Ok(changed)
+        Ok(old)
     }
 
     // ================================================================= folders & lists
@@ -566,12 +570,21 @@ impl MailService {
 
     pub fn mark_read(&self, ids_list: &[String], read: bool) -> Result<()> {
         let groups = Self::group_by_account(ids_list)?;
+        let mut changed = false;
         for (acc, raws) in &groups {
-            self.with_account(acc, |db| raws.iter().try_for_each(|r| db.set_read(r, read)))?;
+            changed |= self.with_account(acc, |db| raws.iter().try_fold(false, |any, r| Ok(db.set_read(r, read)? || any)))?;
             self.enqueue(acc, &Op::MarkRead { ids: raws.clone(), read })?;
         }
         self.changed(groups.into_iter().map(|g| g.0).collect());
+        if read && changed {
+            self.events().unread_mail_read();
+        }
         Ok(())
+    }
+
+    /// Those of `ids` that are still stored and unread (read elsewhere or deleted are left out).
+    pub fn still_unread(&self, ids_list: &[String]) -> Vec<String> {
+        ids_list.iter().filter(|id| self.stored_message(id).is_ok_and(|m| !m.message.summary.is_read)).cloned().collect()
     }
 
     pub fn set_flag(&self, ids_list: &[String], flagged: bool) -> Result<()> {
