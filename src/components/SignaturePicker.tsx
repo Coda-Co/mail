@@ -39,14 +39,23 @@ export function SignaturePicker({
       <button
         type="button"
         className="account-picker signature-picker"
-        aria-label="Signature"
-        title="Signature"
+        aria-label={`Signature: ${current ? current.name : signatureId ? 'custom' : 'none'}`}
+        title="Change signature"
         onClick={(e) => {
           setAnchor(e.currentTarget);
           void load();
         }}
       >
-        {current ? current.name : signatureId ? 'Signature' : signatures.length === 0 ? 'Add signature' : 'No signature'} ▾
+        {signatures.length === 0 && !signatureId ? (
+          'Add signature'
+        ) : (
+          <>
+            {/* Labelled like From, so the name reads as the signature rather than a second account. */}
+            <span className="signature-picker-label">Signature</span>
+            {current ? current.name : signatureId ? 'Custom' : 'None'}
+          </>
+        )}{' '}
+        ▾
       </button>
       {anchor && (
         <Menu

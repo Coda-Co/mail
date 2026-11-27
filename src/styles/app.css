@@ -2251,6 +2251,11 @@ h3 {
   color: var(--text-secondary);
 }
 
+.signature-picker-label {
+  margin-right: 8px;
+  color: var(--text-muted);
+}
+
 .draft-editor {
   padding: 14px 16px;
   font-size: var(--fs-reading);
@@ -2426,18 +2431,6 @@ h3 {
 
 .spell-corrected s {
   color: var(--text-muted);
-}
-
-.draft-footer {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.draft-footer .spacer {
-  flex: 1;
 }
 
 .draft-attachments {
