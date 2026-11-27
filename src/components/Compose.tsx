@@ -28,6 +28,8 @@ export function useDraft(initial: Draft) {
   const dirty = useRef(false);
   // Changed in this window, saved or not.
   const touched = useRef(false);
+  // Bumped on every local edit, so a fetch that started before one can tell it is stale.
+  const edits = useRef(0);
 
   const save = useCallback(async () => {
     if (timer.current) clearTimeout(timer.current);
@@ -57,6 +59,7 @@ export function useDraft(initial: Draft) {
       setDraft(latest.current);
       dirty.current = true;
       touched.current = true;
+      edits.current += 1;
       setSaveState('dirty');
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(save, 800);
@@ -70,11 +73,21 @@ export function useDraft(initial: Draft) {
   }, []);
 
   // Pick up edits made in another window (pop-out) while we're not editing.
+  // Our own autosaves fire this event too. If the user typed while the fetch was
+  // in flight, the fetched copy is older than the editor, and taking it would
+  // reset the editor (caret to the start, newest keystrokes lost), so drop it.
   useEffect(
     () =>
       onEvent<{ draftId: string }>(EVENTS.draftChanged, ({ draftId }) => {
         if (draftId !== initial.id || dirty.current) return;
-        api.getDraft(draftId).then(replace).catch(() => {});
+        const seen = edits.current;
+        api
+          .getDraft(draftId)
+          .then((d) => {
+            if (dirty.current || edits.current !== seen) return;
+            replace(d);
+          })
+          .catch(() => {});
       }),
     [initial.id, replace],
   );
