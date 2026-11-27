@@ -49,7 +49,8 @@ export function EventForm({
   const [to, setTo] = useState(allDay ? addDays(startOfDay(e0), -1) : e0);
   const [location, setLocation] = useState(event?.location ?? '');
   const [attendees, setAttendees] = useState<Address[]>(event?.attendees.filter((a) => a.response !== 'organizer').map((a) => a.address) ?? []);
-  const [online, setOnline] = useState(event?.isOnlineMeeting ?? false);
+  // New invitations are Teams meetings unless unticked; existing events keep their setting.
+  const [online, setOnline] = useState(event?.isOnlineMeeting ?? true);
   const [reminder, setReminder] = useState(event?.reminderMinutes ?? 15);
   const [body, setBody] = useState(event?.bodyHtml ?? '');
   const [error, setError] = useState<string | null>(null);
