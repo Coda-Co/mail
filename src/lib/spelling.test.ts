@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import nspell from 'nspell';
-import { autocorrection, isSlip, misspellings, shouldCheck, startsSentence, suggestionsFor, tokenize, TYPOS, type Checker } from './spelling';
+import { autocorrection, capitalisesAfter, capitalised, isSlip, misspellings, shouldCheck, startsSentence, suggestionsFor, tokenize, TYPOS, type Checker } from './spelling';
 
 function load(pkg: string): Checker {
   const dir = new URL(`../../node_modules/${pkg}/`, import.meta.url);
@@ -103,5 +103,28 @@ describe('autocorrection', () => {
     expect(isSlip('backend', 'backed')).toBe(false);
     expect(isSlip('async', 'sync')).toBe(false);
     expect(isSlip('teh', 'ten')).toBe(false);
+  });
+});
+
+describe('capitals at the start of sentences', () => {
+  it('starts a sentence at the start, after . ! ? and on a new line', () => {
+    for (const before of ['', '  ', '“', '(', 'Done. ', 'Really?  ', 'Great! "', 'Hi Sam,\n', 'Thanks.\n\n', 'It is (nearly) done.) ', 'He said “no.” ', '1. ']) {
+      expect(capitalisesAfter(before)).toBe(true);
+    }
+  });
+
+  it('leaves mid-sentence words, abbreviations, initials and ellipses alone', () => {
+    for (const before of ['Hi ', 'Hi Sam, ', 'apples, e.g. ', 'pears etc. ', 'see Dr. ', 'J. ', 'well... ', 'well… ', 'it is example.', 'done.', '- ', 'cf. ', 'at 9 a.m. ']) {
+      expect(capitalisesAfter(before)).toBe(false);
+    }
+  });
+
+  it('capitalises plain lower-case words only', () => {
+    expect(capitalised('thanks')).toBe('Thanks');
+    expect(capitalised('don’t')).toBe('Don’t');
+    expect(capitalised('a')).toBe('A');
+    expect(capitalised('Thanks')).toBe(null);
+    expect(capitalised('iPhone')).toBe(null);
+    expect(capitalised('eBay')).toBe(null);
   });
 });

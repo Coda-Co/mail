@@ -63,7 +63,7 @@ function lastMailbox(): string | undefined {
   }
 }
 
-const DEFAULT_SETTINGS: Settings = { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show', workStart: 9 * 60, workEnd: 18 * 60, spellcheck: true, autocorrect: true, spellingLanguage: 'en-GB', dictionary: [] };
+const DEFAULT_SETTINGS: Settings = { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show', workStart: 9 * 60, workEnd: 18 * 60, spellcheck: true, autocorrect: true, autocapitalize: true, spellingLanguage: 'en-GB', dictionary: [] };
 const DEFAULT_UPDATE: UpdateStatus = { state: 'unavailable', currentVersion: '' };
 const DEFAULT_SYNC: SyncStatus = { online: true, syncing: false, label: 'Loading…', outboxHeld: 0 };
 

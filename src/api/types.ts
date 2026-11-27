@@ -295,6 +295,8 @@ export interface Settings {
   spellcheck: boolean;
   /** Fix common typos as you type (Backspace straight after puts the word back). */
   autocorrect: boolean;
+  /** Capitalise the first word of a sentence (Backspace straight after puts it back). */
+  autocapitalize: boolean;
   spellingLanguage: 'en-GB' | 'en-US';
   /** Words added to the dictionary, lower case. */
   dictionary: string[];

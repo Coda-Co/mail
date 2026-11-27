@@ -56,6 +56,7 @@ function load(): DemoState {
             remoteImages: st.remoteImages ?? 'show',
             spellcheck: st.spellcheck ?? true,
             autocorrect: st.autocorrect ?? true,
+            autocapitalize: st.autocapitalize ?? true,
             spellingLanguage: st.spellingLanguage ?? 'en-GB',
             dictionary: st.dictionary ?? [],
           };

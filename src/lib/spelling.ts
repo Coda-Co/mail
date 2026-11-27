@@ -58,6 +58,40 @@ export function startsSentence(text: string, start: number): boolean {
   return true;
 }
 
+/** Abbreviations whose full stop rarely ends a sentence, lower case, without the last stop. */
+const ABBREVIATIONS = new Set(['e.g', 'eg', 'i.e', 'ie', 'etc', 'vs', 'cf', 'approx', 'incl', 'esp', 'mr', 'mrs', 'ms', 'dr', 'prof', 'st', 'fig', 'pp', 'a.m', 'p.m', 'ca', 'viz']);
+
+/**
+ * Whether a word should get a capital as the first of a sentence. `before` is
+ * the text ahead of it in the same paragraph, with line breaks as \n. Stricter
+ * than startsSentence: when in doubt (an abbreviation, an initial, an
+ * ellipsis, a list marker) it says no, so a word is only ever changed when
+ * the sentence clearly starts there. A new line counts, so the line after
+ * "Hi Sam," starts with a capital.
+ */
+export function capitalisesAfter(before: string): boolean {
+  let s = before.replace(/["'“‘(\[]+$/u, '');
+  if (s.trim() === '') return true;
+  const gap = s.match(/\s+$/u);
+  if (!gap) return false;
+  if (gap[0].includes('\n')) return true;
+  s = s.slice(0, -gap[0].length).replace(/[)\]"'”’]+$/u, '');
+  const last = s[s.length - 1];
+  if (last === '!' || last === '?') return true;
+  if (last !== '.') return false;
+  const word = s.slice(0, -1).match(/(\S*)$/u)![1].replace(/^["'“‘(\[]+/u, '');
+  if (word.endsWith('.') || word === '') return false; // an ellipsis, or a stray stop
+  if (/^\p{L}$/u.test(word)) return false; // an initial: J. Smith
+  return !ABBREVIATIONS.has(word.toLowerCase());
+}
+
+/** The word with a capital, if it is plain lower case (not iPhone, eBay or a lone I). */
+export function capitalised(word: string): string | null {
+  const first = word[0];
+  if (!first || first === first.toUpperCase() || word !== word.toLowerCase()) return null;
+  return first.toUpperCase() + word.slice(1);
+}
+
 /**
  * Whether a word is worth checking. Leaves out single letters, acronyms and
  * mixed case (KPI, iPhone, McDonald), and capitalised words in the middle of a
