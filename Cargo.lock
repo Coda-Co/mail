@@ -2572,7 +2572,7 @@ dependencies = [
 
 [[package]]
 name = "mail-app"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "chrono",
  "clipboard-rs",
@@ -2597,7 +2597,7 @@ dependencies = [
 
 [[package]]
 name = "mail-core"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "ammonia",
  "anyhow",
