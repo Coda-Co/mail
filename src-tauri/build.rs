@@ -1,6 +1,6 @@
 // Every command the interface may call is listed here so Tauri generates a permission for
 // it; capabilities/ then decide which windows get which. Web accounts (remote Outlook pages)
-// may only call the three reporting commands.
+// may only call the reporting commands (and forward the app's Ctrl+1–9 shortcuts).
 const COMMANDS: &[&str] = &[
     "me",
     "list_accounts",
@@ -64,6 +64,7 @@ const COMMANDS: &[&str] = &[
     "reload_web_account",
     "web_account_report",
     "web_account_notify",
+    "web_account_shortcut",
     "web_account_calendar_report",
     "web_account_event_attendees_report",
     "fetch_web_event_attendees",

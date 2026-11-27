@@ -199,6 +199,7 @@ pub fn run() {
             webaccounts::reload_web_account,
             webaccounts::web_account_report,
             webaccounts::web_account_notify,
+            webaccounts::web_account_shortcut,
             webaccounts::web_account_calendar_report,
             webaccounts::web_account_event_attendees_report,
             webaccounts::fetch_web_event_attendees,

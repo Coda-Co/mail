@@ -11,6 +11,7 @@ import { WebAccountView } from './views/WebAccountView';
 import { SettingsModal } from './views/SettingsModal';
 import { ComposeWindow, MessageWindow } from './views/PopOutWindows';
 import { runCommand, useCommand } from './lib/commands';
+import { EVENTS, onEvent } from './api';
 import { isBrowserReserved, isTypingTarget, resolveShortcut } from './lib/shortcuts';
 import { isMac } from './lib/platform';
 
@@ -29,10 +30,24 @@ function useGlobalShortcuts() {
   }, []);
 }
 
+/** Ctrl+1–9 (Cmd on macOS) pressed inside Outlook on the web, forwarded by its injected script. */
+function useWebAccountShortcuts() {
+  useEffect(
+    () =>
+      onEvent<{ digit: number }>(EVENTS.webShortcut, ({ digit }) => {
+        const key = { key: String(digit), ctrlKey: !isMac, metaKey: isMac, shiftKey: false, altKey: false };
+        const id = resolveShortcut(key, true, isMac);
+        if (id) runCommand(id);
+      }),
+    [],
+  );
+}
+
 function Shell() {
   const app = useApp();
   const [searchSlot, setSearchSlot] = useState<HTMLDivElement | null>(null);
   useGlobalShortcuts();
+  useWebAccountShortcuts();
   useCommand('goCalendar', () => app.navigate({ view: 'calendar' }));
   useCommand('goPeople', () => app.navigate({ view: 'people' }));
   // Outside the mail view, mail shortcuts switch to it first. In the mail

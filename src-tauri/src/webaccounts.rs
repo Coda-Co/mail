@@ -260,6 +260,13 @@ fn hide_all_except(app: &AppHandle, keep: Option<&str>) {
 #[tauri::command]
 pub async fn hide_web_accounts(app: AppHandle) -> Result<(), Error> {
     hide_all_except(&app, None);
+    // A hidden web view can keep keyboard focus (after Ctrl+1 from Outlook, say), leaving key
+    // presses going nowhere; give it back to the interface.
+    if !window_mode() {
+        if let Some(w) = app.get_webview(crate::MAIN) {
+            let _ = w.set_focus();
+        }
+    }
     Ok(())
 }
 
@@ -335,6 +342,18 @@ pub async fn web_account_report(webview: Webview, s: tauri::State<'_, AppState>,
         use tauri::Emitter;
         let _ = webview.app_handle().emit("web-account://unread", serde_json::json!({"accountId": id, "unread": unread}));
     }
+    Ok(())
+}
+
+/// Called by the injected script when Ctrl+1–9 (Cmd on macOS) is pressed in the page. The
+/// main interface runs the shortcut as if pressed there (switch to Mail, Calendar, a mailbox).
+#[tauri::command]
+pub async fn web_account_shortcut(webview: Webview, digit: u8) -> Result<(), Error> {
+    if account_of(&webview).is_none() || !(1..=9).contains(&digit) {
+        return Ok(());
+    }
+    use tauri::Emitter;
+    let _ = webview.app_handle().emit("web-account://shortcut", serde_json::json!({ "digit": digit }));
     Ok(())
 }
 

@@ -14,6 +14,23 @@
     } catch (_) {}
   };
 
+  // --- the app's view shortcuts (Ctrl+1–9, Cmd on macOS): keys pressed in this page never
+  // reach the app's interface, so hand them over. Taken before Outlook sees them, as Outlook
+  // has its own Ctrl+1/2/3 (Mail, Calendar, People) that would otherwise switch inside the page.
+  const mac = /Mac/i.test(navigator.platform || navigator.userAgent);
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.isComposing || e.altKey || e.shiftKey || (mac ? !e.metaKey || e.ctrlKey : !e.ctrlKey || e.metaKey)) return;
+      const m = /^Digit([1-9])$/.exec(e.code) || /^([1-9])$/.exec(e.key);
+      if (!m) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      invoke('web_account_shortcut', { digit: Number(m[1]) });
+    },
+    true,
+  );
+
   // --- unread count
   const num = (s) => {
     const m = String(s || '').match(/(\d[\d,.]*)/);
