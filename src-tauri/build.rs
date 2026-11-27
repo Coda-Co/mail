@@ -29,6 +29,7 @@ const COMMANDS: &[&str] = &[
     "set_draft_signature",
     "add_attachment",
     "add_attachment_data",
+    "paste_attachments",
     "remove_attachment",
     "discard_draft",
     "send_draft",

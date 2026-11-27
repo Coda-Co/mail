@@ -31,6 +31,7 @@ permissions = [
   "allow-set-draft-signature",
   "allow-add-attachment",
   "allow-add-attachment-data",
+  "allow-paste-attachments",
   "allow-remove-attachment",
   "allow-discard-draft",
   "allow-send-draft",
