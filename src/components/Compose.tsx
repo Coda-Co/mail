@@ -436,8 +436,17 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
   return (
     <div className={`draft-section${dropping ? ' dropping' : ''}`} ref={root} aria-label={`${MODE_TITLE[draft.mode]} draft`} onKeyDown={onKeyDown} {...dropProps}>
       {dropHint}
+      {/* Send leads the draft, so it's reachable without scrolling past a long message. */}
       <div className="draft-section-header">
-        <span className="title">{MODE_TITLE[draft.mode]}</span>
+        <button type="button" className="btn btn-primary" onClick={send} disabled={sending}>
+          Send
+        </button>
+        <span className="kbd-hint">{keyLabel('Mod+Enter')}</span>
+        <span className="spacer" />
+        <span className="kbd-hint">{saveLabel}</span>
+        <button type="button" className="btn btn-ghost btn-icon" aria-label="Attach a file" title="Attach a file" onClick={attach}>
+          <Paperclip size={16} />
+        </button>
         <button type="button" className="btn btn-ghost" onClick={popOut}>
           <ExternalLink size={14} />
           Pop out
@@ -455,17 +464,6 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
       {attachments}
       {body}
       {error && <div className="draft-error">{error}</div>}
-      <div className="draft-footer">
-        <button type="button" className="btn btn-primary" onClick={send} disabled={sending}>
-          Send
-        </button>
-        <span className="kbd-hint">{keyLabel('Mod+Enter')}</span>
-        <span className="spacer" />
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="Attach a file" title="Attach a file" onClick={attach}>
-          <Paperclip size={16} />
-        </button>
-        <span className="kbd-hint">{saveLabel}</span>
-      </div>
     </div>
   );
 }

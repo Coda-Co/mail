@@ -536,7 +536,7 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
   if (selection.kind === 'draft') {
     return (
       <article className="reading-pane" aria-label="Compose">
-        <div className="reading-toolbar">
+        <div className="reading-toolbar back-only">
           <button type="button" className="btn btn-ghost back-button" onClick={onBack}>
             <ArrowLeft size={15} /> Back
           </button>

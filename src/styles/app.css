@@ -2079,20 +2079,30 @@ h3 {
   border-top: 1px solid var(--border);
 }
 
+/* A standalone new message has nothing above it to divide from. */
+.reading-content > .draft-section:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
 .draft-section-header {
   display: flex;
   align-items: center;
   gap: 4px;
-  min-height: 28px;
+  min-height: 32px;
+  padding-bottom: 6px;
 }
 
-.draft-section-header .title {
-  font-size: var(--fs-small);
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.draft-section-header > .kbd-hint:first-of-type {
+  margin-left: 6px;
+}
+
+.draft-section-header .spacer {
   flex: 1;
+}
+
+.draft-section-header .kbd-hint + .btn-icon {
+  margin-left: 6px;
 }
 
 .draft-section-header .btn-ghost {
@@ -2103,7 +2113,6 @@ h3 {
 
 .draft-section .field-row,
 .draft-section .draft-editor,
-.draft-section .draft-footer,
 .draft-section .draft-error,
 .draft-section .draft-popped {
   padding-left: 0;
@@ -2113,10 +2122,6 @@ h3 {
 .draft-section .draft-attachments {
   padding: 10px 0 2px;
   border-bottom: 1px solid var(--border-subtle);
-}
-
-.draft-section .draft-footer {
-  border-top: none;
 }
 
 .field-row {
