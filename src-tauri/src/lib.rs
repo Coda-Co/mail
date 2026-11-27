@@ -117,6 +117,15 @@ pub fn run() {
                 if let Some(s) = window.try_state::<AppState>() {
                     s.wake.notify_one();
                 }
+                // The interface is a child web view, so activating the window from its title
+                // bar (or Alt+Tab) focuses only the native window and key presses go nowhere:
+                // Ctrl+1/2/3 and the other shortcuts do nothing until the page is clicked.
+                // Hand focus to the interface, unless a web account is showing over it.
+                if !webaccounts::embedded_shown() {
+                    if let Some(w) = window.app_handle().get_webview(MAIN) {
+                        let _ = w.set_focus();
+                    }
+                }
             }
             // Closing a pop-out compose window docks the draft back.
             tauri::WindowEvent::Destroyed => commands::on_window_closed(window.app_handle(), window.label()),
@@ -190,6 +199,7 @@ pub fn run() {
             webaccounts::reload_web_account,
             webaccounts::web_account_report,
             webaccounts::web_account_notify,
+            webaccounts::web_account_shortcut,
             webaccounts::web_account_calendar_report,
             webaccounts::web_account_event_attendees_report,
             webaccounts::fetch_web_event_attendees,

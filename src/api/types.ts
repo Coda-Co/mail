@@ -467,6 +467,8 @@ export const EVENTS = {
   syncStatus: 'sync://status',
   /** payload: { accountId, unread: number | null } */
   webUnread: 'web-account://unread',
+  /** payload: { digit: 1–9 } — Ctrl/Cmd+digit pressed inside a web account */
+  webShortcut: 'web-account://shortcut',
   /** payload: { draftId } — a pop-out draft was docked back or closed */
   draftDocked: 'draft://docked',
   /** payload: { draftId } — draft changed in another window */
