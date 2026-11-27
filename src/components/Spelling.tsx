@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 import { createPortal } from 'react-dom';
 import { BookPlus, EyeOff, Undo2 } from 'lucide-react';
 import { checkerFor, ignoreWord, onDictionaryChange, type SpellingLanguage } from '../lib/dictionary';
-import { autocorrection, BOUNDARY, capitalisesAfter, capitalised, misspellings, startsSentence, suggestionsFor, type Checker } from '../lib/spelling';
+import { autocorrection, BOUNDARY, capitalFor, capitalised, finishedWord, misspellings, startsSentence, suggestionsFor, type Checker } from '../lib/spelling';
 import { useCommand } from '../lib/commands';
 import { keyLabel, isMac } from '../lib/platform';
 import { matches } from '../lib/shortcuts';
@@ -271,27 +271,14 @@ export function useSpelling(editor: RefObject<HTMLDivElement>, opts: SpellingOpt
       const skip = at.node.parentElement?.closest(SKIP);
       if (skip && root.contains(skip)) return;
       const text = (at.node as Text).data;
-      const space = e.inputType !== 'insertText' || /\s/.test(e.data!);
-      // Usually the word just typed ends at the caret. After "ok." (or "ok.)") it ends
-      // before the stop: a stop alone doesn't capitalise, as example.com would get one.
-      let end = at.offset;
-      if (o.autocapitalize && space) {
-        const tail = text.slice(0, end).match(/[.)\]"'”’]+$/u)?.[0] ?? '';
-        if (tail.includes('.')) end -= tail.length;
-      }
-      const afterStop = end < at.offset;
-      let start = end;
-      while (start > 0 && /[\p{L}'’]/u.test(text[start - 1])) start--;
-      const word = text.slice(start, end).replace(/^['’]+/, '');
-      start = end - word.length;
-      // Only a whole word standing on its own: not part of an address, a number or a path.
-      if (!word || /[\p{L}\d]/u.test(text[end] ?? '') || /[\d@/\\._#-]/.test(text[start - 1] ?? '')) return;
-      if (afterStop && /[\p{L}\d]/u.test(text[end + 1] ?? '')) return;
+      const boundary = e.inputType === 'insertText' ? e.data! : '\n';
+      const found = finishedWord(text, at.offset, o.autocapitalize ? boundary : '');
+      if (!found) return;
+      const { word, start, end, afterStop } = found;
       const before = textBefore(root, at.node, start);
-      const opening = capitalisesAfter(before);
       // A word ended by a stop was already checked for typos when the stop was typed.
       let fixed = fixing && !afterStop ? autocorrection(word, checker!, startsSentence(before + word, before.length)) : null;
-      const capital = o.autocapitalize && opening && !(e.data === '.' && !afterStop) ? capitalised(fixed ?? word) : null;
+      const capital = o.autocapitalize && boundary !== '.' ? capitalFor(fixed ?? word, before) : null;
       if (capital) fixed = capital;
       if (!fixed || fixed === word) return;
       e.preventDefault();
@@ -458,6 +445,53 @@ export function useSpelling(editor: RefObject<HTMLDivElement>, opts: SpellingOpt
   const recheck = useCallback(() => schedule(0), [schedule]);
 
   return { card: view, nativeSpellcheck: opts.spellcheck && !highlightsSupported, recheck };
+}
+
+/**
+ * Capitals for a one-line text field such as the subject: the first word of a
+ * sentence, and days and months. Backspace straight after puts the word back.
+ * The change is typed in, so onChange and undo work as usual. Returns
+ * the field's ref.
+ */
+export function useFieldCapitals(enabled: boolean): (el: HTMLInputElement | null) => void {
+  const [el, setEl] = useState<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (!el || !enabled) return;
+    let just: { caret: number; start: number; original: string; corrected: string } | null = null;
+    const onBeforeInput = (e: InputEvent) => {
+      just = null;
+      if (e.isComposing || e.inputType !== 'insertText' || !e.data || !BOUNDARY.test(e.data) || e.data === '.') return;
+      const at = el.selectionStart;
+      if (at === null || at !== el.selectionEnd) return;
+      const found = finishedWord(el.value, at, e.data);
+      const fixed = found && capitalFor(found.word, el.value.slice(0, found.start));
+      if (!found || !fixed) return;
+      // Typed into the field, so it joins the undo history and React hears it.
+      e.preventDefault();
+      el.setSelectionRange(found.start, found.end);
+      document.execCommand('insertText', false, fixed);
+      el.setSelectionRange(at, at);
+      document.execCommand('insertText', false, e.data);
+      just = { caret: at + e.data.length, start: found.start, original: found.word, corrected: fixed };
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      const j = just;
+      if (e.key !== 'Shift') just = null;
+      if (e.key !== 'Backspace' || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey || !j) return;
+      if (el.selectionStart !== j.caret || el.selectionEnd !== j.caret || el.value.slice(j.start, j.start + j.corrected.length) !== j.corrected) return;
+      e.preventDefault();
+      el.setSelectionRange(j.start, j.start + j.corrected.length);
+      document.execCommand('insertText', false, j.original);
+      el.setSelectionRange(j.caret, j.caret);
+    };
+    el.addEventListener('beforeinput', onBeforeInput);
+    el.addEventListener('keydown', onKeyDown);
+    return () => {
+      el.removeEventListener('beforeinput', onBeforeInput);
+      el.removeEventListener('keydown', onKeyDown);
+    };
+  }, [el, enabled]);
+  return setEl;
 }
 
 function caretFromPoint(x: number, y: number): { node: Node; offset: number } | null {

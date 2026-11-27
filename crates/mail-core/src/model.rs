@@ -725,7 +725,7 @@ pub struct Settings {
     /// Fix common typos as they're typed.
     #[serde(default = "default_true")]
     pub autocorrect: bool,
-    /// Capitalise the first word of a sentence.
+    /// Capitalise the first word of a sentence, and days and months.
     #[serde(default = "default_true")]
     pub autocapitalize: bool,
     /// "en-GB" or "en-US".

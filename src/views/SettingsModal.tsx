@@ -193,7 +193,7 @@ function GeneralTab() {
         </label>
         <label className="check">
           <input type="checkbox" checked={settings.autocapitalize} onChange={(e) => updateSettings({ autocapitalize: e.target.checked })} />
-          Capitalise the start of sentences
+          Capitalise sentences, days and months
         </label>
         <div className="form-row">
           <label htmlFor="spelling-language">Language</label>
