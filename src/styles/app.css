@@ -4554,10 +4554,6 @@ h3 {
   z-index: 1;
 }
 
-.meeting-preview-event.pending {
-  border-left-style: dashed;
-}
-
 .meeting-preview-event.pending .title {
   opacity: 0.75;
 }

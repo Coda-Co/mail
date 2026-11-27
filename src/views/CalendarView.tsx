@@ -512,11 +512,11 @@ export function CalendarView() {
   const title =
     mode === 'month' ? `${monthName(anchor.getMonth())} ${anchor.getFullYear() !== today.getFullYear() ? anchor.getFullYear() : ''}`.trim() : rangeTitle(days[0], days[days.length - 1]);
 
-  // Tentative and unanswered events: washed-out fill and a dashed edge in the calendar's colour.
+  // Tentative and unanswered events: washed-out fill and a dashed edge in the calendar's colour; the left bar stays solid.
   const style = (e: CalendarEvent, isSelected: boolean) => ({
     background: isSelected ? eventSelectedFill(e.color, dark) : isPending(e) ? eventPendingFill(e.color, dark) : eventFill(e.color, dark),
     border: isPending(e) ? `1px dashed ${e.color}` : 'none',
-    borderLeft: `4px ${isPending(e) ? 'dashed' : 'solid'} ${e.color}`,
+    borderLeft: `4px solid ${e.color}`,
     outline: isSelected ? '2px solid var(--text)' : undefined,
     outlineOffset: -1,
   });
