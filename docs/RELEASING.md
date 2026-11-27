@@ -36,7 +36,8 @@ Then:
 
 1. Put the public key in `src-tauri/tauri.updater.conf.json` (`plugins.updater.pubkey`). The endpoint is this public repository's latest release (`https://github.com/Coda-Co/mail/releases/latest/download/latest.json`), which `tauri-action` uploads. Releases are created as drafts; clients only see an update once the draft is published. The private key lives at `~/.tauri/mail-updater.key` on the release machine.
 2. Store the private key and its password in CI as `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
-3. Release builds use:
+3. Pushing a `v*` tag runs `.github/workflows/release.yml`: one job creates the draft release, the three platform builds upload into it in parallel, and a final `updater-manifest` job writes `latest.json` from their `.sig` files once all of them have finished. It fails if any platform's update bundle is missing. If a build fails, re-run the failed jobs; the manifest job runs again after them.
+4. Release builds use:
 
    ```bash
    pnpm tauri build --features updater -c src-tauri/tauri.updater.conf.json

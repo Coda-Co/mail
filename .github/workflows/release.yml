@@ -10,7 +10,28 @@ permissions:
   contents: write
 
 jobs:
+  # One job makes the draft release up front, so the parallel builds below don't race to create it.
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    outputs:
+      release-id: ${{ steps.release.outputs.id }}
+    steps:
+      - id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          id=$(gh api "repos/$GH_REPO/releases" --paginate --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -n1)
+          if [ -z "$id" ]; then
+            gh release create "$TAG" --draft --verify-tag --title "Mail $TAG" --notes ""
+            id=$(gh api "repos/$GH_REPO/releases" --paginate --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -n1)
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
   release:
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -60,7 +81,60 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: --target ${{ matrix.target }} --features updater -c src-tauri/tauri.updater.conf.json
-          tagName: ${{ github.ref_name }}
-          releaseName: Mail ${{ github.ref_name }}
-          releaseDraft: true
-          includeUpdaterJson: true
+          releaseId: ${{ needs.create-release.outputs.release-id }}
+          # latest.json is written once, by the updater-manifest job, after every build has
+          # uploaded. Letting each build edit it in turn raced and could drop a platform.
+          includeUpdaterJson: false
+
+  updater-manifest:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir sigs
+          gh release download "$TAG" -p '*.sig' -D sigs
+          python3 - <<'PY'
+          import datetime, glob, json, os, sys
+
+          repo, tag = os.environ["GH_REPO"], os.environ["TAG"]
+          version = json.load(open("src-tauri/tauri.conf.json"))["version"]
+          if tag != f"v{version}":
+              sys.exit(f"tag {tag} does not match tauri.conf.json version {version}")
+
+          # updater platform keys -> the bundle tauri-action uploads for them
+          wanted = {
+              ("darwin-aarch64", "darwin-aarch64-app"): "Mail_aarch64.app.tar.gz",
+              ("darwin-x86_64", "darwin-x86_64-app"): "Mail_x64.app.tar.gz",
+              ("windows-x86_64", "windows-x86_64-nsis"): f"Mail_{version}_x64-setup.exe",
+          }
+          platforms, missing = {}, []
+          for keys, asset in wanted.items():
+              sig = f"sigs/{asset}.sig"
+              if not os.path.exists(sig):
+                  missing.append(asset)
+                  continue
+              entry = {
+                  "signature": open(sig).read().strip(),
+                  "url": f"https://github.com/{repo}/releases/download/{tag}/{asset}",
+              }
+              for k in keys:
+                  platforms[k] = entry
+          if missing:
+              sys.exit(f"missing update bundles: {missing}; found {sorted(glob.glob('sigs/*'))}")
+
+          manifest = {
+              "version": version,
+              "notes": "",
+              "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "platforms": platforms,
+          }
+          with open("latest.json", "w") as f:
+              json.dump(manifest, f, indent=2)
+          print(json.dumps(manifest, indent=2))
+          PY
+          gh release upload "$TAG" latest.json --clobber
