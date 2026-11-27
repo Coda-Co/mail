@@ -1,14 +1,23 @@
-import { useEffect, useState } from 'react';
-import { api } from '../api';
-import type { CalendarInfo } from '../api/types';
-import { useApp } from '../state/app';
-import { webCalendarNote } from '../lib/webCalendar';
-import { now } from '../lib/clock';
-import { useTick } from '../lib/useTick';
-import { MiniCalendar } from './MiniCalendar';
+import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { api } from "../api";
+import type { CalendarInfo } from "../api/types";
+import { useApp } from "../state/app";
+import { webCalendarNote } from "../lib/webCalendar";
+import { now } from "../lib/clock";
+import { useTick } from "../lib/useTick";
+import { MiniCalendar } from "./MiniCalendar";
 
 /** Calendar's own sidebar: a month overview, and which accounts' calendars to show. */
-export function CalendarSidebar({ anchor, range, onPick }: { anchor: Date; range: Date[]; onPick: (d: Date) => void }) {
+export function CalendarSidebar({
+  anchor,
+  range,
+  onPick,
+}: {
+  anchor: Date;
+  range: Date[];
+  onPick: (d: Date) => void;
+}) {
   const app = useApp();
   const { accounts } = app;
   const [calendars, setCalendars] = useState<CalendarInfo[]>([]);
@@ -18,6 +27,20 @@ export function CalendarSidebar({ anchor, range, onPick }: { anchor: Date; range
   }, [accounts]);
 
   useTick();
+
+  const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed);
+  const toggleCollapsed = (id: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]));
+      } catch {
+        /* not saved; still collapses for now */
+      }
+      return next;
+    });
 
   const setVisible = async (ids: string[], visible: boolean) => {
     for (const id of ids) await api.setCalendarVisible(id, visible);
@@ -31,9 +54,13 @@ export function CalendarSidebar({ anchor, range, onPick }: { anchor: Date; range
         <MiniCalendar anchor={anchor} range={range} onPick={onPick} />
         <div className="nav-section">Calendars</div>
         {accounts.map((a) => {
-          if (a.kind === 'web' && !a.webCalendar)
+          if (a.kind === "web" && !a.webCalendar)
             return (
-              <label key={a.id} className="cal-check disabled" title="Turn on “Show this calendar in Calendar” in the account’s settings">
+              <label
+                key={a.id}
+                className="cal-check disabled"
+                title="Turn on “Show this calendar in Calendar” in the account’s settings"
+              >
                 <input type="checkbox" disabled />
                 {a.displayName} (web only)
               </label>
@@ -41,38 +68,77 @@ export function CalendarSidebar({ anchor, range, onPick }: { anchor: Date; range
           const cals = calendars.filter((c) => c.accountId === a.id);
           const visible = cals.some((c) => c.visible);
           const note = webCalendarNote(a, now());
+          const open = !collapsed.has(a.id);
           return (
             <div key={a.id}>
-              <label className={`cal-check${cals.length === 0 ? ' disabled' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={visible}
-                  disabled={cals.length === 0}
-                  style={{ accentColor: a.color }}
-                  onChange={(e) =>
-                    setVisible(
-                      cals.map((c) => c.id),
-                      e.target.checked,
-                    )
-                  }
-                />
-                {a.displayName}
-                {a.kind === 'web' && (
-                  <>
-                    {' '}
-                    <span className="web-tag">web</span>
-                  </>
+              <div className="cal-account">
+                <label
+                  className={`cal-check${cals.length === 0 ? " disabled" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={visible}
+                    ref={(el) => {
+                      if (el)
+                        el.indeterminate =
+                          visible && cals.some((c) => !c.visible);
+                    }}
+                    disabled={cals.length === 0}
+                    style={{ accentColor: a.color }}
+                    onChange={(e) =>
+                      setVisible(
+                        cals.map((c) => c.id),
+                        e.target.checked,
+                      )
+                    }
+                  />
+                  {a.displayName}
+                  {a.kind === "web" && (
+                    <>
+                      {" "}
+                      <span className="web-tag">web</span>
+                    </>
+                  )}
+                </label>
+                {cals.length > 1 && (
+                  <button
+                    type="button"
+                    className={`cal-collapse${open ? "" : " closed"}`}
+                    aria-expanded={open}
+                    aria-label={`${open ? "Hide" : "Show"} ${a.displayName}’s calendars`}
+                    title={open ? "Hide calendars" : "Show calendars"}
+                    onClick={() => toggleCollapsed(a.id)}
+                  >
+                    <ChevronDown size={14} aria-hidden />
+                  </button>
                 )}
-              </label>
+              </div>
               {note && (
-                <div className="cal-note" title={a.webCalendarError ? 'Showing the last events read' : undefined}>
+                <div
+                  className="cal-note"
+                  title={
+                    a.webCalendarError
+                      ? "Showing the last events read"
+                      : undefined
+                  }
+                >
                   {note}
                 </div>
               )}
               {cals.length > 1 &&
+                open &&
                 cals.map((c) => (
-                  <label key={c.id} className="cal-check" style={{ paddingLeft: 34 }}>
-                    <input type="checkbox" checked={c.visible} style={{ accentColor: c.color }} onChange={(e) => setVisible([c.id], e.target.checked)} />
+                  <label
+                    key={c.id}
+                    className="cal-check"
+                    style={{ paddingLeft: 34 }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={c.visible}
+                      style={{ accentColor: c.color }}
+                      onChange={(e) => setVisible([c.id], e.target.checked)}
+                    />
                     {c.name}
                   </label>
                 ))}
@@ -82,4 +148,20 @@ export function CalendarSidebar({ anchor, range, onPick }: { anchor: Date; range
       </div>
     </aside>
   );
+}
+
+const COLLAPSED_KEY = "calendar.collapsedAccounts";
+
+/** Accounts whose list of calendars is folded away, remembered between runs. */
+function loadCollapsed(): Set<string> {
+  try {
+    const ids = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "[]");
+    return new Set(
+      Array.isArray(ids)
+        ? ids.filter((x): x is string => typeof x === "string")
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
 }
