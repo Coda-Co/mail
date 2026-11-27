@@ -2251,11 +2251,6 @@ h3 {
   color: var(--text-secondary);
 }
 
-.signature-picker-label {
-  margin-right: 8px;
-  color: var(--text-muted);
-}
-
 .draft-editor {
   padding: 14px 16px;
   font-size: var(--fs-reading);

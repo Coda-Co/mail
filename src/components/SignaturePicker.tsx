@@ -46,16 +46,8 @@ export function SignaturePicker({
           void load();
         }}
       >
-        {signatures.length === 0 && !signatureId ? (
-          'Add signature'
-        ) : (
-          <>
-            {/* Labelled like From, so the name reads as the signature rather than a second account. */}
-            <span className="signature-picker-label">Signature</span>
-            {current ? current.name : signatureId ? 'Custom' : 'None'}
-          </>
-        )}{' '}
-        ▾
+        {/* Just the word: the menu shows which signature is ticked. */}
+        Signature ▾
       </button>
       {anchor && (
         <Menu
