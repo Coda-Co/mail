@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Account, CalendarEvent } from '../api/types';
-import { eventActions, webCalendarErrorText, webCalendarNote, webCalendarStatus } from './webCalendar';
+import { eventActions, isPending, webCalendarErrorText, webCalendarNote, webCalendarStatus } from './webCalendar';
 
 const ref = new Date(2026, 10, 23, 12, 0);
 const minsAgo = (m: number) => new Date(ref.getTime() - m * 60000).toISOString();
@@ -68,5 +68,18 @@ describe('event panel actions', () => {
   it('lets organisers edit and others respond', () => {
     expect(eventActions(event({ myResponse: 'organizer' }))).toEqual({ respond: false, edit: true, delete: true });
     expect(eventActions(event({ myResponse: 'accepted' }))).toEqual({ respond: true, edit: false, delete: false });
+  });
+});
+
+describe('pending events', () => {
+  it('counts tentative and unanswered invitations', () => {
+    expect(isPending(event({ myResponse: 'tentative' }))).toBe(true);
+    expect(isPending(event({ myResponse: 'none' }))).toBe(true);
+  });
+  it('leaves firm and own events alone, and never flags read-only ones as unanswered', () => {
+    expect(isPending(event({ myResponse: 'accepted' }))).toBe(false);
+    expect(isPending(event({ myResponse: 'declined' }))).toBe(false);
+    expect(isPending(event({ myResponse: 'organizer' }))).toBe(false);
+    expect(isPending(event({ readOnly: true, myResponse: 'none' }))).toBe(false);
   });
 });

@@ -3764,8 +3764,10 @@ h3 {
   padding: 0;
 }
 
-.cal-event.tentative {
-  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 255, 255, 0.45) 6px 9px);
+/* Tentative or unanswered: the fill and dashed edge are set inline; the text steps back too. */
+.cal-event.pending .title,
+.cal-event.pending .location {
+  opacity: 0.75;
 }
 
 .all-day-event {
@@ -4029,6 +4031,14 @@ h3 {
 .month-event .t {
   color: var(--text-muted);
   flex-shrink: 0;
+}
+
+.month-event.pending .acc-dot {
+  box-sizing: border-box;
+}
+
+.month-event.pending .s {
+  opacity: 0.7;
 }
 
 .month-event .s {
@@ -4582,8 +4592,8 @@ h3 {
   z-index: 1;
 }
 
-.meeting-preview-event.tentative {
-  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 255, 255, 0.45) 6px 9px);
+.meeting-preview-event.pending .title {
+  opacity: 0.75;
 }
 
 .meeting-preview-event.declined .title {

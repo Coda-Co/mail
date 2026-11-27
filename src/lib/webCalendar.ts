@@ -55,3 +55,11 @@ export function eventActions(e: CalendarEvent): { respond: boolean; edit: boolea
   const organizer = e.myResponse === 'organizer';
   return { respond: !organizer, edit: organizer, delete: organizer };
 }
+
+/**
+ * Not firmly in your diary: you said Tentative, or it's an invitation you haven't answered.
+ * Drawn dashed and washed out, like Outlook. Read-only (web) events never count as unanswered.
+ */
+export function isPending(e: CalendarEvent): boolean {
+  return e.myResponse === 'tentative' || (e.myResponse === 'none' && eventActions(e).respond);
+}
