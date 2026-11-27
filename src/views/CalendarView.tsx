@@ -43,6 +43,7 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
   const { accountById, navigate } = useApp();
   const toast = useToast();
   const [showAll, setShowAll] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const acc = accountById(event.accountId);
   const fromWeb = acc?.kind === 'web';
   const start = new Date(event.start);
@@ -118,11 +119,7 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
               type="button"
               className="btn btn-danger"
               style={{ marginRight: 'auto' }}
-              onClick={async () => {
-                await api.deleteEvent(event.id);
-                toast(event.attendees.length > 1 ? 'Event cancelled' : 'Event deleted');
-                onDeleted();
-              }}
+              onClick={() => setConfirmDelete(true)}
             >
               {event.attendees.length > 1 ? 'Cancel event' : 'Delete'}
             </button>
@@ -133,6 +130,7 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
         ) : undefined
       }
     >
+      {confirmDelete && <DeleteEventModal event={event} onCancel={() => setConfirmDelete(false)} onDeleted={onDeleted} />}
       <div className="modal-body event-detail">
         <span className="acc">
           <span className="acc-dot" style={{ background: acc?.color ?? event.color }} />
@@ -238,6 +236,51 @@ function retimed(event: CalendarEvent, start: Date, end: Date): EventInput {
     isOnlineMeeting: event.isOnlineMeeting,
     reminderMinutes: event.reminderMinutes,
   };
+}
+
+/** Asks before an event is deleted, or a meeting cancelled (its attendees get a cancellation). */
+function DeleteEventModal({ event, onCancel, onDeleted }: { event: CalendarEvent; onCancel: () => void; onDeleted: () => void }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const meeting = event.attendees.length > 1;
+  const invitees = otherAttendees(event);
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await api.deleteEvent(event.id);
+      toast(meeting ? 'Event cancelled' : 'Event deleted');
+      onDeleted();
+    } catch (e) {
+      toast(`Couldn’t ${meeting ? 'cancel' : 'delete'} the event: ${e instanceof Error ? e.message : e}`);
+      setBusy(false);
+      onCancel();
+    }
+  };
+  return (
+    <Modal
+      className="reschedule-modal"
+      title={meeting ? 'Cancel event?' : 'Delete event?'}
+      onClose={onCancel}
+      footer={
+        <>
+          <span className="hint" style={{ marginRight: 'auto' }}>
+            {meeting && invitees.length > 0 ? 'Attendees get a cancellation.' : ''}
+          </span>
+          <button type="button" className="btn" autoFocus onClick={onCancel}>
+            {meeting ? 'Keep event' : 'Cancel'}
+          </button>
+          <button type="button" className="btn btn-danger" onClick={remove} disabled={busy}>
+            {meeting ? 'Cancel event' : 'Delete'}
+          </button>
+        </>
+      }
+    >
+      <div className="modal-body reschedule">
+        <div className="reschedule-title">{eventTitle(event)}</div>
+        <span className="muted">{longDate(new Date(event.start))}{event.isAllDay ? '' : `, ${hhmm(new Date(event.start))} – ${hhmm(new Date(event.end))}`}</span>
+      </div>
+    </Modal>
+  );
 }
 
 /** Asks before a dragged or resized meeting is saved, since its attendees hear about it. */

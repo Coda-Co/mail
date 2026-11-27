@@ -19,12 +19,22 @@ use mail_core::model::{Account, AccountKind};
 use mail_core::Error;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Webview, WebviewBuilder, WebviewUrl, WebviewWindowBuilder};
 
 const SCRIPT: &str = include_str!("web_account.js");
+
+/// Whether a web account is showing over the main panel (embedded mode only).
+static EMBEDDED_SHOWN: AtomicBool = AtomicBool::new(false);
+
+/// True while an embedded web account covers the main panel, so it, not the main
+/// interface, should take keyboard focus when the window is activated.
+pub fn embedded_shown() -> bool {
+    EMBEDDED_SHOWN.load(Ordering::Relaxed)
+}
 
 fn label(account_id: &str) -> String {
     format!("web-{account_id}")
@@ -230,11 +240,15 @@ pub async fn show_web_account(app: AppHandle, s: tauri::State<'_, AppState>, acc
     w.set_position(LogicalPosition::new(bounds.x, bounds.y)).map_err(|e| Error::Other(e.to_string()))?;
     w.set_size(LogicalSize::new(bounds.width.max(1.0), bounds.height.max(1.0))).map_err(|e| Error::Other(e.to_string()))?;
     w.show().map_err(|e| Error::Other(e.to_string()))?;
+    EMBEDDED_SHOWN.store(true, Ordering::Relaxed);
     let _ = w.set_focus();
     Ok(())
 }
 
 fn hide_all_except(app: &AppHandle, keep: Option<&str>) {
+    if keep.is_none() {
+        EMBEDDED_SHOWN.store(false, Ordering::Relaxed);
+    }
     let keep = keep.map(label);
     for (l, w) in app.webviews() {
         if l.starts_with("web-") && Some(&l) != keep.as_ref() && app.get_webview_window(&l).is_none() {
