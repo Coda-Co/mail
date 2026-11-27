@@ -1,0 +1,177 @@
+[
+  {
+    "name": "list of ranges per day, compact times, UKT",
+    "subject": "RE: Catch up & demos",
+    "from": "Priya Nair",
+    "sentAt": "2026-11-27T14:24:00Z",
+    "body": "Hi Miles,\n\nI hope you are well,\n\nWould any of the dates below work for this session with Jan and Alex.\n\nWednesday 16th December 1130-1230, 1300-1400, 1530-1630 UKT\nThursday 17th December 11:00-1200, 1600-1700 UKT\nFriday 18th December 11:00-1200 UKT\n\nBest,\n\nPriya\n\nPriya Nair\nt: 020 3976 0000\nNorthgate Partners LLP\n10 Example Street, London",
+    "expect": [
+      { "start": "2026-12-16T11:30:00Z", "end": "2026-12-16T12:30:00Z" },
+      { "start": "2026-12-16T13:00:00Z", "end": "2026-12-16T14:00:00Z" },
+      { "start": "2026-12-16T15:30:00Z", "end": "2026-12-16T16:30:00Z" },
+      { "start": "2026-12-17T11:00:00Z", "end": "2026-12-17T12:00:00Z" },
+      { "start": "2026-12-17T16:00:00Z", "end": "2026-12-17T17:00:00Z" },
+      { "start": "2026-12-18T11:00:00Z", "end": "2026-12-18T12:00:00Z" }
+    ]
+  },
+  {
+    "name": "assistant offers windows for a 30 minute call, summer time",
+    "subject": "RE: Contacts and engagement",
+    "from": "Ellen Vance",
+    "sentAt": "2026-10-02T08:10:00Z",
+    "body": "Morning both,\n\nI hope you're well?\n\nPlease kindly let me know whether any of the following slots suit for a call next week:\n\nTuesday 6th between 11:00 – 13:00\nWednesday 7th between 10:00 – 11:00\nThursday 8th between 11:30 – 13:00\n\nKind regards,\n\nEllen Vance\nExecutive Assistant\n+44 (0)203 000 0000\n\nFrom: Alan Lowe <alan@example.pe>\nSent: 01 October 2026 17:25\nTo: Miles Rowland; Ellen Vance\nSubject: RE: Contacts and engagement\n\nCopying Ellen for my diary - can we find 30 mins next week?\n\nAlan",
+    "minutes": 30,
+    "expect": [
+      { "start": "2026-10-06T10:00:00Z", "end": "2026-10-06T12:00:00Z", "minutes": 30 },
+      { "start": "2026-10-07T09:00:00Z", "end": "2026-10-07T10:00:00Z", "minutes": 30 },
+      { "start": "2026-10-08T10:30:00Z", "end": "2026-10-08T12:00:00Z", "minutes": 30 }
+    ]
+  },
+  {
+    "name": "scheduling assistant: start-between windows under a date header",
+    "subject": "RE: Intro",
+    "from": "Clio (scheduling assistant)",
+    "sentAt": "2026-11-03T15:01:57Z",
+    "body": "Hi Andy and Jess,\n\nGlad to help arrange time to meet with Miles over Microsoft Teams.\n\nWhich of the following would be best to begin a 30 minute meeting for your team?\n\nMon (Nov 9):\n– starting between 9:30am and 11:00am (GMT)\n– starting between 3:00pm and 4:30pm (GMT)\n\nTue (Nov 10):\n– starting between 9:00am and 10:30am (GMT)\n– starting between 12:00pm and 1:30pm (GMT)\n\nWed (Nov 11):\n– at 1:00pm (GMT)\n– starting between 2:30pm and 4:00pm (GMT)\n\nFeel free to suggest other times if these don't work.\n\nCheers,\nClio\n\nOn Tue, 3 Nov 2026 14:59:09 +0000 Miles Rowland wrote:\n> could you help us find a 30 minute slot with Andy and Jess next week?",
+    "minutes": 30,
+    "expect": [
+      { "start": "2026-11-09T09:30:00Z", "end": "2026-11-09T11:30:00Z", "minutes": 30 },
+      { "start": "2026-11-09T15:00:00Z", "end": "2026-11-09T17:00:00Z", "minutes": 30 },
+      { "start": "2026-11-10T09:00:00Z", "end": "2026-11-10T11:00:00Z", "minutes": 30 },
+      { "start": "2026-11-10T12:00:00Z", "end": "2026-11-10T14:00:00Z", "minutes": 30 },
+      { "start": "2026-11-11T13:00:00Z", "end": "2026-11-11T13:30:00Z", "minutes": 30 },
+      { "start": "2026-11-11T14:30:00Z", "end": "2026-11-11T16:30:00Z", "minutes": 30 }
+    ]
+  },
+  {
+    "name": "prose, time before weekday, dots",
+    "subject": "RE: Exit prep next steps",
+    "from": "Ivan Petrov",
+    "sentAt": "2026-10-20T15:22:00Z",
+    "body": "Hi Miles,\n\nI can do 4.30 to 5.30 pm on Wednesday and 11.30 am to 1.30 pm on Thursday.\n\nKind regards,\nIvan\n\nFrom: Miles Rowland <miles@example.co>\nSent: Tuesday, October 20, 2026 4:59 PM\nTo: Ivan Petrov\nSubject: Exit prep next steps\n\nHi Ivan,\n\nDo you have any slots tomorrow or Thursday for a quick chat with me, Rosa and Nina on immediate next steps for the exit prep?\n\nThanks,\nMiles",
+    "expect": [
+      { "start": "2026-10-21T15:30:00Z", "end": "2026-10-21T16:30:00Z" },
+      { "start": "2026-10-22T10:30:00Z", "end": "2026-10-22T12:30:00Z" }
+    ]
+  },
+  {
+    "name": "bare weekdays that mean dates from the quoted thread",
+    "subject": "Re: Intro to Miles - data and AI use cases",
+    "from": "Sanjay Rao",
+    "sentAt": "2026-08-10T15:31:14Z",
+    "body": "Thursday 2.00pm and Friday 11.30am work for me\n\nThanks and Best regards\nSanjay Rao\nCo-Founder & CTO\n\nOn Mon 10 Aug 2026, 15:53 Ellen Vance, <ellen@example.pe> wrote:\n\n> Hi all,\n>\n> Following the emails below, please kindly let me know whether any of the following slots suit you:\n>\n> Thursday 20th between 14:00 – 15:00 or 16:30 -17:30\n>\n> Friday 21st between 11:30 – 14:00\n>\n> From: Alan Lowe\n> Sent: 10 August 2026 15:24\n> Ellen please could you help organise from our end? Would be good to get an hour on this I think.",
+    "minutes": 60,
+    "expect": [
+      { "start": "2026-08-20T13:00:00Z", "end": "2026-08-20T14:00:00Z" },
+      { "start": "2026-08-21T10:30:00Z", "end": "2026-08-21T11:30:00Z" }
+    ]
+  },
+  {
+    "name": "times that won't work, one exact and one loose",
+    "subject": "Re: Using data at Klarion",
+    "from": "Neil Ward",
+    "sentAt": "2026-09-30T10:04:16Z",
+    "body": "Hi Ellen,\n\nMonday afternoon/Tuesday/Wednesday next week won't work for me as I'm at an offsite.\n\nOf the offered times the 14:30 on this Thursday for 30 minutes is open.  I can also make Friday morning work\n\nIf its out next week then I can probably make Thursday afternoon and/or Friday morning work\n\nThanks\n\nNeil\n\nOn Wed, Sep 30, 2026 at 9:23 AM Miles Rowland <miles@example.co> wrote:\n\n> Hi Ellen – Tuesday 6th 1130-1300 is good for me thanks.\n>\n> From: Ellen Vance\n> Sent: 30 September 2026 04:20\n> Hi both, please kindly let me know whether any of the following slots work for you:\n> Tomorrow between 14:30 – 16:00\n> Tuesday 6th between 11:00 – 13:00\n>\n> From: Alan Lowe\n> Please could you find a time for Neil, Miles and I to meet. 30 mins sometime end this week / start next.",
+    "minutes": 30,
+    "expect": [
+      { "start": "2026-10-01T13:30:00Z", "end": "2026-10-01T14:00:00Z" },
+      { "start": "2026-10-02", "approximate": true }
+    ],
+    "forbid": ["2026-10-06T10:00:00Z", "2026-10-06T10:30:00Z", "2026-10-05", "2026-10-07"]
+  },
+  {
+    "name": "no month, mixed ranges and a start time, UK",
+    "subject": "Re: Meeting scheduler",
+    "from": "Nina Vasquez",
+    "sentAt": "2026-09-29T12:33:56Z",
+    "body": "Sure, Matt can do the following.\nMon 12th 4-5pm UK\nTue 13th 3-5pm UK\nThu 15th 11:30am UK\nFri 16th 2:30-3:30pm UK\n\nTks,\nNina\n\nFrom: Miles Rowland <miles@example.co>\nDate: Tuesday, 29 September 2026 at 13:27\nTo: Nina Vasquez\nSubject: Re: Meeting scheduler\n\nIs there another 30 min slot perhaps when Matt is back just for him and I?",
+    "minutes": 30,
+    "expect": [
+      { "start": "2026-10-12T15:00:00Z", "end": "2026-10-12T16:00:00Z" },
+      { "start": "2026-10-13T14:00:00Z", "end": "2026-10-13T16:00:00Z", "minutes": 30 },
+      { "start": "2026-10-15T10:30:00Z" },
+      { "start": "2026-10-16T13:30:00Z", "end": "2026-10-16T14:30:00Z" }
+    ]
+  },
+  {
+    "name": "10-12pm style ranges for a weekly 30 minute call",
+    "subject": "Re: Project Clarity - Stand Up",
+    "from": "Stella Wynn",
+    "sentAt": "2026-10-28T15:12:16Z",
+    "body": "Hi All,\n\nPlease see below Martin's availability for a weekly 30 min call, can you please provide your availability against the timeslots.\n\n * Monday 2nd 3-4pm\n * Tuesday 3rd 10-12pm\n * Wednesday 4th 2-4pm\n * Thursday 5th 10-11am\n\nThank you.\n\nBest Regards,\nStella Wynn | Group Executive Assistant",
+    "minutes": 30,
+    "expect": [
+      { "start": "2026-11-02T15:00:00Z", "end": "2026-11-02T16:00:00Z", "minutes": 30 },
+      { "start": "2026-11-03T10:00:00Z", "end": "2026-11-03T12:00:00Z", "minutes": 30 },
+      { "start": "2026-11-04T14:00:00Z", "end": "2026-11-04T16:00:00Z", "minutes": 30 },
+      { "start": "2026-11-05T10:00:00Z", "end": "2026-11-05T11:00:00Z", "minutes": 30 }
+    ]
+  },
+  {
+    "name": "day number on its own line, month from the thread, after the UK clock change",
+    "subject": "RE: 13:00uk | Miles Rowland with Oakfield Capital",
+    "from": "Clara Jones",
+    "sentAt": "2026-10-06T15:24:16Z",
+    "body": "Hi Miles,\n\nHope you are well. Would any of the below slots work, if so I will issue an invite shortly.\n\n28th\n\n11:00-12:00uk\n\n13:00-14:30uk\n\n15:00-16:00uk\n\n17:00-18:00uk\n\nMany thanks – and please let me know if we need to look at a different day.\n\nBest,\nClara\n\nFrom: Miles Rowland\nSent: 06 October 2026 12:55\nSubject: RE: 13:00uk | Miles Rowland with Oakfield Capital\n\nGreat, yes last week of Oct works well on my side.\n\n-----Original Appointment-----\nWhen: 05 October 2026 13:00-14:00 (UTC+00:00) Dublin, Edinburgh, Lisbon, London.",
+    "expect": [
+      { "start": "2026-10-28T11:00:00Z", "end": "2026-10-28T12:00:00Z" },
+      { "start": "2026-10-28T13:00:00Z", "end": "2026-10-28T14:30:00Z" },
+      { "start": "2026-10-28T15:00:00Z", "end": "2026-10-28T16:00:00Z" },
+      { "start": "2026-10-28T17:00:00Z", "end": "2026-10-28T18:00:00Z" }
+    ],
+    "forbid": ["2026-10-05"]
+  },
+  {
+    "name": "US eastern time across the US clock change",
+    "subject": "Data warehouse draft proposal",
+    "from": "Miles Rowland",
+    "sentAt": "2026-10-28T09:37:00Z",
+    "body": "Al, Adam, Jet, Chris,\n\nShall we find some time to get on a call to talk it through and iterate?\n\nSome good options on our side could be:\n\n * Tomorrow 4pm ET\n * Monday 10-12 ET, or 3pm ET\n * Thursday 11-1pm ET\n * Friday morning ET\n\nLet us know what works.\n\nThanks,\nMiles",
+    "expect": [
+      { "start": "2026-10-29T20:00:00Z" },
+      { "start": "2026-11-02T15:00:00Z", "end": "2026-11-02T17:00:00Z" },
+      { "start": "2026-11-02T20:00:00Z" },
+      { "start": "2026-11-05T16:00:00Z", "end": "2026-11-05T18:00:00Z" },
+      { "start": "2026-11-06", "approximate": true }
+    ]
+  },
+  {
+    "name": "far-off dates with dotted times",
+    "subject": "Re: Introduction",
+    "from": "Dana Hart",
+    "sentAt": "2026-09-18T11:11:36Z",
+    "body": "Dear Miles,\n\nClaire's diary is pretty back-to-back throughout September and October. Her diary looks much better from w/c 2nd November.\n\nWe have the following window available for the proposed call:\n\n * Tuesday 3rd November - Between 11.00 and 11.30\n * Tuesday 10th November - Between 13.00 and 14.00\n * Wednesday 11th November - Between 11.00 and 11.30\n\nWould any of these options work for you?\n\nKind regards,\nDana",
+    "expect": [
+      { "start": "2026-11-03T11:00:00Z", "end": "2026-11-03T11:30:00Z" },
+      { "start": "2026-11-10T13:00:00Z", "end": "2026-11-10T14:00:00Z" },
+      { "start": "2026-11-11T11:00:00Z", "end": "2026-11-11T11:30:00Z" }
+    ]
+  },
+  {
+    "name": "accepts one of my offered times",
+    "subject": "Re: Zombies and AI",
+    "from": "Harvey Bell",
+    "sentAt": "2026-10-28T22:01:38Z",
+    "body": "I can do 3:30pm on Thursday 12th if you can still do that? Will send an invite, and you can let me know if the slot has gone.\nSee you then.\n\nFrom: Miles Rowland <miles@example.co>\nSent: 22 October 2026 13:53\nTo: Harvey Bell\nSubject: Zombies and AI\n\nWould be good to fill you in on what we are doing. Are you around for a coffee either:\n\n * Weds 4th around 4pm\n * Thursday 12th 1530-1730?\n\nMiles",
+    "expect": [
+      { "start": "2026-11-12T15:30:00Z" }
+    ],
+    "forbid": ["2026-11-04"]
+  },
+  {
+    "name": "vague: end of this week",
+    "subject": "RE: Data warehouse draft proposal",
+    "from": "Al Grant",
+    "sentAt": "2026-11-03T13:37:54Z",
+    "body": "Hey Miles, apologies. Whirlwind last week with the board meeting and some last minute q4 pivots for 2027. I'd definitely like to put some time together to catch up toward the end of this week if you have any.\n\nFrom: Miles Rowland\nSent: Tuesday, November 3, 2026 8:35 AM\nHi Al, Would it be helpful to jump on a call to step through the proposal?",
+    "onlyApproximate": true
+  },
+  {
+    "name": "no proposal at all",
+    "subject": "RE: Deck",
+    "from": "Tom Reed",
+    "sentAt": "2026-11-20T10:00:00Z",
+    "body": "Thanks Miles, got the deck. Will review with the team and come back to you next week.\n\nTom\n\nFrom: Miles Rowland\nSent: 19 November 2026 17:00\nHere's the deck from our session on Tuesday 17th at 2pm.",
+    "expect": []
+  }
+]

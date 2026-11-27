@@ -7,7 +7,7 @@ use mail_core::auth::{self, SignIn, Tokens};
 use mail_core::graph::GraphClient;
 use mail_core::model::*;
 use mail_core::sync::Syncer;
-use mail_core::{ids, Error};
+use mail_core::{ids, times, Error};
 use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
@@ -492,6 +492,38 @@ pub async fn get_settings(s: State<'_, AppState>) -> R<Settings> {
 #[tauri::command]
 pub async fn update_settings(s: State<'_, AppState>, patch: SettingsPatch) -> R<Settings> {
     s.svc.update_settings(&patch)
+}
+
+// ---------------------------------------------------------------- find times
+
+/// Sends the message's text to the AI Gateway and returns the times it proposes. Only runs
+/// when the user asks; the calendar is checked in the interface, never sent.
+#[tauri::command]
+pub async fn find_times(s: State<'_, AppState>, message_id: String) -> R<times::TimeProposals> {
+    if s.demo {
+        return Err(Error::Invalid("Not available in the demo".into()));
+    }
+    let key = s.tokens.get(times::KEY_ID)?.filter(|k| !k.trim().is_empty()).ok_or_else(|| Error::Invalid("Add an AI Gateway key in Settings to find times".into()))?;
+    let model = s.svc.settings()?.ai_model;
+    let email = s.svc.times_input(&message_id)?;
+    let url = std::env::var("MAIL_APP_AI_GATEWAY_URL").unwrap_or_else(|_| times::GATEWAY_URL.to_string());
+    times::find(&s.http, &url, key.trim(), &model, &email, times::local_tz()).await
+}
+
+/// Whether an AI Gateway key is saved (the key itself never goes to the interface).
+#[tauri::command]
+pub async fn ai_key_saved(s: State<'_, AppState>) -> R<bool> {
+    Ok(s.tokens.get(times::KEY_ID)?.is_some_and(|k| !k.trim().is_empty()))
+}
+
+/// Saves the AI Gateway key in the OS credential store, or removes it (None or empty).
+#[tauri::command]
+pub async fn set_ai_key(s: State<'_, AppState>, key: Option<String>) -> R<bool> {
+    match key.as_deref().map(str::trim).filter(|k| !k.is_empty()) {
+        Some(k) => s.tokens.set(times::KEY_ID, k)?,
+        None => s.tokens.delete(times::KEY_ID)?,
+    }
+    ai_key_saved(s).await
 }
 
 #[tauri::command]

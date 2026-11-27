@@ -16,6 +16,7 @@ A lightweight, fast replacement for Outlook on Windows and macOS: mail, calendar
 | 4. Search and people | Built. FTS5 local index, search filters the current view, facets (From, To, Has attachment, Unread, Date, Account), contact card, "Search the server", people ranked by recency and frequency. |
 | 5. Calendar | Built. Day, work week and month views, accounts overlaid and toggleable, event panel with Accept / Tentative / Decline, create and edit, agenda panel, reminders. |
 | 6. Web accounts | Built. Outlook on the web in an isolated native web view per account, kept loaded in the background, with unread count and notifications captured from the page. Optional read-only calendar per account, read from the page with Outlook's own sign-in (docs/WEB_CALENDAR.md); checked against a real account on Windows. Needs the milestone-1 check on Windows and macOS, and the web calendar check on macOS. |
+| Find times | Built (beyond the spec). A button on each message sends that email to a model through the Vercel AI Gateway (`openai/gpt-6-luna` by default), which returns the times it proposes. The core converts zones and checks the weekdays; the interface checks each time against every visible calendar on the device, with Reply and Hold. Off until an AI Gateway key is added in Settings › General. |
 | 7. Polish | Mostly done. Dark mode, notifications, tray/dock badge, identical shortcuts, CI and signing/update pipeline ([docs/RELEASING.md](docs/RELEASING.md)). Still to do: real certificates, update host, two weeks of daily use. |
 
 ## Try it
@@ -50,6 +51,7 @@ crates/mail-core/     Everything except the window
   sync.rs             Graph delta sync, pending-operation replay, outbox rules, calendar
   graph.rs, auth.rs   Graph client (immutable ids, Retry-After) and PKCE sign-in
   html.rs             Sanitising, remote-image blocking, signatures, quoting
+  times.rs            Find times: the AI Gateway request, zone conversion and checks on the answer
 docs/                 Security note for client admins, app registration, releasing, screenshots
 ```
 
@@ -73,6 +75,14 @@ pnpm typecheck && pnpm test          # interface (vitest)
 cargo test --workspace               # core, sync against a mock Graph server
 cargo clippy --workspace --all-targets -- -D warnings
 ```
+
+Find times has a live check against the real model, over made-up emails in the styles real scheduling mail uses (`crates/mail-core/tests/fixtures/find_times.json`). It needs a key, so it only runs when asked:
+
+```bash
+MAIL_APP_AI_KEY=... cargo test -p mail-core --test find_times_live -- --ignored --nocapture
+```
+
+`FIND_TIMES_RUNS=3` repeats each email; `MAIL_APP_AI_MODEL` tries another model.
 
 ## Open decisions (from the spec)
 

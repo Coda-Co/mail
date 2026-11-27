@@ -501,6 +501,21 @@ impl MailService {
         self.render(m, false)
     }
 
+    /// What "Find times" sends for a message: its text (quoted history included, for
+    /// context), subject, sender's name and when it was sent. No addresses.
+    pub fn times_input(&self, id: &str) -> Result<crate::times::EmailInput> {
+        let m = self.stored_message(id)?.message;
+        let h = &m.summary;
+        let sent_at = chrono::DateTime::parse_from_rfc3339(&h.received_at).map(|t| t.with_timezone(&chrono::Utc)).unwrap_or_else(|_| chrono::Utc::now());
+        Ok(crate::times::EmailInput {
+            subject: h.subject.clone(),
+            from_name: if h.from.name.is_empty() { h.from.email.split('@').next().unwrap_or_default().to_string() } else { h.from.name.clone() },
+            me_name: self.me()?.name,
+            sent_at,
+            body_text: crate::text::html_to_text(&m.body_html),
+        })
+    }
+
     pub fn show_remote_images_once(&self, id: &str) -> Result<Message> {
         let m = self.stored_message(id)?.message;
         self.render(m, true)
@@ -686,7 +701,10 @@ impl MailService {
             }
         }
         let when = source.as_ref().map(|s| format_when(&s.message.summary.received_at)).unwrap_or_default();
-        let body = html::compose_body(sig.as_ref().map(|s| (s.id.as_str(), s.html.as_str())));
+        let mut body = html::compose_body(sig.as_ref().map(|s| (s.id.as_str(), s.html.as_str())));
+        if let Some(line) = req.opening.as_deref().map(str::trim).filter(|l| !l.is_empty()) {
+            body = format!("<div>{}</div>{body}", html_escape::encode_text(line));
+        }
         let quote = source.as_ref().map(|s| html::quote_block(req.mode, &s.message, &when));
         let raw_id = ids::new_local_id("d");
         let draft = Draft {

@@ -88,7 +88,7 @@ export function MeetingCard({ message, onChanged }: { message: Message; onChange
 }
 
 /** A few hours either side of the meeting, with every visible calendar's events, like Outlook's invitation preview. */
-function DayPreview({
+export function DayPreview({
   meeting,
   start,
   end,

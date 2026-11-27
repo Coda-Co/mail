@@ -16,6 +16,7 @@ pub mod secrets;
 pub mod service;
 pub mod sync;
 pub mod text;
+pub mod times;
 pub mod webcal;
 
 pub use error::{Error, Result};

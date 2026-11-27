@@ -19,6 +19,7 @@ import type {
   SearchField,
   SearchResult,
   Signature,
+  SlotKind,
   SyncStatus,
   UpdateStatus,
   ViewScope,
@@ -32,6 +33,8 @@ import { escapeHtml, htmlToText } from '../lib/text';
 import { PALETTE, WEB_ONLY } from '../lib/colors';
 
 const STORAGE_KEY = 'mail-demo-state';
+/** Demo stand-in for the credential store: '0' once the key is removed (saved by default). */
+const AI_KEY = 'mail-demo-ai-key';
 // FolderRole::order in mail-core.
 const ROLE_ORDER: FolderRole[] = ['inbox', 'drafts', 'sent', 'archive', 'deleted', 'junk'];
 const hasWindow = typeof window !== 'undefined';
@@ -59,6 +62,7 @@ function load(): DemoState {
             autocapitalize: st.autocapitalize ?? true,
             spellingLanguage: st.spellingLanguage ?? 'en-GB',
             dictionary: st.dictionary ?? [],
+            aiModel: st.aiModel ?? 'openai/gpt-6-luna',
           };
           return recount(parsed);
         }
@@ -700,6 +704,7 @@ export const demoApi: MailApi = {
     } else {
       draft.bodyHtml = sig ? withSignature('', sig) : '';
     }
+    if (req.opening?.trim()) draft.bodyHtml = `<p>${escapeHtml(req.opening.trim())}</p>${draft.bodyHtml || '<p><br></p>'}`;
     state.drafts.push(draft);
     changed([accountId]);
     return clone(draft);
@@ -988,6 +993,54 @@ export const demoApi: MailApi = {
     if (hasWindow && new URLSearchParams(window.location.search).get('disk') === 'off') return 'off';
     return 'on';
   },
+  async findTimes(messageId) {
+    const m = getMsg(messageId);
+    await sleep(1200);
+    if (!(await demoApi.aiKeySaved())) throw new Error('Add an AI Gateway key in Settings to find times');
+    const model = state.settings.aiModel ?? 'openai/gpt-6-luna';
+    if (!m.subject.includes('Catch up & demos')) {
+      return { summary: 'The demo only reads the sample “Catch up & demos” email; no times found here.', slots: [], model };
+    }
+    // What the model returns for that email, in the demo's week (Mon 23 Nov 2026).
+    const t = (day: number, h: number, min = 0) => new Date(2026, 10, 23 + day, h, min).toISOString();
+    const slot = (day: number, from: [number, number], to: [number, number], quote: string, kind: SlotKind = 'exact', minutes?: number) => ({
+      kind,
+      windowStart: t(day, ...from),
+      windowEnd: t(day, ...to),
+      minutes: minutes ?? (to[0] * 60 + to[1] - (from[0] * 60 + from[1])),
+      timeZone: 'Europe/London',
+      quote,
+      approximate: false,
+      warnings: [],
+    });
+    return {
+      summary: 'Elena offers two one-hour slots on Wednesday and Thursday, or half an hour on Friday morning.',
+      slots: [
+        slot(2, [11, 30], [12, 30], 'Wednesday 25th November 1130-1230'),
+        slot(2, [14, 0], [15, 0], '1400-1500 UKT'),
+        slot(3, [11, 0], [12, 0], 'Thursday 26th November 11:00-1200'),
+        slot(3, [16, 0], [17, 0], '1600-1700 UKT'),
+        slot(4, [9, 30], [11, 0], 'Friday 27th any time between 9.30 and 11.00 for half an hour', 'window', 30),
+      ],
+      model,
+    };
+  },
+  async aiKeySaved() {
+    try {
+      return localStorage.getItem(AI_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  },
+  async setAiKey(key) {
+    try {
+      localStorage.setItem(AI_KEY, key?.trim() ? '1' : '0');
+    } catch {
+      /* not remembered */
+    }
+    return !!key?.trim();
+  },
+
   async popOut(kind, id) {
     if (kind === 'draft') {
       const d = getDraftState(id);

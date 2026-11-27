@@ -300,6 +300,8 @@ export interface Settings {
   spellingLanguage: 'en-GB' | 'en-US';
   /** Words added to the dictionary, lower case. */
   dictionary: string[];
+  /** "Find times": the AI Gateway model id, e.g. "openai/gpt-6-luna". */
+  aiModel: string;
 }
 
 export interface SyncStatus {
@@ -328,6 +330,40 @@ export type AddAccountResult =
     }
   | { kind: 'cancelled' }
   | { kind: 'error'; message: string };
+
+/**
+ * How a proposed time is meant. exact: the meeting fills it. window: the sender is free for
+ * longer than the meeting. startBetween: the meeting can start anywhere in a range.
+ */
+export type SlotKind = 'exact' | 'window' | 'startBetween';
+
+/** A meeting time an email proposes, read by the AI and checked by the core. */
+export interface ProposedSlot {
+  kind: SlotKind;
+  /** The span the meeting has to fit in (UTC). For startBetween: latest start plus the length. */
+  windowStart: string;
+  windowEnd: string;
+  /** The meeting's length in minutes. */
+  minutes: number;
+  /** IANA zone the sender wrote the time in. */
+  timeZone: string;
+  /** The words in the email it came from. */
+  quote: string;
+  note?: string;
+  /** Read from loose wording ("Friday morning"). */
+  approximate: boolean;
+  /** Something that doesn't add up (the weekday doesn't match the date, length assumed...). */
+  warnings: string[];
+}
+
+export interface TimeProposals {
+  /** One line on what the email proposes, including times that won't work. */
+  summary: string;
+  minutes?: number;
+  slots: ProposedSlot[];
+  /** The model that read it. */
+  model: string;
+}
 
 export interface Me {
   name: string;
@@ -363,7 +399,8 @@ export interface MailApi {
   /** Puts the files on the system clipboard, downloading any not cached yet. */
   copyAttachments(messageId: string, attachmentIds: string[]): Promise<void>;
 
-  createDraft(req: { mode: DraftMode; sourceMessageId?: string; accountId?: string }): Promise<Draft>;
+  /** `opening`: plain text for the body's first line (e.g. "Thanks, Wednesday 16 December, 11:30–12:30 works for me."). */
+  createDraft(req: { mode: DraftMode; sourceMessageId?: string; accountId?: string; opening?: string }): Promise<Draft>;
   getDraft(draftId: string): Promise<Draft>;
   updateDraft(draft: Draft): Promise<Draft>;
   /** Swap From: re-inserts that account's signature. */
@@ -412,6 +449,16 @@ export interface MailApi {
   syncNow(accountId?: string): Promise<void>;
   syncStatus(): Promise<SyncStatus>;
   diskEncryption(): Promise<DiskEncryption>;
+
+  /**
+   * Send this message's text to the AI Gateway and get back the meeting times it proposes.
+   * Only on request; the calendar isn't sent (the caller checks it with listEvents).
+   */
+  findTimes(messageId: string): Promise<TimeProposals>;
+  /** Whether an AI Gateway key is saved. The key itself never comes back. */
+  aiKeySaved(): Promise<boolean>;
+  /** Save the AI Gateway key to the OS credential store, or remove it (null). Returns aiKeySaved(). */
+  setAiKey(key: string | null): Promise<boolean>;
 
   /** Open a message or draft in its own window. */
   popOut(kind: 'message' | 'draft', id: string): Promise<void>;

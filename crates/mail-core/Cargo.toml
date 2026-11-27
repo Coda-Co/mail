@@ -29,6 +29,7 @@ ammonia = "4"
 html-escape = "0.2"
 urlencoding = "2"
 iana-time-zone = "0.1"
+chrono-tz = "0.10"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"], optional = true }

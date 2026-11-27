@@ -19,7 +19,7 @@ export interface DemoState {
   serverOnly: Message[];
 }
 
-export const DEMO_VERSION = 6;
+export const DEMO_VERSION = 7;
 
 const COLORS = { coda: '#1F883D', harbour: '#8250DF', fenwick: '#D4600F', aldgate: '#6E7781' };
 
@@ -125,6 +125,12 @@ export function buildDemoState(now: Date): DemoState {
     messages.push(m);
     return m;
   };
+
+  // Proposes times for "Find times" (the demo's canned reading is in demo.ts).
+  // In Clients, not the inbox, so the inbox keeps the mockup's counts.
+  add('coda', 'coda-clients', PEOPLE.elena, at(now, -1, 16, 20), 'RE: Catch up & demos',
+    'Hi Miles,\n\nI hope you are well.\n\nWould any of the dates below work for this session with Jan and Alex?\n\nWednesday 25th November 1130-1230, 1400-1500 UKT\nThursday 26th November 11:00-1200, 1600-1700 UKT\nFriday 27th any time between 9.30 and 11.00 for half an hour\n\nBest,\n\nElena',
+    {}).snippet = 'Would any of the dates below work for this session with Jan and Alex?';
 
   // The six messages in the Main mockup.
   const sarahMsg = add('harbour', 'inbox', PEOPLE.sarah, at(now, 0, 9, 42), 'Agenda for Thursday’s steering committee',
@@ -338,7 +344,7 @@ export function buildDemoState(now: Date): DemoState {
     calendars,
     events,
     signatures,
-    settings: { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show', workStart: 9 * 60, workEnd: 18 * 60, spellcheck: true, autocorrect: true, autocapitalize: true, spellingLanguage: 'en-GB', dictionary: [] },
+    settings: { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show', workStart: 9 * 60, workEnd: 18 * 60, spellcheck: true, autocorrect: true, autocapitalize: true, spellingLanguage: 'en-GB', dictionary: [], aiModel: 'openai/gpt-6-luna' },
     serverOnly,
   };
 }

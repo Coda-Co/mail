@@ -59,10 +59,19 @@ fn actions_apply_locally_and_queue() {
 }
 
 #[test]
+fn reply_can_start_with_an_opening_line() {
+    let (svc, ids) = setup();
+    let src = format!("{}:m-agenda", ids.harbour);
+    let req = CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src), account_id: None, opening: Some("Thanks, Thursday 3 December, 11:00–11:30 works for <me> & Jan.".into()) };
+    let d = svc.create_draft(&req).unwrap();
+    assert!(d.body_html.starts_with("<div>Thanks, Thursday 3 December, 11:00–11:30 works for &lt;me&gt; &amp; Jan.</div><div><br></div>"), "{}", d.body_html);
+}
+
+#[test]
 fn reply_draft_defaults_and_from_swap() {
     let (svc, ids) = setup();
     let src = format!("{}:m-agenda", ids.harbour);
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src.clone()), account_id: None }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src.clone()), account_id: None, opening: None }).unwrap();
     assert_eq!(d.account_id, ids.harbour, "From defaults to the account the message came in on");
     assert_eq!(d.to, vec![Address::new("Sarah Okafor", "sarah.okafor@harbourpartners.example")]);
     assert_eq!(d.subject, "RE: Agenda for Thursday’s steering committee");
@@ -84,7 +93,7 @@ fn reply_draft_defaults_and_from_swap() {
     assert!(svc.with_account(&ids.coda, |db| db.draft_quote(raw2)).unwrap().is_some(), "quote moves with the draft");
     assert!(svc.get_draft(&d.id).is_err());
 
-    let reply_all = svc.create_draft(&CreateDraftRequest { mode: DraftMode::ReplyAll, source_message_id: Some(format!("{}:m-moved", ids.harbour)), account_id: None }).unwrap();
+    let reply_all = svc.create_draft(&CreateDraftRequest { mode: DraftMode::ReplyAll, source_message_id: Some(format!("{}:m-moved", ids.harbour)), account_id: None, opening: None }).unwrap();
     let to: Vec<&str> = reply_all.to.iter().map(|a| a.email.as_str()).collect();
     assert_eq!(to, vec!["sarah.okafor@harbourpartners.example", "james.hart@harbourpartners.example"], "reply all leaves me out");
 }
@@ -94,7 +103,7 @@ fn signature_added_swapped_and_removed_on_an_existing_draft() {
     let (svc, ids) = setup();
     let sigs = svc.list_signatures(Some(&ids.coda)).unwrap();
     let sig = sigs.first().expect("demo Coda account has a signature").clone();
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()) }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()), opening: None }).unwrap();
     let cleared = svc.set_draft_signature(&d.id, None).unwrap();
     assert!(!cleared.body_html.contains("data-signature"), "signature removed");
     assert_eq!(cleared.signature_id, None);
@@ -122,7 +131,7 @@ fn inbox_rows_show_an_unfinished_draft() {
     let has_draft = || svc.list_messages(&ViewScope::unified_inbox(), 50, 0).unwrap().into_iter().find(|m| m.id == src).unwrap().has_draft;
     assert!(!has_draft());
 
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src.clone()), account_id: None }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src.clone()), account_id: None, opening: None }).unwrap();
     assert!(!has_draft(), "opening Reply without typing doesn't count");
 
     let mut edit = d.clone();
@@ -133,7 +142,7 @@ fn inbox_rows_show_an_unfinished_draft() {
     svc.send_draft(&d.id).unwrap();
     assert!(!has_draft(), "a queued send is no longer a draft to finish");
 
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Forward, source_message_id: Some(src.clone()), account_id: None }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Forward, source_message_id: Some(src.clone()), account_id: None, opening: None }).unwrap();
     let d = svc.update_draft(&d).unwrap();
     assert!(has_draft());
     svc.discard_draft(&d.id).unwrap();
@@ -143,7 +152,7 @@ fn inbox_rows_show_an_unfinished_draft() {
 #[test]
 fn outbox_rules() {
     let (svc, ids) = setup();
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()) }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()), opening: None }).unwrap();
     assert!(d.body_html.contains("coda.example"), "new-message signature");
     assert!(svc.send_draft(&d.id).is_err(), "needs a recipient");
     let mut edit = d.clone();
@@ -160,7 +169,7 @@ fn outbox_rules() {
     assert!(svc.discard_draft(&queued.id).is_err());
     assert_eq!(ops(&svc, &ids.coda).iter().filter(|k| *k == "send").count(), 1);
     // Web accounts can't compose here.
-    assert!(svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.aldgate.clone()) }).is_err());
+    assert!(svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.aldgate.clone()), opening: None }).is_err());
 }
 
 #[test]
@@ -391,7 +400,7 @@ fn remove_account_cleans_up() {
 #[test]
 fn drafts_folder_lists_by_draft_id() {
     let (svc, ids) = setup();
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:m-agenda", ids.harbour)), account_id: None }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:m-agenda", ids.harbour)), account_id: None, opening: None }).unwrap();
     let mut e = d.clone();
     e.body_html = format!("<div>Happy to take it.</div>{}", &d.body_html[d.body_html.find("<div data-signature").unwrap()..]);
     svc.update_draft(&e).unwrap();
@@ -433,7 +442,7 @@ fn sending_moves_a_draft_from_drafts_to_the_outbox() {
         (f.unread, f.outbox)
     };
     let (drafts_before, _) = counts();
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()) }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()), opening: None }).unwrap();
     let mut e = d.clone();
     e.to = vec![Address::new("Tom", "tom@coda.example")];
     let d = svc.update_draft(&e).unwrap();
@@ -495,7 +504,7 @@ fn mail_with_a_person_from_them_or_to_them() {
 fn a_drafts_server_copy_opens_that_draft_not_a_duplicate() {
     let (svc, ids) = setup();
     let src = format!("{}:m-agenda", ids.harbour);
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src.clone()), account_id: None }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src.clone()), account_id: None, opening: None }).unwrap();
     let mut e = d.clone();
     e.body_html = format!("<p>Sounds great</p>{}", d.body_html);
     let d = svc.update_draft(&e).unwrap();
@@ -527,7 +536,7 @@ fn a_drafts_server_copy_opens_that_draft_not_a_duplicate() {
 fn copies_left_by_an_earlier_send_are_cleaned_up() {
     let (svc, ids) = setup();
     // A duplicate adopted from a server draft that has since been sent: no server copy remains.
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()) }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()), opening: None }).unwrap();
     let (_, raw) = mail_core::ids::split(&d.id).unwrap();
     svc.with_account(&ids.coda, |db| {
         let (mut stray, _) = db.get_draft(raw)?;
@@ -555,7 +564,7 @@ fn copies_left_by_an_earlier_send_are_cleaned_up() {
 fn sent_drafts_leave_the_thread_held_ones_stay() {
     let (svc, ids) = setup();
     let src = format!("{}:m-agenda", ids.harbour);
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src.clone()), account_id: None }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src.clone()), account_id: None, opening: None }).unwrap();
     svc.send_draft(&d.id).unwrap();
     assert!(svc.get_thread(&src).unwrap().drafts.is_empty(), "queued drafts are in the outbox, not the editor");
     let (_, raw) = mail_core::ids::split(&d.id).unwrap();
@@ -569,7 +578,7 @@ fn sent_drafts_leave_the_thread_held_ones_stay() {
 fn new_drafts_are_unedited_until_changed() {
     let (svc, ids) = setup();
     let src = format!("{}:m-agenda", ids.harbour);
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src), account_id: None }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(src), account_id: None, opening: None }).unwrap();
     assert!(!d.edited, "a fresh reply is unedited");
     assert!(!svc.get_draft(&d.id).unwrap().edited, "stored as unedited");
     assert!(!svc.set_popped_out(&d.id, true).unwrap().edited, "popping out isn't an edit");
@@ -583,7 +592,7 @@ fn new_drafts_are_unedited_until_changed() {
 #[test]
 fn dropped_files_are_kept_and_attached() {
     let (svc, ids) = setup();
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()) }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(ids.coda.clone()), opening: None }).unwrap();
     let d = svc.add_attachment_bytes(&d.id, "Q4 plan: draft?.pdf", b"%PDF-1.4 hello").unwrap();
     let a = &d.attachments[0];
     assert_eq!(a.name, "Q4 plan_ draft_.pdf", "unsafe characters are replaced");
@@ -596,7 +605,7 @@ fn dropped_files_are_kept_and_attached() {
 }
 
 fn new_draft(svc: &MailService, acc: &str) -> Draft {
-    svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(acc.to_string()) }).unwrap()
+    svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(acc.to_string()), opening: None }).unwrap()
 }
 
 fn dropped_path(d: &Draft, i: usize) -> std::path::PathBuf {

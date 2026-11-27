@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Copy, ExternalLink, Forward, MoreHorizontal, Reply, ReplyAll, X } from 'lucide-react';
+import { ArrowLeft, CalendarSearch, Copy, ExternalLink, Forward, MoreHorizontal, Reply, ReplyAll, X } from 'lucide-react';
 import { api, EVENTS, onEvent } from '../api';
 import type { Address, Draft, DraftMode, Folder, Message, Thread } from '../api/types';
 import { useApp } from '../state/app';
@@ -12,6 +12,7 @@ import { MessageBody } from './MessageBody';
 import { splitQuoted } from '../lib/quoted';
 import { FileIcon } from './FileIcon';
 import { MeetingCard } from './MeetingCard';
+import { ProposedTimes } from './ProposedTimes';
 import { ClosedDraft, Compose, PoppedOutDraft } from './Compose';
 import { inOutbox, OutboxItem } from './OutboxItem';
 
@@ -167,20 +168,34 @@ type MessageActions = {
   forward: () => void;
   popOut: () => void;
   more: (anchor: HTMLElement) => void;
+  /** Reply with this line already written at the top. */
+  replyWith: (text: string) => void;
 };
 
-function MessageActionIcons({ actions, disabled }: { actions: MessageActions; disabled: boolean }) {
-  const items: { label: string; icon: React.ReactNode; run: (e: React.MouseEvent<HTMLButtonElement>) => void }[] = [
+type IconActions = Omit<MessageActions, 'replyWith'> & { findTimes?: () => void; findingTimes?: boolean };
+
+function MessageActionIcons({ actions, disabled }: { actions: IconActions; disabled: boolean }) {
+  const items: { label: string; icon: React.ReactNode; run: (e: React.MouseEvent<HTMLButtonElement>) => void; pressed?: boolean }[] = [
     { label: 'Reply', icon: <Reply size={16} />, run: actions.reply },
     { label: 'Reply all', icon: <ReplyAll size={16} />, run: actions.replyAll },
     { label: 'Forward', icon: <Forward size={16} />, run: actions.forward },
+    ...(actions.findTimes ? [{ label: 'Find times', icon: <CalendarSearch size={16} />, run: actions.findTimes, pressed: !!actions.findingTimes }] : []),
     { label: 'Open in new window', icon: <ExternalLink size={15} />, run: actions.popOut },
     { label: 'More actions', icon: <MoreHorizontal size={16} />, run: (e) => actions.more(e.currentTarget) },
   ];
   return (
     <div className="message-actions">
       {items.map((it) => (
-        <button key={it.label} type="button" className="btn btn-ghost btn-icon" aria-label={it.label} title={it.label} disabled={disabled} onClick={it.run}>
+        <button
+          key={it.label}
+          type="button"
+          className="btn btn-ghost btn-icon"
+          aria-label={it.label}
+          aria-pressed={it.pressed}
+          title={it.label === 'Find times' ? 'Find times: check the times this email proposes against your calendar (sends the email to the AI)' : it.label}
+          disabled={disabled}
+          onClick={it.run}
+        >
           {it.icon}
         </button>
       ))}
@@ -211,6 +226,7 @@ function MessageView({
   const setActiveAddress = useCopyHoveredAddress();
   const split = useMemo(() => splitQuoted(message.bodyHtml), [message.bodyHtml]);
   const [showQuoted, setShowQuoted] = useState(false);
+  const [findingTimes, setFindingTimes] = useState(false);
   // A click on the header area (date line included) that isn't selecting text, following a
   // link, pressing a button or picking up a name to copy.
   const headerClick = (e: React.MouseEvent) => !!window.getSelection()?.isCollapsed && !(e.target as Element).closest('a, button, .addr');
@@ -283,7 +299,7 @@ function MessageView({
             </span>
             <RecipientLine message={message} onActive={setActiveAddress} />
           </div>
-          <MessageActionIcons actions={actions} disabled={actionsDisabled} />
+          <MessageActionIcons actions={{ ...actions, findTimes: () => setFindingTimes((v) => !v), findingTimes }} disabled={actionsDisabled} />
         </div>
         {message.remoteImagesBlocked && (
           <div className="images-bar">
@@ -305,6 +321,7 @@ function MessageView({
           </div>
         )}
         {message.meeting && <MeetingCard message={message} onChanged={onChanged} />}
+        {findingTimes && <ProposedTimes message={message} onClose={() => setFindingTimes(false)} onReply={actions.replyWith} />}
         <AttachmentList message={message} />
         <MessageBody html={showQuoted ? message.bodyHtml : split.main} cacheKey={showQuoted || !split.hasQuote ? message.id : `${message.id}:new`} />
         {split.hasQuote && (
@@ -437,15 +454,21 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
     [selection, loadThread],
   );
 
-  const startDraft = async (mode: DraftMode, source: Message | null = selectedMessage) => {
+  /** `opening` goes on the first line of a new reply ("Find times"). */
+  const startDraft = async (mode: DraftMode, source: Message | null = selectedMessage, opening?: string) => {
     if (!source || !selectedMessage) return;
     const open = thread?.drafts.find((d) => !d.poppedOut);
     if (open) {
       setClosedDraftId(null);
       setFocusDraft(true);
+      // A reply is already being written: don't touch it, offer the line to paste.
+      if (opening) {
+        await navigator.clipboard?.writeText(opening).catch(() => {});
+        toast('Copied the reply line; paste it into your draft');
+      }
       return;
     }
-    await api.createDraft({ mode, sourceMessageId: source.id });
+    await api.createDraft({ mode, sourceMessageId: source.id, opening });
     setFocusDraft(true);
     await loadThread(selectedMessage.id);
   };
@@ -642,6 +665,7 @@ export function ReadingPane({ selection, onBack, onRemoved }: { selection: Selec
                         forward: () => void startDraft('forward', m),
                         popOut: () => void api.popOut('message', m.id),
                         more: (anchor) => void moreMenu(anchor, m),
+                        replyWith: (text) => void startDraft('reply', m, text),
                       }}
                     />
                   ))}

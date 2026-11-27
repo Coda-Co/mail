@@ -277,6 +277,14 @@ impl AppDb {
             s.dictionary.dedup();
             s.dictionary.truncate(10_000);
         }
+        if let Some(v) = &p.ai_model {
+            let v = v.trim();
+            // Gateway ids are "provider/model"; empty puts the default back.
+            if v.len() > 100 || v.chars().any(char::is_whitespace) || (!v.is_empty() && !v.contains('/')) {
+                return Err(Error::Invalid("Model ids look like openai/gpt-6-luna".into()));
+            }
+            s.ai_model = if v.is_empty() { crate::times::DEFAULT_MODEL.into() } else { v.to_string() };
+        }
         let (start, end) = (p.work_start.unwrap_or(s.work_start), p.work_end.unwrap_or(s.work_end));
         if p.work_start.is_some() || p.work_end.is_some() {
             if start % 15 != 0 || end % 15 != 0 || end > 24 * 60 || start >= end {
@@ -438,6 +446,18 @@ mod tests {
         assert_eq!((s.theme.as_str(), s.work_start, s.work_end), ("dark", 540, 1080));
         assert!(s.spellcheck && s.autocorrect && s.autocapitalize);
         assert_eq!((s.spelling_language.as_str(), s.dictionary.len()), ("en-GB", 0));
+    }
+
+    #[test]
+    fn ai_model_defaults_validates_and_resets() {
+        let db = db();
+        assert_eq!(db.settings().unwrap().ai_model, crate::times::DEFAULT_MODEL);
+        let s = db.update_settings(&SettingsPatch { ai_model: Some(" anthropic/claude-haiku-5-5 ".into()), ..Default::default() }).unwrap();
+        assert_eq!(s.ai_model, "anthropic/claude-haiku-5-5");
+        assert!(db.update_settings(&SettingsPatch { ai_model: Some("gpt 6".into()), ..Default::default() }).is_err());
+        assert!(db.update_settings(&SettingsPatch { ai_model: Some("gpt-6-luna".into()), ..Default::default() }).is_err(), "needs the provider");
+        let s = db.update_settings(&SettingsPatch { ai_model: Some("".into()), ..Default::default() }).unwrap();
+        assert_eq!(s.ai_model, crate::times::DEFAULT_MODEL, "empty puts the default back");
     }
 
     #[test]

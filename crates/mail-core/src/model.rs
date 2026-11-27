@@ -434,6 +434,9 @@ pub struct CreateDraftRequest {
     pub source_message_id: Option<String>,
     #[serde(default)]
     pub account_id: Option<String>,
+    /// Plain text for the first line of the body ("Find times" replies).
+    #[serde(default)]
+    pub opening: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -734,6 +737,13 @@ pub struct Settings {
     /// The user's own words, lower case, sorted.
     #[serde(default)]
     pub dictionary: Vec<String>,
+    /// "Find times": the AI Gateway model that reads proposed times out of an email.
+    #[serde(default = "default_ai_model")]
+    pub ai_model: String,
+}
+
+fn default_ai_model() -> String {
+    crate::times::DEFAULT_MODEL.into()
 }
 
 fn default_true() -> bool {
@@ -771,6 +781,7 @@ impl Default for Settings {
             autocapitalize: true,
             spelling_language: default_spelling_language(),
             dictionary: vec![],
+            ai_model: default_ai_model(),
         }
     }
 }
@@ -790,6 +801,7 @@ pub struct SettingsPatch {
     pub autocapitalize: Option<bool>,
     pub spelling_language: Option<String>,
     pub dictionary: Option<Vec<String>>,
+    pub ai_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

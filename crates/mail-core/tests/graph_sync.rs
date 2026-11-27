@@ -178,7 +178,7 @@ async fn reply_is_created_saved_and_sent() {
     Mock::given(method("GET")).and(path("/me/messages/D1/attachments")).respond_with(ResponseTemplate::new(200).set_body_json(json!({"value": []}))).mount(&server).await;
     Mock::given(method("POST")).and(path("/me/messages/D1/send")).respond_with(ResponseTemplate::new(202)).expect(1).mount(&server).await;
 
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None, opening: None }).unwrap();
     svc.send_draft(&d.id).unwrap();
     let r = Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run().await.unwrap();
     assert_eq!(r.ops_done, 2, "save then send");
@@ -199,7 +199,7 @@ async fn the_outbox_sends_without_waiting_for_a_full_sync() {
     let g = client(&server, Duration::from_secs(10));
     Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
     mount_reply_and_send(&server, 1).await;
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None, opening: None }).unwrap();
     svc.send_draft(&d.id).unwrap();
     let before = server.received_requests().await.unwrap().len();
     let r = Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run_outbox().await.unwrap();
@@ -222,7 +222,7 @@ async fn taken_back_to_edit_it_is_not_sent() {
     let g = client(&server, Duration::from_secs(10));
     Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
     mount_reply_and_send(&server, 0).await;
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None, opening: None }).unwrap();
     svc.send_draft(&d.id).unwrap();
     svc.cancel_send(&d.id).unwrap();
     Syncer::new(&svc, &g, svc.get_account(&acc.id).unwrap()).run_outbox().await.unwrap();
@@ -235,7 +235,7 @@ async fn a_send_cut_off_by_a_quit_is_held_not_repeated() {
     let g = client(&server, Duration::from_secs(10));
     Syncer::new(&svc, &g, acc.clone()).run().await.unwrap();
     mount_reply_and_send(&server, 0).await;
-    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None }).unwrap();
+    let d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::Reply, source_message_id: Some(format!("{}:M1", acc.id)), account_id: None, opening: None }).unwrap();
     svc.send_draft(&d.id).unwrap();
     let (_, raw) = mail_core::ids::split(&d.id).unwrap();
     svc.with_account(&acc.id, |db| db.set_draft_status(raw, DraftStatus::Sending, None)).unwrap();
@@ -255,7 +255,7 @@ async fn sending_deletes_dropped_copies() {
     Mock::given(method("POST")).and(path("/me/messages/D9/attachments")).respond_with(ResponseTemplate::new(201).set_body_json(json!({"id": "ATT9"}))).expect(1).mount(&server).await;
     Mock::given(method("POST")).and(path("/me/messages/D9/send")).respond_with(ResponseTemplate::new(202)).expect(1).mount(&server).await;
 
-    let mut d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(acc.id.clone()) }).unwrap();
+    let mut d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(acc.id.clone()), opening: None }).unwrap();
     d.to = vec![Address::new("Sarah", "sarah@harbour.example")];
     svc.update_draft(&d).unwrap();
     let d = svc.add_attachment_bytes(&d.id, "notes.txt", b"hello").unwrap();
@@ -287,7 +287,7 @@ async fn unknown_send_is_held_never_repeated() {
         .with_priority(1)
         .mount(&server)
         .await;
-    let mut d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(acc.id.clone()) }).unwrap();
+    let mut d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(acc.id.clone()), opening: None }).unwrap();
     d.to = vec![Address::new("Tom", "tom@coda.example")];
     d.subject = "Hello".into();
     let d = svc.update_draft(&d).unwrap();
@@ -315,7 +315,7 @@ async fn offline_send_waits_for_reconnect() {
     let svc = Arc::new(MailService::in_memory().unwrap());
     let acc = svc.add_graph_account("miles@coda.example", "Coda", None, None).unwrap();
     svc.with_account(&acc.id, |db| db.upsert_folder("F-INBOX", "Inbox", Some(FolderRole::Inbox), None, 0)).unwrap();
-    let mut d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(acc.id.clone()) }).unwrap();
+    let mut d = svc.create_draft(&CreateDraftRequest { mode: DraftMode::New, source_message_id: None, account_id: Some(acc.id.clone()), opening: None }).unwrap();
     d.to = vec![Address::new("Tom", "tom@coda.example")];
     let d = svc.update_draft(&d).unwrap();
     svc.send_draft(&d.id).unwrap();

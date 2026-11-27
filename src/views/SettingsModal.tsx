@@ -136,6 +136,95 @@ function OwnWords() {
   );
 }
 
+/** The AI Gateway key (kept in the OS credential store) and model for "Find times". */
+function FindTimesGroup() {
+  const { settings, updateSettings } = useApp();
+  const toast = useToast();
+  const [saved, setSaved] = useState<boolean | null>(null);
+  const [key, setKey] = useState('');
+  const [model, setModel] = useState(settings.aiModel);
+
+  useEffect(() => {
+    api.aiKeySaved().then(setSaved, () => setSaved(false));
+  }, []);
+  useEffect(() => setModel(settings.aiModel), [settings.aiModel]);
+
+  const saveKey = async (value: string | null) => {
+    try {
+      setSaved(await api.setAiKey(value));
+      setKey('');
+      toast(value ? 'AI Gateway key saved' : 'AI Gateway key removed');
+    } catch (e) {
+      toast(`Couldn’t save the key: ${e instanceof Error ? e.message : e}`);
+    }
+  };
+
+  const saveModel = async () => {
+    if (model.trim() === settings.aiModel) return;
+    try {
+      await updateSettings({ aiModel: model.trim() });
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e));
+      setModel(settings.aiModel);
+    }
+  };
+
+  return (
+    <div className="settings-group">
+      <h3>Find times</h3>
+      <div className="form-row">
+        <label htmlFor="ai-key">AI Gateway key</label>
+        <div className="form-inline">
+          <input
+            id="ai-key"
+            className="input"
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            style={{ maxWidth: 260 }}
+            placeholder={saved ? 'Saved · paste to replace' : 'Paste your Vercel AI Gateway key'}
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && key.trim()) void saveKey(key);
+            }}
+          />
+          <button type="button" className="btn btn-primary" disabled={!key.trim()} onClick={() => void saveKey(key)}>
+            Save
+          </button>
+          {saved && (
+            <button type="button" className="btn btn-ghost" onClick={() => void saveKey(null)}>
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="form-row">
+        <label htmlFor="ai-model">Model</label>
+        <input
+          id="ai-model"
+          className="input"
+          spellCheck={false}
+          style={{ maxWidth: 260 }}
+          value={model}
+          placeholder="openai/gpt-6-luna"
+          onChange={(e) => setModel(e.target.value)}
+          onBlur={() => void saveModel()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void saveModel();
+          }}
+        />
+      </div>
+      <span className="hint">
+        {saved === false && 'Add a key to use Find times. '}
+        Find times reads the meeting times an email proposes and checks them against your calendars. When you press it, that one email’s text (with the quoted thread,
+        subject and sender’s name) is sent to the Vercel AI Gateway and the model above. Nothing is sent otherwise, and your calendar never leaves this device. The key
+        is kept in the {isMac ? 'Keychain' : 'Windows Credential Manager'}.
+      </span>
+    </div>
+  );
+}
+
 function GeneralTab() {
   const { settings, updateSettings, disk } = useApp();
   return (
@@ -181,6 +270,7 @@ function GeneralTab() {
         </div>
         <span className="hint">The calendar shades the hours outside these.</span>
       </div>
+      <FindTimesGroup />
       <div className="settings-group">
         <h3>Spelling</h3>
         <label className="check">

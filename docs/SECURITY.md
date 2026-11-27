@@ -29,8 +29,20 @@ It does **not** request:
 - **On the user's device only.** Mail and calendar are stored in a local SQLite database per account under the user's app data folder. By default this holds 6 months of full messages and a rolling calendar window of 3 months back and 12 months forward.
 - **Disk encryption.** The app relies on full-disk encryption (BitLocker or FileVault) and shows whether it is on in Settings; it does not warn when it is off.
 - **Tokens.** Sign-in tokens are kept in the operating system's credential store (Windows Credential Manager or macOS Keychain), never in files.
-- **No Coda & Co servers in the path.** The app talks directly to `login.microsoftonline.com` and `graph.microsoft.com`; no mail, calendar data or tokens are sent to Coda & Co or anyone else.
+- **No Coda & Co servers in the path.** The app talks directly to `login.microsoftonline.com` and `graph.microsoft.com`; no mail, calendar data or tokens are sent to Coda & Co, and nothing goes anywhere else except as described under "Find times" below.
 - **Removing the account** in the app deletes its local database, cached attachments and tokens.
+
+## Find times (optional, off by default)
+
+"Find times" reads the meeting times an email proposes and checks them against the user's calendar. It is off until the user adds their own Vercel AI Gateway key in Settings.
+
+- **Only on request.** Nothing is sent until the user presses Find times on a message.
+- **What is sent:** that one message's text (including the quoted earlier messages in it), its subject, the sender's display name, the user's own display name, when it was sent and the user's time zone. Email addresses, attachments and other messages are not sent.
+- **Where it goes:** `ai-gateway.vercel.sh`, which passes it to the model chosen in Settings (OpenAI's `gpt-6-luna` by default). Vercel's and the model provider's terms for that key apply; the gateway lists the model as not training on requests.
+- **What is not sent:** the calendar. The times the model returns are checked against the calendar on the device.
+- **The key** is stored in the operating system's credential store, beside the sign-in tokens.
+
+Organisations that don't want email content to reach an AI provider should ask users not to add a key; without one the feature does nothing.
 
 ## How to approve
 
