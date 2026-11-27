@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, Clock, LoaderCircle, MapPin, Video } from 'lucide-react';
+import { Check, Clock, LoaderCircle, MapPin, Reply, ReplyAll, Video } from 'lucide-react';
 import { api } from '../api';
 import type { CalendarEvent, EventField, EventInput, ResponseStatus } from '../api/types';
 import { useApp } from '../state/app';
@@ -18,6 +18,7 @@ import { RsvpButtons, type Rsvp, type RsvpOptions } from '../components/RsvpButt
 import { eventActions, isPending, webEventSource } from '../lib/webCalendar';
 import { durationLabel } from '../lib/timeEntry';
 import { isBlankHtml, stripMeetingBlock } from '../lib/meetingBody';
+import { canReplyToEvent, eventReply, replyAllDiffers, type EventReplyMode } from '../lib/eventReply';
 
 type Mode = 'day' | 'week' | 'month';
 const HOUR = 56;
@@ -94,6 +95,36 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
       toast(`Couldn’t respond: ${e instanceof Error ? e.message : e}`);
     }
   };
+  // Email the people on the invite. Web accounts send from Outlook on the web, so they don't get this.
+  const withAttendees = { ...event, attendees: webAttendees };
+  const myEmail = acc?.email ?? '';
+  const canReply = !fromWeb && canReplyToEvent(withAttendees, myEmail);
+  const showReplyAll = canReply && replyAllDiffers(withAttendees, myEmail);
+  const replyTo = async (mode: EventReplyMode) => {
+    try {
+      const r = eventReply(withAttendees, myEmail, mode);
+      const d = await api.createDraft({ mode: 'new', accountId: event.accountId });
+      await api.updateDraft({ ...d, to: r.to, cc: r.cc, subject: r.subject, edited: true });
+      await api.popOut('draft', d.id);
+      onClose();
+    } catch (e) {
+      toast(`Couldn’t start the email: ${e instanceof Error ? e.message : e}`);
+    }
+  };
+  const replyButtons = canReply && (
+    <>
+      <button type="button" className="btn" onClick={() => void replyTo('reply')} title="Email the organiser">
+        <Reply size={16} aria-hidden />
+        Reply
+      </button>
+      {showReplyAll && (
+        <button type="button" className="btn" onClick={() => void replyTo('replyAll')} title="Email everyone on the invite">
+          <ReplyAll size={16} aria-hidden />
+          Reply all
+        </button>
+      )}
+    </>
+  );
   return (
     <Modal
       className="event-modal"
@@ -123,10 +154,13 @@ function EventModal({ event, onClose, onChanged, onEdit, onDeleted }: { event: C
             >
               {event.attendees.length > 1 ? 'Cancel event' : 'Delete'}
             </button>
+            {replyButtons}
             <button type="button" className="btn" onClick={onEdit}>
               Edit
             </button>
           </>
+        ) : canReply ? (
+          replyButtons
         ) : undefined
       }
     >
