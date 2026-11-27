@@ -338,7 +338,7 @@ export function buildDemoState(now: Date): DemoState {
     calendars,
     events,
     signatures,
-    settings: { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show', workStart: 9 * 60, workEnd: 18 * 60, spellcheck: true, autocorrect: true, spellingLanguage: 'en-GB', dictionary: [] },
+    settings: { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show', workStart: 9 * 60, workEnd: 18 * 60, spellcheck: true, autocorrect: true, autocapitalize: true, spellingLanguage: 'en-GB', dictionary: [] },
     serverOnly,
   };
 }

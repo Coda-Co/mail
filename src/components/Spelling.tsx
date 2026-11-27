@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 import { createPortal } from 'react-dom';
 import { BookPlus, EyeOff, Undo2 } from 'lucide-react';
 import { checkerFor, ignoreWord, onDictionaryChange, type SpellingLanguage } from '../lib/dictionary';
-import { autocorrection, BOUNDARY, misspellings, startsSentence, suggestionsFor, type Checker } from '../lib/spelling';
+import { autocorrection, BOUNDARY, capitalFor, capitalised, finishedWord, misspellings, startsSentence, suggestionsFor, type Checker } from '../lib/spelling';
 import { useCommand } from '../lib/commands';
 import { keyLabel, isMac } from '../lib/platform';
 import { matches } from '../lib/shortcuts';
@@ -49,6 +49,23 @@ function blockOf(node: Node, root: HTMLElement): Element {
   return b && root.contains(b) ? b : root;
 }
 
+/**
+ * Up to `max` characters of text before a point, in the same paragraph, with
+ * line breaks and nested blocks as \n. Formatting splits text into several
+ * nodes, so the node the caret is in alone can't say where a sentence starts.
+ */
+function textBefore(root: HTMLElement, node: Node, offset: number, max = 60): string {
+  const block = blockOf(node, root);
+  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let out = '';
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n === node) return (out + (n as Text).data.slice(0, offset)).slice(-max);
+    if (n.nodeType === Node.TEXT_NODE) out = (out + (n as Text).data).slice(-max);
+    else if ((n as Element).matches(`br, ${BLOCK}`)) out = '\n';
+  }
+  return out;
+}
+
 function caret(): { node: Node; offset: number } | null {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return null;
@@ -85,6 +102,8 @@ interface Correction {
   corrected: string;
   /** When it was made: the mark shows for a moment, then only on click. */
   at: number;
+  /** Only a capital at the start of a sentence: not marked, and undoing it ignores nothing. */
+  capitalOnly?: boolean;
 }
 
 const MARK_MS = 3000;
@@ -96,6 +115,8 @@ type Card =
 export interface SpellingOptions {
   spellcheck: boolean;
   autocorrect: boolean;
+  /** Capitalise the first word of a sentence when it's finished. */
+  autocapitalize: boolean;
   language: SpellingLanguage;
   /** Save a word to the user's dictionary. */
   addWord: (word: string) => void;
@@ -240,7 +261,9 @@ export function useSpelling(editor: RefObject<HTMLDivElement>, opts: SpellingOpt
 
     const onBeforeInput = (e: InputEvent) => {
       justCorrected.current = null;
-      if (!checker || !optsRef.current.autocorrect || e.isComposing) return;
+      const o = optsRef.current;
+      const fixing = !!checker && o.autocorrect;
+      if ((!fixing && !o.autocapitalize) || e.isComposing) return;
       const ends = e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak' || (e.inputType === 'insertText' && e.data !== null && BOUNDARY.test(e.data));
       if (!ends) return;
       const at = caret();
@@ -248,24 +271,29 @@ export function useSpelling(editor: RefObject<HTMLDivElement>, opts: SpellingOpt
       const skip = at.node.parentElement?.closest(SKIP);
       if (skip && root.contains(skip)) return;
       const text = (at.node as Text).data;
-      let start = at.offset;
-      while (start > 0 && /[\p{L}'’]/u.test(text[start - 1])) start--;
-      const word = text.slice(start, at.offset).replace(/^['’]+/, '');
-      start = at.offset - word.length;
-      // Only a whole word standing on its own: not part of an address, a number or a path.
-      if (!word || /[\p{L}\d]/u.test(text[at.offset] ?? '') || /[\d@/\\._#-]/.test(text[start - 1] ?? '')) return;
-      const fixed = autocorrection(word, checker, startsSentence(text, start));
-      if (!fixed) return;
+      const boundary = e.inputType === 'insertText' ? e.data! : '\n';
+      const found = finishedWord(text, at.offset, o.autocapitalize ? boundary : '');
+      if (!found) return;
+      const { word, start, end, afterStop } = found;
+      const before = textBefore(root, at.node, start);
+      // A word ended by a stop was already checked for typos when the stop was typed.
+      let fixed = fixing && !afterStop ? autocorrection(word, checker!, startsSentence(before + word, before.length)) : null;
+      const capital = o.autocapitalize && boundary !== '.' ? capitalFor(fixed ?? word, before) : null;
+      if (capital) fixed = capital;
+      if (!fixed || fixed === word) return;
       e.preventDefault();
-      replaceRange(rangeAt(at.node, start, at.offset), fixed);
+      replaceRange(rangeAt(at.node, start, end), fixed);
       // The editor may have split or replaced the text node, so measure from the caret.
-      const end = caret();
-      if (!end || end.offset < fixed.length) return;
-      const range = rangeAt(end.node, end.offset - fixed.length, end.offset);
+      const wordEnd = caret();
+      if (!wordEnd || wordEnd.offset < fixed.length) return;
+      const range = rangeAt(wordEnd.node, wordEnd.offset - fixed.length, wordEnd.offset);
+      // Put the caret back after the stop before typing what was typed.
+      if (afterStop) window.getSelection()?.collapse(wordEnd.node, Math.min(wordEnd.offset + (at.offset - end), wordEnd.node.textContent?.length ?? 0));
       if (e.inputType === 'insertText') document.execCommand('insertText', false, e.data!);
       else document.execCommand(e.inputType === 'insertParagraph' ? 'insertParagraph' : 'insertLineBreak');
-      const correction: Correction = { range, original: word, corrected: fixed, at: Date.now() };
-      corrections.current.push(correction);
+      const capitalOnly = fixed === capitalised(word);
+      const correction: Correction = { range, original: word, corrected: fixed, at: Date.now(), capitalOnly };
+      if (!capitalOnly) corrections.current.push(correction);
       const after = caret();
       if (after) justCorrected.current = { correction, node: after.node, offset: after.offset };
       showCorrected();
@@ -337,7 +365,7 @@ export function useSpelling(editor: RefObject<HTMLDivElement>, opts: SpellingOpt
       window.getSelection()?.collapse(at.node, Math.min(restoreOffset, at.node.textContent?.length ?? restoreOffset));
       corrections.current = corrections.current.filter((x) => x !== c);
       justCorrected.current = null;
-      ignoreWord(c.original);
+      if (!c.capitalOnly) ignoreWord(c.original);
       showCorrected();
     };
 
@@ -417,6 +445,53 @@ export function useSpelling(editor: RefObject<HTMLDivElement>, opts: SpellingOpt
   const recheck = useCallback(() => schedule(0), [schedule]);
 
   return { card: view, nativeSpellcheck: opts.spellcheck && !highlightsSupported, recheck };
+}
+
+/**
+ * Capitals for a one-line text field such as the subject: the first word of a
+ * sentence, and days and months. Backspace straight after puts the word back.
+ * The change is typed in, so onChange and undo work as usual. Returns
+ * the field's ref.
+ */
+export function useFieldCapitals(enabled: boolean): (el: HTMLInputElement | null) => void {
+  const [el, setEl] = useState<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (!el || !enabled) return;
+    let just: { caret: number; start: number; original: string; corrected: string } | null = null;
+    const onBeforeInput = (e: InputEvent) => {
+      just = null;
+      if (e.isComposing || e.inputType !== 'insertText' || !e.data || !BOUNDARY.test(e.data) || e.data === '.') return;
+      const at = el.selectionStart;
+      if (at === null || at !== el.selectionEnd) return;
+      const found = finishedWord(el.value, at, e.data);
+      const fixed = found && capitalFor(found.word, el.value.slice(0, found.start));
+      if (!found || !fixed) return;
+      // Typed into the field, so it joins the undo history and React hears it.
+      e.preventDefault();
+      el.setSelectionRange(found.start, found.end);
+      document.execCommand('insertText', false, fixed);
+      el.setSelectionRange(at, at);
+      document.execCommand('insertText', false, e.data);
+      just = { caret: at + e.data.length, start: found.start, original: found.word, corrected: fixed };
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      const j = just;
+      if (e.key !== 'Shift') just = null;
+      if (e.key !== 'Backspace' || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey || !j) return;
+      if (el.selectionStart !== j.caret || el.selectionEnd !== j.caret || el.value.slice(j.start, j.start + j.corrected.length) !== j.corrected) return;
+      e.preventDefault();
+      el.setSelectionRange(j.start, j.start + j.corrected.length);
+      document.execCommand('insertText', false, j.original);
+      el.setSelectionRange(j.caret, j.caret);
+    };
+    el.addEventListener('beforeinput', onBeforeInput);
+    el.addEventListener('keydown', onKeyDown);
+    return () => {
+      el.removeEventListener('beforeinput', onBeforeInput);
+      el.removeEventListener('keydown', onKeyDown);
+    };
+  }, [el, enabled]);
+  return setEl;
 }
 
 function caretFromPoint(x: number, y: number): { node: Node; offset: number } | null {

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import nspell from 'nspell';
-import { autocorrection, isSlip, misspellings, shouldCheck, startsSentence, suggestionsFor, tokenize, TYPOS, type Checker } from './spelling';
+import { autocorrection, capitalFor, capitalisesAfter, capitalised, capsSlip, finishedWord, isSlip, misspellings, shouldCheck, startsSentence, suggestionsFor, tokenize, TYPOS, type Checker } from './spelling';
 
 function load(pkg: string): Checker {
   const dir = new URL(`../../node_modules/${pkg}/`, import.meta.url);
@@ -103,5 +103,63 @@ describe('autocorrection', () => {
     expect(isSlip('backend', 'backed')).toBe(false);
     expect(isSlip('async', 'sync')).toBe(false);
     expect(isSlip('teh', 'ten')).toBe(false);
+  });
+});
+
+describe('capitals at the start of sentences', () => {
+  it('starts a sentence at the start, after . ! ? and on a new line', () => {
+    for (const before of ['', '  ', '“', '(', 'Done. ', 'Really?  ', 'Great! "', 'Hi Sam,\n', 'Thanks.\n\n', 'It is (nearly) done.) ', 'He said “no.” ', '1. ']) {
+      expect(capitalisesAfter(before)).toBe(true);
+    }
+  });
+
+  it('leaves mid-sentence words, abbreviations, initials and ellipses alone', () => {
+    for (const before of ['Hi ', 'Hi Sam, ', 'apples, e.g. ', 'pears etc. ', 'see Dr. ', 'J. ', 'well... ', 'well… ', 'it is example.', 'done.', '- ', 'cf. ', 'at 9 a.m. ']) {
+      expect(capitalisesAfter(before)).toBe(false);
+    }
+  });
+
+  it('capitalises plain lower-case words only', () => {
+    expect(capitalised('thanks')).toBe('Thanks');
+    expect(capitalised('don’t')).toBe('Don’t');
+    expect(capitalised('a')).toBe('A');
+    expect(capitalised('Thanks')).toBe(null);
+    expect(capitalised('iPhone')).toBe(null);
+    expect(capitalised('eBay')).toBe(null);
+  });
+});
+
+describe('days, months and the word a boundary finishes', () => {
+  it('capitalises days and months anywhere, but not the ones that are also words', () => {
+    expect(capitalFor('monday', 'see you ')).toBe('Monday');
+    expect(capitalFor('sept', 'back in ')).toBe('Sept');
+    expect(capitalFor('june', '')).toBe('June');
+    for (const w of ['may', 'march', 'sat', 'sun', 'wed']) expect(capitalFor(w, 'we ')).toBe(null);
+    expect(capitalFor('may', 'Done. ')).toBe('May');
+    expect(capitalFor('report', 'the ')).toBe(null);
+  });
+
+  it('finds the finished word, looking past a stop only once a space is typed', () => {
+    expect(finishedWord('hi there', 8, ' ')).toEqual({ word: 'there', start: 3, end: 8, afterStop: false });
+    expect(finishedWord('so ok.', 6, ' ')).toEqual({ word: 'ok', start: 3, end: 5, afterStop: true });
+    expect(finishedWord('so ok.)', 7, ' ')?.word).toBe('ok');
+    expect(finishedWord('so ok.', 6, ',')).toBe(null);
+    expect(finishedWord('see example.com', 15, ' ')).toBe(null);
+    expect(finishedWord('mail a@b', 8, ' ')).toBe(null);
+    expect(finishedWord('so e.g.', 7, ' ')).toBe(null);
+  });
+});
+
+describe('slips of Shift and Caps Lock', () => {
+  it('puts them right when the fix is a word', () => {
+    expect(capsSlip('THanks', gb)).toBe('Thanks');
+    expect(capsSlip('tHANKS', gb)).toBe('Thanks');
+    expect(capsSlip('WEdnesday', gb)).toBe('Wednesday');
+    expect(autocorrection('THe', gb, true)).toBe(null); // too short to tell from an acronym
+    expect(autocorrection('THanks', gb, false)).toBe('Thanks');
+  });
+
+  it('leaves acronyms, plurals of acronyms and mixed-case names alone', () => {
+    for (const w of ['IDs', 'URLs', 'APIs', 'PDFs', 'iOS', 'mRNA', 'KPI', 'THANKS', 'PhD', 'McDonald', 'iPhone', 'eBay', 'OAuth', 'VMware', 'MHz', 'SQLite']) expect(capsSlip(w, gb)).toBe(null);
   });
 });

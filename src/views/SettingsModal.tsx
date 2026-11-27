@@ -191,6 +191,10 @@ function GeneralTab() {
           <input type="checkbox" checked={settings.autocorrect} onChange={(e) => updateSettings({ autocorrect: e.target.checked })} />
           Correct common typos as I type
         </label>
+        <label className="check">
+          <input type="checkbox" checked={settings.autocapitalize} onChange={(e) => updateSettings({ autocapitalize: e.target.checked })} />
+          Capitalise sentences, days and months
+        </label>
         <div className="form-row">
           <label htmlFor="spelling-language">Language</label>
           <select
@@ -205,7 +209,7 @@ function GeneralTab() {
           </select>
         </div>
         <span className="hint">
-          Click an underlined word for suggestions, or press {keyLabel('Mod+;')} to go to the next one. Backspace straight after a correction puts back what you typed.
+          Click an underlined word for suggestions, or press {keyLabel('Mod+;')} to go to the next one. Backspace straight after a correction or capital puts back what you typed.
         </span>
         {settings.dictionary.length > 0 && <OwnWords />}
       </div>

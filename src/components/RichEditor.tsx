@@ -47,6 +47,7 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(function RichEdito
   const { card, nativeSpellcheck, recheck } = useSpelling(el, {
     spellcheck: !!spelling && settings.spellcheck,
     autocorrect: !!spelling && settings.autocorrect,
+    autocapitalize: !!spelling && settings.autocapitalize,
     language: settings.spellingLanguage,
     addWord,
   });
@@ -96,6 +97,7 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(function RichEdito
         // Our own spell check draws its own marks; the web view's would double them up.
         spellCheck={spelling ? nativeSpellcheck : undefined}
         autoCorrect={spelling && settings.autocorrect ? 'off' : undefined}
+        autoCapitalize={spelling && settings.autocapitalize ? 'off' : undefined}
         className={`rich-editor ${className ?? ''}`}
         contentEditable
         suppressContentEditableWarning

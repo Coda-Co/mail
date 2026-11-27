@@ -257,6 +257,9 @@ impl AppDb {
         if let Some(v) = p.autocorrect {
             s.autocorrect = v;
         }
+        if let Some(v) = p.autocapitalize {
+            s.autocapitalize = v;
+        }
         if let Some(v) = &p.spelling_language {
             if !["en-GB", "en-US"].contains(&v.as_str()) {
                 return Err(Error::Invalid(format!("spellingLanguage {v}")));
@@ -433,7 +436,7 @@ mod tests {
         db.conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('app', ?1)", [r#"{"theme":"dark","notifications":true,"ctrlF":"forward","remoteImageSenders":[]}"#]).unwrap();
         let s = db.settings().unwrap();
         assert_eq!((s.theme.as_str(), s.work_start, s.work_end), ("dark", 540, 1080));
-        assert!(s.spellcheck && s.autocorrect);
+        assert!(s.spellcheck && s.autocorrect && s.autocapitalize);
         assert_eq!((s.spelling_language.as_str(), s.dictionary.len()), ("en-GB", 0));
     }
 
@@ -442,8 +445,8 @@ mod tests {
         let db = db();
         assert!(db.update_settings(&SettingsPatch { spelling_language: Some("fr".into()), ..Default::default() }).is_err());
         let words = vec!["Mecsia".into(), " motherduck ".into(), "mecsia".into(), "".into(), "two words".into(), "x".repeat(65)];
-        let s = db.update_settings(&SettingsPatch { spelling_language: Some("en-US".into()), autocorrect: Some(false), dictionary: Some(words), ..Default::default() }).unwrap();
+        let s = db.update_settings(&SettingsPatch { spelling_language: Some("en-US".into()), autocorrect: Some(false), autocapitalize: Some(false), dictionary: Some(words), ..Default::default() }).unwrap();
         assert_eq!(s.dictionary, vec!["mecsia".to_string(), "motherduck".to_string()]);
-        assert_eq!((s.spelling_language.as_str(), s.autocorrect, s.spellcheck), ("en-US", false, true));
+        assert_eq!((s.spelling_language.as_str(), s.autocorrect, s.autocapitalize, s.spellcheck), ("en-US", false, false, true));
     }
 }

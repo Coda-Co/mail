@@ -58,6 +58,90 @@ export function startsSentence(text: string, start: number): boolean {
   return true;
 }
 
+/** Abbreviations whose full stop rarely ends a sentence, lower case, without the last stop. */
+const ABBREVIATIONS = new Set(['e.g', 'eg', 'i.e', 'ie', 'etc', 'vs', 'cf', 'approx', 'incl', 'esp', 'mr', 'mrs', 'ms', 'dr', 'prof', 'st', 'fig', 'pp', 'a.m', 'p.m', 'ca', 'viz']);
+
+/**
+ * Whether a word should get a capital as the first of a sentence. `before` is
+ * the text ahead of it in the same paragraph, with line breaks as \n. Stricter
+ * than startsSentence: when in doubt (an abbreviation, an initial, an
+ * ellipsis, a list marker) it says no, so a word is only ever changed when
+ * the sentence clearly starts there. A new line counts, so the line after
+ * "Hi Sam," starts with a capital.
+ */
+export function capitalisesAfter(before: string): boolean {
+  let s = before.replace(/["'“‘(\[]+$/u, '');
+  if (s.trim() === '') return true;
+  const gap = s.match(/\s+$/u);
+  if (!gap) return false;
+  if (gap[0].includes('\n')) return true;
+  s = s.slice(0, -gap[0].length).replace(/[)\]"'”’]+$/u, '');
+  const last = s[s.length - 1];
+  if (last === '!' || last === '?') return true;
+  if (last !== '.') return false;
+  const word = s.slice(0, -1).match(/(\S*)$/u)![1].replace(/^["'“‘(\[]+/u, '');
+  if (word.endsWith('.') || word === '') return false; // an ellipsis, or a stray stop
+  if (/^\p{L}$/u.test(word)) return false; // an initial: J. Smith
+  return !ABBREVIATIONS.has(word.toLowerCase());
+}
+
+/** The word with a capital, if it is plain lower case (not iPhone, eBay or a lone I). */
+export function capitalised(word: string): string | null {
+  const first = word[0];
+  if (!first || first === first.toUpperCase() || word !== word.toLowerCase()) return null;
+  return first.toUpperCase() + word.slice(1);
+}
+
+/** Days and months, which take a capital anywhere. Not may, march, sat, sun or wed, which are words too. */
+const DAYS_AND_MONTHS = new Set(
+  'monday tuesday wednesday thursday friday saturday sunday mon tue tues thu thur thurs fri january february april june july august september october november december jan feb apr jun jul aug sept oct nov dec'.split(' '),
+);
+
+/** The capital a finished lower-case word should get here, if any: as the first of a sentence, or a day or month. */
+export function capitalFor(word: string, before: string): string | null {
+  const fixed = capitalised(word);
+  if (!fixed) return null;
+  return DAYS_AND_MONTHS.has(word) || capitalisesAfter(before) ? fixed : null;
+}
+
+/**
+ * The word a typed boundary finishes, with the caret at `at`. Usually it ends at
+ * the caret; after "ok." (or "ok.)") and a space it ends before the stop, which
+ * is how a word ended by a stop gets its capital (the stop itself never gives
+ * one, or example.com would). Null unless it's a whole word on its own: not part
+ * of an address, a number or a path.
+ */
+export function finishedWord(text: string, at: number, boundary: string): { word: string; start: number; end: number; afterStop: boolean } | null {
+  let end = at;
+  if (/\s/.test(boundary)) {
+    const tail = text.slice(0, end).match(/[.)\]"'”’]+$/u)?.[0] ?? '';
+    if (tail.includes('.')) end -= tail.length;
+  }
+  const afterStop = end < at;
+  let start = end;
+  while (start > 0 && /[\p{L}'’]/u.test(text[start - 1])) start--;
+  const word = text.slice(start, end).replace(/^['’]+/, '');
+  start = end - word.length;
+  if (!word || /[\p{L}\d]/u.test(text[end] ?? '') || /[\d@/\\._#-]/.test(text[start - 1] ?? '')) return null;
+  if (afterStop && /[\p{L}\d]/u.test(text[end + 1] ?? '')) return null;
+  return { word, start, end, afterStop };
+}
+
+/**
+ * "THanks" (Shift held a moment too long) or "tHANKS" (Caps Lock on) as the word
+ * meant, when that is a word. Acronyms with an s (IDs, URLs), short mixed-case
+ * names (iOS) and brands whose fix isn't a word (OAuth, VMware) don't match.
+ */
+export function capsSlip(word: string, checker: Checker): string | null {
+  let fixed: string | null = null;
+  if (/^\p{Lu}{2}[\p{Ll}'’]{2,}$/u.test(word)) fixed = word[0] + word.slice(1).toLowerCase();
+  else if (/^\p{Ll}[\p{Lu}'’]{3,}$/u.test(word)) fixed = word[0].toUpperCase() + word.slice(1).toLowerCase();
+  if (!fixed) return null;
+  // Hunspell is loose about case and calls THanks correct, so only the fix is looked up.
+  const plain = fixed.replace(/’/g, "'");
+  return checker.correct(plain) || checker.correct(plain.toLowerCase()) ? fixed : null;
+}
+
 /**
  * Whether a word is worth checking. Leaves out single letters, acronyms and
  * mixed case (KPI, iPhone, McDonald), and capitalised words in the middle of a
@@ -256,9 +340,12 @@ export function suggestionsFor(word: string, checker: Checker, limit = 4): strin
  * The correction to make as a word is finished, or null to leave it alone.
  * Only near-certain fixes: a known typo, or a misspelling with exactly one
  * dictionary suggestion that is a slip (definately → definitely). Names,
- * acronyms and capitalised words mid-sentence are never touched.
+ * acronyms and capitalised words mid-sentence are never touched. A slip of
+ * Shift or Caps Lock (THanks, tHANKS) is put right.
  */
 export function autocorrection(word: string, checker: Checker, atSentenceStart: boolean): string | null {
+  const caps = capsSlip(word, checker);
+  if (caps) return caps;
   const lower = word.toLowerCase();
   const known = TYPOS[lower];
   if (known) {

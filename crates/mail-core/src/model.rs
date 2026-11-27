@@ -725,6 +725,9 @@ pub struct Settings {
     /// Fix common typos as they're typed.
     #[serde(default = "default_true")]
     pub autocorrect: bool,
+    /// Capitalise the first word of a sentence, and days and months.
+    #[serde(default = "default_true")]
+    pub autocapitalize: bool,
     /// "en-GB" or "en-US".
     #[serde(default = "default_spelling_language")]
     pub spelling_language: String,
@@ -765,6 +768,7 @@ impl Default for Settings {
             work_end: default_work_end(),
             spellcheck: true,
             autocorrect: true,
+            autocapitalize: true,
             spelling_language: default_spelling_language(),
             dictionary: vec![],
         }
@@ -783,6 +787,7 @@ pub struct SettingsPatch {
     pub work_end: Option<u32>,
     pub spellcheck: Option<bool>,
     pub autocorrect: Option<bool>,
+    pub autocapitalize: Option<bool>,
     pub spelling_language: Option<String>,
     pub dictionary: Option<Vec<String>>,
 }

@@ -6,6 +6,7 @@ import { AccountPicker } from './AccountPicker';
 import { AddressField } from './AddressField';
 import { SignaturePicker } from './SignaturePicker';
 import { RichEditor, type RichEditorHandle } from './RichEditor';
+import { useFieldCapitals } from './Spelling';
 import { useToast } from './ui';
 import { useCommand } from '../lib/commands';
 import { MessageBody } from './MessageBody';
@@ -118,7 +119,8 @@ interface Props {
 export function Compose({ initial, layout, onDone, autoFocus }: Props) {
   const { draft, update, replace, save, saveState, touched } = useDraft(initial);
   const toast = useToast();
-  const { sync, openSettings } = useApp();
+  const { sync, openSettings, settings } = useApp();
+  const subjectField = useFieldCapitals(settings.autocapitalize);
   const editor = useRef<RichEditorHandle>(null);
   const root = useRef<HTMLDivElement>(null);
   const [showCc, setShowCc] = useState(initial.cc.length > 0);
@@ -358,7 +360,7 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
   const subjectRow = (isNewLike || layout === 'popout') && (
     <div className="field-row">
       <span className="field-label">Subject</span>
-      <input className="plain" aria-label="Subject" value={draft.subject} onChange={(e) => update({ subject: e.target.value })} />
+      <input ref={subjectField} className="plain" aria-label="Subject" autoCapitalize={settings.autocapitalize ? 'off' : undefined} value={draft.subject} onChange={(e) => update({ subject: e.target.value })} />
     </div>
   );
   const body = (
