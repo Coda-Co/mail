@@ -4,9 +4,9 @@ import { api } from '../api';
 import type { CalendarEvent, Message, MeetingInfo } from '../api/types';
 import { useApp } from '../state/app';
 import { addDays, dayShort, hhmm, monthName, monthShort, sameDay, startOfDay } from '../lib/dates';
-import { eventFill } from '../lib/colors';
+import { eventFill, eventPendingFill } from '../lib/colors';
 import { layoutDay } from '../lib/eventLayout';
-import { eventActions } from '../lib/webCalendar';
+import { eventActions, isPending } from '../lib/webCalendar';
 import { eventTitle } from '../lib/text';
 import { useToast } from './ui';
 import { RsvpButtons, type Rsvp, type RsvpOptions } from './RsvpButtons';
@@ -178,8 +178,8 @@ function DayPreview({
             <button
               key={e.id}
               type="button"
-              className={isInvite(e) ? 'meeting-preview-event invite' : 'meeting-preview-event'}
-              style={{ background: eventFill(e.color, dark), borderLeftColor: e.color }}
+              className={['meeting-preview-event', isInvite(e) && 'invite', isPending(e) && 'pending'].filter(Boolean).join(' ')}
+              style={{ background: isPending(e) ? eventPendingFill(e.color, dark) : eventFill(e.color, dark), borderLeftColor: e.color }}
               title={`${eventTitle(e)} · all day${accountName(e) ? ` · ${accountName(e)}` : ''}`}
               onClick={() => onOpen(isInvite(e) && !meeting.event ? undefined : e.id)}
             >
@@ -204,13 +204,13 @@ function DayPreview({
               <button
                 key={e.id}
                 type="button"
-                className={['meeting-preview-event', isInvite(e) && 'invite', declined && 'declined', e.myResponse === 'tentative' && 'tentative'].filter(Boolean).join(' ')}
+                className={['meeting-preview-event', isInvite(e) && 'invite', declined && 'declined', isPending(e) && 'pending'].filter(Boolean).join(' ')}
                 style={{
                   top,
                   height,
                   left: `calc(${(lane / lanes) * 100}% + 1px)`,
                   width: `calc(${100 / lanes}% - 2px)`,
-                  background: eventFill(e.color, dark),
+                  background: isPending(e) ? eventPendingFill(e.color, dark) : eventFill(e.color, dark),
                   borderLeftColor: e.color,
                 }}
                 title={label(e)}

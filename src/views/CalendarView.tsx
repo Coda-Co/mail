@@ -5,7 +5,7 @@ import type { CalendarEvent, EventField, EventInput, ResponseStatus } from '../a
 import { useApp } from '../state/app';
 import { addDays, dayShort, hhmm, longDate, monthName, rangeTitle, sameDay, shortDate, startOfDay, startOfWeek } from '../lib/dates';
 import { now } from '../lib/clock';
-import { eventFill, eventSelectedFill } from '../lib/colors';
+import { eventFill, eventPendingFill, eventSelectedFill } from '../lib/colors';
 import { layoutDay } from '../lib/eventLayout';
 import { EventForm } from './EventForm';
 import { eventWhere } from '../components/Agenda';
@@ -15,7 +15,7 @@ import { TopSearch } from '../components/TopSearch';
 import { CalendarSidebar } from '../components/CalendarSidebar';
 import { Resizer } from '../components/Resizer';
 import { RsvpButtons, type Rsvp, type RsvpOptions } from '../components/RsvpButtons';
-import { eventActions, webEventSource } from '../lib/webCalendar';
+import { eventActions, isPending, webEventSource } from '../lib/webCalendar';
 import { durationLabel } from '../lib/timeEntry';
 import { isBlankHtml, stripMeetingBlock } from '../lib/meetingBody';
 
@@ -512,10 +512,11 @@ export function CalendarView() {
   const title =
     mode === 'month' ? `${monthName(anchor.getMonth())} ${anchor.getFullYear() !== today.getFullYear() ? anchor.getFullYear() : ''}`.trim() : rangeTitle(days[0], days[days.length - 1]);
 
+  // Tentative and unanswered events: washed-out fill and a dashed edge in the calendar's colour.
   const style = (e: CalendarEvent, isSelected: boolean) => ({
-    background: isSelected ? eventSelectedFill(e.color, dark) : eventFill(e.color, dark),
-    border: 'none',
-    borderLeft: `4px solid ${e.color}`,
+    background: isSelected ? eventSelectedFill(e.color, dark) : isPending(e) ? eventPendingFill(e.color, dark) : eventFill(e.color, dark),
+    border: isPending(e) ? `1px dashed ${e.color}` : 'none',
+    borderLeft: `4px ${isPending(e) ? 'dashed' : 'solid'} ${e.color}`,
     outline: isSelected ? '2px solid var(--text)' : undefined,
     outlineOffset: -1,
   });
@@ -704,7 +705,7 @@ export function CalendarView() {
                     <button
                       key={e.id}
                       type="button"
-                      className={`cal-event${e.myResponse === 'declined' ? ' declined' : ''}${e.myResponse === 'tentative' ? ' tentative' : ''}${draggable ? ' draggable' : ''}${isMoving ? ' moving' : ''}${short ? ' short' : ''}`}
+                      className={`cal-event${e.myResponse === 'declined' ? ' declined' : ''}${isPending(e) ? ' pending' : ''}${draggable ? ' draggable' : ''}${isMoving ? ' moving' : ''}${short ? ' short' : ''}`}
                       style={{
                         ...style(e, e.id === selectedId),
                         top: (startMin / 60) * HOUR,
@@ -769,8 +770,8 @@ export function CalendarView() {
                 {d.getDate()}
               </button>
               {list.slice(0, 3).map((e) => (
-                <button key={e.id} type="button" className="month-event" onClick={() => setSelectedId(e.id)} style={e.id === selectedId ? { background: eventFill(e.color, dark) } : undefined}>
-                  <span className="acc-dot" style={{ background: e.color }} />
+                <button key={e.id} type="button" className={`month-event${isPending(e) ? ' pending' : ''}`} onClick={() => setSelectedId(e.id)} style={e.id === selectedId ? { background: eventFill(e.color, dark) } : undefined}>
+                  <span className="acc-dot" style={isPending(e) ? { border: `1.5px dashed ${e.color}` } : { background: e.color }} />
                   {!e.isAllDay && <span className="t">{hhmm(new Date(e.start))}</span>}
                   <span className="s">{eventTitle(e)}</span>
                   {webTag(e)}

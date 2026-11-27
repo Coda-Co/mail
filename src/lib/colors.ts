@@ -24,6 +24,11 @@ export function eventFill(color: string, dark: boolean): string {
   return dark ? mix(color, 0.4, '#1C1A17') : mix(color, 0.32);
 }
 
+/** A tentative or unanswered event: the same colour, washed out. */
+export function eventPendingFill(color: string, dark: boolean): string {
+  return dark ? mix(color, 0.18, '#1C1A17') : mix(color, 0.12);
+}
+
 export function eventSelectedFill(color: string, dark: boolean): string {
   return dark ? mix(color, 0.55, '#1C1A17') : mix(color, 0.48);
 }
