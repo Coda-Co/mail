@@ -1,10 +1,15 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
+
+// The Hunspell dictionaries don't export their .aff/.dic files, so reach them by path.
+const dictionary = (pkg: string) => fileURLToPath(new URL(`./node_modules/${pkg}`, import.meta.url));
 
 // Tauri expects a fixed dev port and a static build in dist/.
 export default defineConfig({
   plugins: [react()],
+  resolve: { alias: { '@dictionary/en-GB': dictionary('dictionary-en-gb'), '@dictionary/en-US': dictionary('dictionary-en') } },
   clearScreen: false,
   server: { port: 1420, strictPort: true, watch: { ignored: ['**/src-tauri/**', '**/crates/**', '**/target/**'] } },
   envPrefix: ['VITE_', 'TAURI_ENV_'],

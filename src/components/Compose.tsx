@@ -353,6 +353,7 @@ export function Compose({ initial, layout, onDone, autoFocus }: Props) {
       ref={editor}
       className="draft-editor"
       label="Message text"
+      spelling
       html={draft.bodyHtml}
       onChange={(bodyHtml) => update({ bodyHtml })}
       placeholder={draft.mode === 'new' ? 'Write your message…' : 'Write your reply…'}

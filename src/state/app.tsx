@@ -63,7 +63,7 @@ function lastMailbox(): string | undefined {
   }
 }
 
-const DEFAULT_SETTINGS: Settings = { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show', workStart: 9 * 60, workEnd: 18 * 60 };
+const DEFAULT_SETTINGS: Settings = { theme: 'light', notifications: true, ctrlF: 'forward', remoteImageSenders: [], remoteImages: 'show', workStart: 9 * 60, workEnd: 18 * 60, spellcheck: true, autocorrect: true, spellingLanguage: 'en-GB', dictionary: [] };
 const DEFAULT_UPDATE: UpdateStatus = { state: 'unavailable', currentVersion: '' };
 const DEFAULT_SYNC: SyncStatus = { online: true, syncing: false, label: 'Loading…', outboxHeld: 0 };
 
@@ -104,10 +104,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ),
     ];
     const net = () => api.syncStatus().then(setSync);
+    // Settings can change in another window (a word added to the dictionary in a pop-out).
+    const focus = () => api.getSettings().then(setSettings).catch(() => {});
+    window.addEventListener('focus', focus);
     window.addEventListener('online', net);
     window.addEventListener('offline', net);
     return () => {
       offs.forEach((off) => off());
+      window.removeEventListener('focus', focus);
       window.removeEventListener('online', net);
       window.removeEventListener('offline', net);
     };

@@ -50,7 +50,15 @@ function load(): DemoState {
         const parsed = JSON.parse(raw) as DemoState;
         if (parsed.version === DEMO_VERSION) {
           // Settings added since this state was saved take their defaults.
-          parsed.settings = { ...parsed.settings, remoteImages: parsed.settings.remoteImages ?? 'show' };
+          const st = parsed.settings;
+          parsed.settings = {
+            ...st,
+            remoteImages: st.remoteImages ?? 'show',
+            spellcheck: st.spellcheck ?? true,
+            autocorrect: st.autocorrect ?? true,
+            spellingLanguage: st.spellingLanguage ?? 'en-GB',
+            dictionary: st.dictionary ?? [],
+          };
           return recount(parsed);
         }
       }
@@ -947,6 +955,7 @@ export const demoApi: MailApi = {
     return clone({ ...state.settings, workStart: state.settings.workStart ?? 9 * 60, workEnd: state.settings.workEnd ?? 18 * 60 });
   },
   async updateSettings(patch) {
+    if (patch.dictionary) patch = { ...patch, dictionary: [...new Set(patch.dictionary.map((w) => w.trim().toLowerCase()).filter((w) => w && !/\s/.test(w)))].sort() };
     Object.assign(state.settings, patch);
     save();
     return clone(state.settings);
